@@ -1,0 +1,154 @@
+/**
+ * AuthContext — multi-barista authentication via Supabase
+ *
+ * - Credentials checked against the `baristas` table
+ * - Station auto-assigned on first login (Cart 1, Cart 2, etc.)
+ * - Session tracked in `barista_sessions` table
+ * - Session lives in memory — logout or restart clears it
+ * - Printer assignment is now DEVICE-SPECIFIC via `barista_device_printers` table
+ */
+
+import React, { createContext, useContext, useState } from 'react';
+import { supabase } from './supabase';
+import { saveDefaultPrinter } from './printerConfig';
+import { getDeviceId } from './deviceId';
+
+const AuthContext = createContext(null);
+
+const STATION_NAMES = [
+  'Cart 1', 'Cart 2', 'Cart 3', 'Cart 4', 'Cart 5',
+  'Cart 6', 'Cart 7', 'Cart 8', 'Cart 9', 'Cart 10',
+];
+
+export function AuthProvider({ children }) {
+  const [isAdmin, setIsAdmin] = useState(false);
+  const [barista, setBarista] = useState(null);
+  const [authError, setAuthError] = useState('');
+  const [authLoading, setAuthLoading] = useState(false);
+
+  const login = async (username, password) => {
+    setAuthLoading(true);
+    setAuthError('');
+
+    try {
+      const { data, error } = await supabase
+        .from('baristas')
+        .select('*')
+        .eq('username', username.trim().toLowerCase())
+        .eq('password', password)
+        .eq('active', true)
+        .single();
+
+      if (error || !data) {
+        setAuthError('Incorrect username or password.');
+        setAuthLoading(false);
+        return false;
+      }
+
+      // Auto-assign station if not already set
+      let station = data.station;
+      if (!station) {
+        station = await assignStation(data.id);
+      }
+
+      // Load printer assigned to this barista account (shared across all devices)
+      const { data: baristaWithPrinter } = await supabase
+        .from('baristas')
+        .select(`
+          printer_id,
+          printers (
+            id, name, ip, port, model, printer_type, supports_auto_cut
+          )
+        `)
+        .eq('id', data.id)
+        .single();
+
+      if (baristaWithPrinter?.printers) {
+        const printer = baristaWithPrinter.printers;
+        await saveDefaultPrinter({
+          id: printer.id,
+          ip: printer.ip,
+          port: printer.port || 9100,
+          name: printer.name,
+          model: printer.model || null,
+          printer_type: printer.printer_type || null,
+          supports_auto_cut: printer.supports_auto_cut === true,
+        });
+        console.log('[Auth] Loaded barista printer:', printer.name, printer.ip);
+      } else {
+        console.log('[Auth] No printer assigned to this barista account');
+      }
+
+      // Record login session
+      await supabase.from('barista_sessions').insert({
+        barista_id: data.id,
+        station,
+      });
+
+      const baristaData = { ...data, station };
+      setBarista(baristaData);
+      setIsAdmin(true);
+      setAuthLoading(false);
+      return true;
+
+    } catch (err) {
+      console.warn('[Auth] Login error:', err.message);
+      setAuthError('Login failed. Please check your connection.');
+      setAuthLoading(false);
+      return false;
+    }
+  };
+
+  const logout = async () => {
+    if (barista?.id) {
+      await supabase
+        .from('barista_sessions')
+        .update({ logged_out_at: new Date().toISOString() })
+        .eq('barista_id', barista.id)
+        .is('logged_out_at', null);
+
+      // Clear station assignment so it can be reused
+      await supabase
+        .from('baristas')
+        .update({ station: null })
+        .eq('id', barista.id);
+    }
+    setIsAdmin(false);
+    setBarista(null);
+    setAuthError('');
+  };
+
+  return (
+    <AuthContext.Provider value={{
+      isAdmin, barista,
+      isOwner: barista?.role === 'owner' || barista?.username === 'admin',
+      login, logout,
+      authError, authLoading, setAuthError,
+    }}>
+      {children}
+    </AuthContext.Provider>
+  );
+}
+
+async function assignStation(baristaId) {
+  try {
+    const { data: activeSessions } = await supabase
+      .from('barista_sessions')
+      .select('station')
+      .is('logged_out_at', null);
+
+    const taken = new Set((activeSessions || []).map((s) => s.station));
+    const station = STATION_NAMES.find((s) => !taken.has(s)) || `Cart ${Date.now()}`;
+
+    await supabase.from('baristas').update({ station }).eq('id', baristaId);
+    return station;
+  } catch {
+    return 'Cart 1';
+  }
+}
+
+export function useAuth() {
+  const ctx = useContext(AuthContext);
+  if (!ctx) throw new Error('useAuth must be used within AuthProvider');
+  return ctx;
+}

@@ -1,0 +1,162 @@
+/**
+ * CoffeeIcons.js
+ *
+ * Reusable icon components using @expo/vector-icons.
+ * MaterialCommunityIcons (MCI) and Ionicons cover all our coffee/UI needs.
+ *
+ * Usage:
+ *   import { CupIcon, BaristaIcon, OrdersIcon } from './CoffeeIcons';
+ *   <CupIcon size={24} color={colors.primary} />
+ */
+
+import React from 'react';
+import { MaterialCommunityIcons as MCI } from '@expo/vector-icons';
+import { Ionicons } from '@expo/vector-icons';
+
+// ── Menu / drink icons ──────────────────────────────────
+
+/** Hot espresso / short black */
+export const EspressoIcon = ({ size = 24, color = '#006D80' }) => (
+  <MCI name="coffee" size={size} color={color} />
+);
+
+/** Latte, flat white, cappuccino */
+export const LatteIcon = ({ size = 24, color = '#006D80' }) => (
+  <MCI name="coffee-outline" size={size} color={color} />
+);
+
+/** Iced / cold drinks */
+export const IcedCupIcon = ({ size = 24, color = '#006D80' }) => (
+  <MCI name="cup-outline" size={size} color={color} />
+);
+
+/** Hot chocolate / mocha */
+export const HotChocIcon = ({ size = 24, color = '#006D80' }) => (
+  <MCI name="cup-water" size={size} color={color} />
+);
+
+/** Chai / specialty */
+export const ChaiIcon = ({ size = 24, color = '#006D80' }) => (
+  <MCI name="tea-outline" size={size} color={color} />
+);
+
+/** Tea */
+export const TeaIcon = ({ size = 24, color = '#006D80' }) => (
+  <MCI name="tea" size={size} color={color} />
+);
+
+/** Takeaway cup — used for Order tab */
+export const TakeawayCupIcon = ({ size = 24, color = '#006D80' }) => (
+  <MCI name="coffee-to-go-outline" size={size} color={color} />
+);
+
+// ── Navigation icons ────────────────────────────────────
+
+/** Orders & Profile tab */
+export const ReceiptIcon = ({ size = 24, color = '#006D80' }) => (
+  <MCI name="receipt" size={size} color={color} />
+);
+
+/** Barista tab */
+export const BaristaIcon = ({ size = 24, color = '#006D80' }) => (
+  <MCI name="chef-hat" size={size} color={color} />
+);
+
+// ── Operator / settings icons ───────────────────────────
+
+/** Printer */
+export const PrinterIcon = ({ size = 24, color = '#006D80' }) => (
+  <MCI name="printer-outline" size={size} color={color} />
+);
+
+/** Settings gear */
+export const SettingsIcon = ({ size = 24, color = '#006D80' }) => (
+  <MCI name="cog-outline" size={size} color={color} />
+);
+
+/** WiFi / network scan */
+export const WifiIcon = ({ size = 24, color = '#006D80' }) => (
+  <MCI name="wifi" size={size} color={color} />
+);
+
+/** QR scanner */
+export const QrScanIcon = ({ size = 24, color = '#006D80' }) => (
+  <MCI name="qrcode-scan" size={size} color={color} />
+);
+
+/** Logout */
+export const LogoutIcon = ({ size = 24, color = '#006D80' }) => (
+  <MCI name="logout" size={size} color={color} />
+);
+
+/** Menu / items */
+export const MenuIcon = ({ size = 24, color = '#006D80' }) => (
+  <MCI name="menu" size={size} color={color} />
+);
+
+/** Toggle / switch */
+export const ToggleIcon = ({ size = 24, color = '#006D80' }) => (
+  <MCI name="toggle-switch-outline" size={size} color={color} />
+);
+
+// ── Form / profile icons ────────────────────────────────
+
+/** User / person */
+export const UserIcon = ({ size = 24, color = '#006D80' }) => (
+  <MCI name="account-outline" size={size} color={color} />
+);
+
+/** Email */
+export const EmailIcon = ({ size = 24, color = '#006D80' }) => (
+  <MCI name="email-outline" size={size} color={color} />
+);
+
+/** Lock / password */
+export const LockIcon = ({ size = 24, color = '#006D80' }) => (
+  <MCI name="lock-outline" size={size} color={color} />
+);
+
+/** Trash / delete */
+export const TrashIcon = ({ size = 24, color = '#006D80' }) => (
+  <MCI name="trash-can-outline" size={size} color={color} />
+);
+
+/** Bell / notification */
+export const BellIcon = ({ size = 24, color = '#006D80' }) => (
+  <MCI name="bell-outline" size={size} color={color} />
+);
+
+/** Check / complete */
+export const CheckIcon = ({ size = 24, color = '#006D80' }) => (
+  <MCI name="check-circle-outline" size={size} color={color} />
+);
+
+/** Add / plus */
+export const AddIcon = ({ size = 24, color = '#006D80' }) => (
+  <MCI name="plus-circle-outline" size={size} color={color} />
+);
+
+/** Edit / pencil */
+export const EditIcon = ({ size = 24, color = '#006D80' }) => (
+  <MCI name="pencil-outline" size={size} color={color} />
+);
+
+/** Coffee beans */
+export const BeansIcon = ({ size = 24, color = '#006D80' }) => (
+  <MCI name="seed-outline" size={size} color={color} />
+);
+
+/** Analytics / chart */
+export const AnalyticsIcon = ({ size = 24, color = '#006D80' }) => (
+  <MCI name="chart-bar" size={size} color={color} />
+);
+
+/** Back arrow */
+export const BackIcon = ({ size = 24, color = '#006D80' }) => (
+  <Ionicons name="chevron-back" size={size} color={color} />
+);
+
+/** Forward / chevron */
+export const ChevronIcon = ({ size = 24, color = '#006D80' }) => (
+  <Ionicons name="chevron-forward" size={size} color={color} />
+);

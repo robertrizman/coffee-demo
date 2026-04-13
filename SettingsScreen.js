@@ -1,0 +1,898 @@
+import React, { useState, useEffect, useRef } from 'react';
+import {
+  View, Text, ScrollView, TouchableOpacity,
+  StyleSheet, SafeAreaView, Alert, Platform,
+  Animated, Easing, Switch, Image, Modal, TextInput,
+} from 'react-native';
+import { useNavigation } from '@react-navigation/native';
+import * as Print from 'expo-print';
+import { trackSettingsOpen, trackPrinterTest } from './tealium';
+import { buildLabelsHtml, buildQrDebugHtml } from './printing';
+import { useAuth } from './AuthContext';
+import { supabase } from './supabase';
+import { saveDefaultPrinter, loadDefaultPrinter, clearDefaultPrinter, saveAutoPrint, loadAutoPrint, saveShorthand, loadShorthand, saveAutoCut, loadAutoCut } from './printerConfig';
+import { scanForPrinters, getDeviceIP, deriveSubnet } from './printerScanner';
+import StoreHoursManager from './StoreHoursManager';
+import PushBroadcastScreen from './PushBroadcastScreen';
+import { colors, typography, spacing, radius, shadow } from './theme';
+import Svg, { Path } from 'react-native-svg';
+
+function TealiumTabIcon({ active }) {
+  const fill = active ? '#fff' : colors.textMuted;
+  return (
+    <Svg viewBox="0 0 99 23.8" width={28} height={7} style={{ marginBottom: 3 }}>
+      <Path fill={fill} d="m3.82,8.22c-.02-1-.51-1.81-1.09-1.8-.58.01-1.04.83-1.02,1.84.02,1,.51,1.8,1.09,1.79.58-.01,1.04-.83,1.02-1.83Z"/>
+      <Path fill={fill} d="m1.72,5.51c-.02-.89-.41-1.61-.89-1.6C.36,3.92-.02,4.65,0,5.55c.02.89.42,1.61.89,1.6.47,0,.85-.74.83-1.63Z"/>
+      <Path fill={fill} d="m8.72,5.19c.9.27,1.33,1.51.96,2.79-.37,1.28-1.41,2.1-2.31,1.84-.91-.27-1.33-1.51-.97-2.79.38-1.28,1.42-2.1,2.32-1.84Z"/>
+      <Path fill={fill} d="m5.45,2.25c.71.19,1.04,1.28.72,2.42-.31,1.14-1.14,1.91-1.85,1.72-.71-.19-1.03-1.27-.72-2.42.31-1.14,1.15-1.91,1.85-1.71Z"/>
+      <Path fill={fill} d="m2.97,0c.5.11.71,1.07.48,2.16-.23,1.09-.82,1.89-1.32,1.78-.49-.1-.71-1.07-.48-2.16C1.89.7,2.48-.09,2.97,0Z"/>
+      <Path fill={fill} d="m6.3,11.95c-.02,1.13-.67,2.04-1.46,2.03-.78-.01-1.4-.95-1.38-2.08.02-1.14.67-2.05,1.46-2.03.78.01,1.4.95,1.38,2.08Z"/>
+      <Path fill={fill} d="m3.82,15.58c-.02,1-.51,1.81-1.09,1.8-.58-.01-1.04-.83-1.02-1.84.02-1,.51-1.8,1.09-1.79.58.01,1.04.83,1.02,1.83Z"/>
+      <Path fill={fill} d="m1.72,18.28c-.02.89-.41,1.61-.89,1.6-.47,0-.85-.74-.83-1.63.02-.89.42-1.61.89-1.6.47,0,.85.74.83,1.63Z"/>
+      <Path fill={fill} d="m14.54,11.95c-.03,1.42-1.2,2.55-2.62,2.53-1.42-.03-2.55-1.2-2.53-2.62.03-1.42,1.2-2.55,2.62-2.53,1.42.03,2.55,1.2,2.53,2.62Z"/>
+      <Path fill={fill} d="m8.72,18.6c.9-.27,1.33-1.51.96-2.79-.37-1.28-1.41-2.1-2.31-1.84-.91.27-1.33,1.51-.97,2.79.38,1.28,1.42,2.1,2.32,1.84Z"/>
+      <Path fill={fill} d="m5.45,21.54c.71-.19,1.04-1.28.72-2.42-.31-1.14-1.14-1.91-1.85-1.72-.71.19-1.03,1.27-.72,2.42.31,1.14,1.15,1.91,1.85,1.71Z"/>
+      <Path fill={fill} d="m2.97,23.79c.5-.11.71-1.07.48-2.16-.23-1.09-.82-1.89-1.32-1.78-.49.1-.71,1.07-.48,2.16.23,1.09.82,1.88,1.32,1.78Z"/>
+      <Path fill={fill} d="m28.48,9.02h-4.13v7.11h-2.3v-7.11h-4.08v-1.89h10.51v1.89Z"/>
+      <Path fill={fill} d="m39.59,16.13h-8.92V7.12h8.92v1.89h-6.62v1.71h5.84v1.79h-5.84v1.78h6.62v1.82Z"/>
+      <Path fill={fill} d="m53.34,16.13h-2.45l-.88-1.82h-5.48l-.91,1.82h-2.38l4.61-9.01h2.85l4.64,9.01Zm-4.15-3.49l-1.9-3.62-1.92,3.62h3.82Z"/>
+      <Path fill={fill} d="m62.92,16.13h-8.14V7.12h2.3v7.02h5.85v1.99Z"/>
+      <Path fill={fill} d="m67.11,16.13h-2.3V7.12h2.3v9.01Z"/>
+      <Path fill={fill} d="m80.4,12.36c0,2.98-1.4,3.92-5.53,3.92s-5.4-.8-5.4-3.92v-5.24h2.25v5.09c0,1.91,1.1,2.11,3.16,2.11,1.93,0,3.27-.34,3.27-2.11v-5.09h2.26v5.24Z"/>
+      <Path fill={fill} d="m97.12,16.13h-2.45l-1.11-7-2.81,7h-2.61l-2.75-7-1.13,7h-2.37l1.58-9.01h3.41l2.55,6.6,2.71-6.6h3.38l1.61,9.01Z"/>
+    </Svg>
+  );
+}
+
+export default function SettingsScreen() {
+  const navigation = useNavigation();
+  const { barista, isOwner } = useAuth();
+
+  const [defaultPrinter, setDefaultPrinter] = useState(null);
+  const [deviceIP, setDeviceIP] = useState(null);
+  const [autoPrintEnabled, setAutoPrintEnabled] = useState(false);
+  const [shorthandEnabled, setShorthandEnabled] = useState(false);
+  const [activeTab, setActiveTab] = useState('hours');
+  const [autoCutEnabled, setAutoCutEnabled] = useState(false);
+
+  // Scanner state
+  const [scanning, setScanning] = useState(false);
+  const [scanProgress, setScanProgress] = useState(0);
+  const [scanTotal, setScanTotal] = useState(254);
+  const [broadcastVisible, setBroadcastVisible] = useState(false);
+  const [foundPrinters, setFoundPrinters] = useState([]);
+  const [scanComplete, setScanComplete] = useState(false);
+  const [scanError, setScanError] = useState(null);
+  const scanSignal = useRef({ cancelled: false });
+
+  // Progress bar animation
+  const progressAnim = useRef(new Animated.Value(0)).current;
+
+  useEffect(() => {
+    trackSettingsOpen();
+    loadDefaultPrinter().then(setDefaultPrinter);
+    loadAutoPrint().then(setAutoPrintEnabled);
+    loadShorthand().then(setShorthandEnabled);
+    loadAutoCut().then(setAutoCutEnabled);
+    getDeviceIP().then(setDeviceIP);
+  }, []);
+
+  useEffect(() => {
+    Animated.timing(progressAnim, {
+      toValue: scanTotal > 0 ? scanProgress / scanTotal : 0,
+      duration: 200,
+      useNativeDriver: false,
+    }).start();
+  }, [scanProgress, scanTotal]);
+
+  const startScan = async () => {
+    setScanning(true);
+    setScanProgress(0);
+    setScanComplete(false);
+    setScanError(null);
+    setFoundPrinters([]);
+    progressAnim.setValue(0);
+    scanSignal.current = { cancelled: false };
+
+    try {
+      await scanForPrinters(
+        (scanned, total) => {
+          setScanProgress(scanned);
+          setScanTotal(total);
+        },
+        (printer) => {
+          setFoundPrinters((prev) => {
+            // Keep preferred (Brother QL) at the top
+            const updated = [...prev, printer];
+            return updated.sort((a, b) => (b.isPreferred ? 1 : 0) - (a.isPreferred ? 1 : 0));
+          });
+        },
+        scanSignal.current,
+      );
+    } catch (err) {
+      setScanError(err.message);
+    } finally {
+      setScanning(false);
+      setScanComplete(true);
+    }
+  };
+
+  const stopScan = () => {
+    scanSignal.current.cancelled = true;
+    setScanning(false);
+    setScanComplete(true);
+  };
+
+  const handleSetDefault = async (printer) => {
+    const normalizedPrinter = {
+      ...printer,
+      printer_type: printer.printer_type || (printer.model?.toLowerCase().includes('ql-') ? 'brother_ql' : printer.model?.toLowerCase().includes('mfc-') ? 'brother_mfc' : 'generic'),
+      supports_auto_cut: printer.supports_auto_cut === true || printer.model?.toLowerCase().includes('ql-'),
+    };
+
+    await saveDefaultPrinter(normalizedPrinter);
+    setDefaultPrinter(normalizedPrinter);
+
+    try {
+      // Step 1: Save/update printer in printers table
+      const { data: existing } = await supabase
+        .from('printers')
+        .select('id')
+        .eq('ip', normalizedPrinter.ip)
+        .single();
+
+      const payload = {
+        name: normalizedPrinter.name,
+        ip: normalizedPrinter.ip,
+        port: normalizedPrinter.port || 9100,
+        model: normalizedPrinter.model || null,
+        mac_address: normalizedPrinter.mac || null,
+        printer_type: normalizedPrinter.printer_type || null,
+        supports_auto_cut: normalizedPrinter.supports_auto_cut === true,
+        last_seen_at: new Date().toISOString(),
+      };
+
+      let printerId;
+      if (existing) {
+        await supabase.from('printers').update(payload).eq('ip', normalizedPrinter.ip);
+        printerId = existing.id;
+      } else {
+        const { data: newPrinter } = await supabase.from('printers').insert(payload).select('id').single();
+        printerId = newPrinter?.id;
+      }
+
+      // Step 2: Save printer to barista account (shared across all devices)
+      if (barista?.id && printerId) {
+        await supabase.from('baristas')
+          .update({ printer_id: printerId })
+          .eq('id', barista.id);
+        console.log('[Settings] Saved printer to barista account:', barista.name, printerId);
+      }
+    } catch (err) {
+      console.warn('[Settings] Could not save printer to DB:', err.message);
+    }
+
+    Alert.alert(
+      '✓ Default printer set',
+      `${normalizedPrinter.name} (${normalizedPrinter.ip}) will be used on this device when reachable.`,
+    );
+  };
+
+  const handleClearDefault = () => {
+    Alert.alert('Remove default printer', 'Print jobs will use the native dialog instead.', [
+      { text: 'Cancel', style: 'cancel' },
+      {
+        text: 'Remove', style: 'destructive', onPress: async () => {
+          await clearDefaultPrinter();
+          setDefaultPrinter(null);
+        },
+      },
+    ]);
+  };
+
+  const handleShorthandToggle = async (value) => {
+    setShorthandEnabled(value);
+    await saveShorthand(value);
+  };
+
+  const handleAutoPrintToggle = async (value) => {
+    if (value && !defaultPrinter) {
+      Alert.alert(
+        'No default printer',
+        'Please scan for and set a default printer before enabling auto-print.',
+      );
+      return;
+    }
+    setAutoPrintEnabled(value);
+    await saveAutoPrint(value);
+  };
+
+  const handleTestPrint = async () => {
+    trackPrinterTest('wifi-scan');
+    try {
+      const html = await buildLabelsHtml({
+        id: '#TEST',
+        name: 'Test Print',
+        email: 'test@example.com',
+        placedAt: Date.now(),
+        items: [{ name: 'Flat White', size: 'Medium', milk: 'Oat', extras: [], specialRequest: '' }],
+      }, 'test-visitor');
+      await Print.printAsync({ html });
+    } catch (err) {
+      Alert.alert('Test failed', err.message);
+    }
+  };
+
+  const handleQrDebug = async () => {
+    try {
+      const html = buildQrDebugHtml();
+      await Print.printAsync({ html });
+    } catch (err) {
+      Alert.alert('QR debug failed', err.message);
+    }
+  };
+
+  const subnet = deviceIP ? deriveSubnet(deviceIP) : null;
+  const progressWidth = progressAnim.interpolate({
+    inputRange: [0, 1],
+    outputRange: ['0%', '100%'],
+  });
+
+  const TABS = [
+    { id: 'hours',     icon: '🕐', label: 'Coffee Hours' },
+    { id: 'push',      icon: '🔔', label: 'Push' },
+    { id: 'users',     icon: '👤', label: 'User Access' },
+    { id: 'printer',   icon: '🖨', label: 'Printer' },
+    { id: 'shorthand', icon: '☕', label: 'Shorthand' },
+    { id: 'tealium',   icon: null,  label: 'Tealium' },
+  ];
+
+  return (
+    <SafeAreaView style={styles.safe}>
+      <View style={styles.header}>
+        <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backBtn}>
+          <Text style={styles.backIcon}>‹</Text>
+        </TouchableOpacity>
+        <Text style={styles.title}>Settings</Text>
+        <View style={{ width: 40 }} />
+      </View>
+
+      {/* Horizontal tab nav */}
+      <ScrollView
+        horizontal
+        showsHorizontalScrollIndicator={false}
+        style={styles.tabNav}
+        contentContainerStyle={styles.tabNavContent}
+      >
+        {TABS.map(t => (
+          <TouchableOpacity
+            key={t.id}
+            style={[styles.tabBtn, activeTab === t.id && styles.tabBtnActive]}
+            onPress={() => setActiveTab(t.id)}
+          >
+            {t.icon
+              ? <Text style={styles.tabBtnIcon}>{t.icon}</Text>
+              : <TealiumTabIcon active={activeTab === t.id} />
+            }
+            <Text style={[styles.tabBtnLabel, activeTab === t.id && styles.tabBtnLabelActive]}>{t.label}</Text>
+          </TouchableOpacity>
+        ))}
+      </ScrollView>
+
+      <ScrollView contentContainerStyle={styles.body} showsVerticalScrollIndicator={false}>
+
+        {/* ── Coffee Hours ── */}
+        {activeTab === 'hours' && (
+          <View style={styles.section}>
+            <StoreHoursManager />
+          </View>
+        )}
+
+        {/* ── Push Notifications ── */}
+        {activeTab === 'push' && (
+          <View style={styles.section}>
+            <TouchableOpacity
+              style={styles.broadcastBtn}
+              onPress={() => setBroadcastVisible(true)}
+              activeOpacity={0.85}
+            >
+              <Text style={styles.broadcastBtnText}>📣 Push Notifications Broadcast</Text>
+              <Text style={styles.broadcastBtnSub}>Send custom messages to all customers</Text>
+            </TouchableOpacity>
+          </View>
+        )}
+
+        {/* ── User Access ── */}
+        {activeTab === 'users' && (
+          <View style={styles.section}>
+            {/* ── Signed in as ── */}
+        {barista && (
+          <View style={styles.card}>
+            <View style={styles.cardHeader}>
+              <Text style={styles.cardIcon}>👤</Text>
+              <Text style={styles.cardTitle}>Signed in as</Text>
+            </View>
+            <View style={styles.userInfoRow}>
+              <View style={styles.userAvatar}>
+                <Text style={styles.userAvatarText}>{barista.name?.charAt(0).toUpperCase()}</Text>
+              </View>
+              <View style={{ flex: 1 }}>
+                <Text style={styles.userName}>{barista.name}</Text>
+                <Text style={styles.userMeta}>@{barista.username} · {barista.station || 'No station'}</Text>
+                {isOwner && <Text style={styles.userRole}>Owner</Text>}
+              </View>
+            </View>
+            {isOwner && (
+              <TouchableOpacity
+                style={styles.manageBaristasBtn}
+                onPress={() => navigation.navigate('BaristaManagement')}
+              >
+                <Text style={styles.manageBaristasText}>👥  Manage baristas</Text>
+              </TouchableOpacity>
+            )}
+          </View>
+        )}
+          </View>
+        )}
+
+        {/* ── Printer Setup ── */}
+        {activeTab === 'printer' && (
+          <View style={styles.section}>
+            {/* ── Current Default Printer ── */}
+        <View style={styles.card}>
+          <View style={styles.cardHeader}>
+            <Text style={styles.cardIcon}>🖨</Text>
+            <Text style={styles.cardTitle}>Print station</Text>
+          </View>
+
+          {defaultPrinter ? (
+            <View style={styles.defaultPrinterBox}>
+              <View style={styles.defaultPrinterLeft}>
+                <View style={styles.preferredBadgeRow}>
+                  <Text style={styles.defaultPrinterName}>{defaultPrinter.name}</Text>
+                  {defaultPrinter.isPreferred && (
+                    <View style={styles.qlBadge}>
+                      <Text style={styles.qlBadgeText}>QL Label</Text>
+                    </View>
+                  )}
+                </View>
+                <Text style={styles.defaultPrinterIp}>{defaultPrinter.ip}:{defaultPrinter.port}</Text>
+              </View>
+              <TouchableOpacity style={styles.clearBtn} onPress={handleClearDefault}>
+                <Text style={styles.clearBtnText}>✕</Text>
+              </TouchableOpacity>
+            </View>
+          ) : (
+            <View style={styles.noPrinterBox}>
+              <Text style={styles.noPrinterText}>
+                No default set — will use native print dialog (AirPrint / Mopria)
+              </Text>
+            </View>
+          )}
+        </View>
+            {/* ── WiFi Scanner ── */}
+        <View style={styles.card}>
+          <View style={styles.cardHeader}>
+            <Text style={styles.cardIcon}>📡</Text>
+            <Text style={styles.cardTitle}>Scan for printers</Text>
+          </View>
+
+          {deviceIP ? (
+            <View style={styles.networkInfo}>
+              <Text style={styles.networkInfoText}>
+                📶 Connected — scanning{' '}
+                <Text style={styles.networkInfoHighlight}>{subnet}.1 – {subnet}.254</Text>
+                {' '}on ports 631 & 9100
+              </Text>
+            </View>
+          ) : (
+            <View style={styles.noWifiBox}>
+              <Text style={styles.noWifiText}>
+                ⚠️ Not connected to WiFi. Connect first then scan.
+              </Text>
+            </View>
+          )}
+
+          {/* Scan button */}
+          {!scanning ? (
+            <TouchableOpacity
+              style={[styles.scanBtn, !deviceIP && styles.scanBtnDisabled]}
+              onPress={startScan}
+              disabled={!deviceIP}
+              activeOpacity={0.85}
+            >
+              <Text style={styles.scanBtnText}>
+                {scanComplete && foundPrinters.length === 0 ? '🔄 Scan again' : '🔍 Scan network'}
+              </Text>
+            </TouchableOpacity>
+          ) : (
+            <TouchableOpacity style={styles.stopBtn} onPress={stopScan} activeOpacity={0.85}>
+              <Text style={styles.stopBtnText}>⏹ Stop scan</Text>
+            </TouchableOpacity>
+          )}
+
+          {/* Progress bar */}
+          {(scanning || (scanComplete && scanProgress > 0)) && (
+            <View style={styles.progressWrap}>
+              <View style={styles.progressTrack}>
+                <Animated.View style={[styles.progressFill, { width: progressWidth }]} />
+              </View>
+              <Text style={styles.progressLabel}>
+                {scanning
+                  ? `Scanning ${scanProgress} / ${scanTotal}…`
+                  : `Scanned ${scanProgress} hosts`}
+              </Text>
+            </View>
+          )}
+
+          {/* Scan error */}
+          {scanError && (
+            <View style={styles.errorBox}>
+              <Text style={styles.errorText}>⚠️ {scanError}</Text>
+            </View>
+          )}
+
+          {/* Results */}
+          {foundPrinters.length > 0 && (
+            <View style={styles.resultsWrap}>
+              <Text style={styles.resultsLabel}>
+                {foundPrinters.length} printer{foundPrinters.length !== 1 ? 's' : ''} found
+              </Text>
+              {foundPrinters.map((printer, i) => {
+                const isDefault = defaultPrinter?.ip === printer.ip;
+                return (
+                  <View
+                    key={printer.ip}
+                    style={[
+                      styles.printerResult,
+                      printer.isPreferred && styles.printerResultPreferred,
+                      i < foundPrinters.length - 1 && styles.printerResultBorder,
+                    ]}
+                  >
+                    <View style={styles.printerResultLeft}>
+                      <View style={styles.printerResultNameRow}>
+                        <Text style={styles.printerResultName}>{printer.name}</Text>
+                        {printer.isPreferred && (
+                          <View style={styles.qlBadge}>
+                            <Text style={styles.qlBadgeText}>QL Label</Text>
+                          </View>
+                        )}
+                      </View>
+                      <Text style={styles.printerResultIp}>{printer.ip}:{printer.port}</Text>
+                    </View>
+                    {isDefault ? (
+                      <View style={styles.defaultTag}>
+                        <Text style={styles.defaultTagText}>Default</Text>
+                      </View>
+                    ) : (
+                      <TouchableOpacity
+                        style={styles.setDefaultBtn}
+                        onPress={() => handleSetDefault(printer)}
+                      >
+                        <Text style={styles.setDefaultBtnText}>Set default</Text>
+                      </TouchableOpacity>
+                    )}
+                  </View>
+                );
+              })}
+            </View>
+          )}
+
+          {/* No printers found after scan */}
+          {scanComplete && foundPrinters.length === 0 && !scanError && !scanning && (
+            <View style={styles.noneFoundBox}>
+              <Text style={styles.noneFoundText}>
+                No printers found on {subnet}.x{'\n'}
+                Make sure your printer is on and connected to the same WiFi.
+              </Text>
+            </View>
+          )}
+        </View>
+            {/* ── Auto-Print Service ── */}
+        <View style={styles.card}>
+          <View style={styles.cardHeader}>
+            <Text style={styles.cardIcon}>⚡</Text>
+            <Text style={styles.cardTitle}>Auto-print service</Text>
+          </View>
+
+          <View style={styles.autoPrintRow}>
+            <View style={styles.autoPrintLeft}>
+              <Text style={styles.autoPrintLabel}>Print on new order</Text>
+              <Text style={styles.autoPrintSub}>
+                Automatically prints a label as soon as a customer places an order
+              </Text>
+            </View>
+            <Switch
+              value={autoPrintEnabled}
+              onValueChange={handleAutoPrintToggle}
+              trackColor={{ false: colors.border, true: colors.primary }}
+              thumbColor="#fff"
+            />
+          </View>
+
+          {autoPrintEnabled && defaultPrinter && (
+            <View style={styles.autoPrintActive}>
+              <Text style={styles.autoPrintActiveText}>
+                ✓ Active — printing to {defaultPrinter.name} ({defaultPrinter.ip})
+              </Text>
+            </View>
+          )}
+
+          {autoPrintEnabled && !defaultPrinter && (
+            <View style={styles.autoPrintWarning}>
+              <Text style={styles.autoPrintWarningText}>
+                ⚠️ No default printer set — scan for printers above first
+              </Text>
+            </View>
+          )}
+
+          {!autoPrintEnabled && (
+            <Text style={styles.cardBody}>
+              When disabled, the barista must tap the print button manually on each order.
+            </Text>
+          )}
+        </View>
+            {/* Auto-cut for Brother QL */}
+            {defaultPrinter?.model?.toLowerCase().includes('ql') && (
+              <View style={styles.card}>
+                <View style={styles.cardHeader}>
+                  <Text style={styles.cardIcon}>✂️</Text>
+                  <Text style={styles.cardTitle}>Auto-cut</Text>
+                </View>
+                <Text style={styles.cardBody}>Automatically cut the label tape after printing. Requires Brother QL-820NWB or compatible model.</Text>
+                <View style={styles.toggleRow}>
+                  <Text style={styles.toggleLabel}>Cut after print</Text>
+                  <Switch
+                    value={autoCutEnabled}
+                    onValueChange={async (v) => {
+                      setAutoCutEnabled(v);
+                      await saveAutoCut(v);
+                    }}
+                    trackColor={{ false: '#e0e0e0', true: colors.primary }}
+                    thumbColor="#fff"
+                  />
+                </View>
+              </View>
+            )}
+            {/* ── Test Print ── */}
+        <View style={styles.card}>
+          <View style={styles.cardHeader}>
+            <Text style={styles.cardIcon}>🧪</Text>
+            <Text style={styles.cardTitle}>Test print</Text>
+          </View>
+          <Text style={styles.cardBody}>
+            Sends a sample label to your default printer, or opens the native print dialog if no default is set.
+          </Text>
+          <TouchableOpacity style={styles.secondaryBtn} onPress={handleTestPrint}>
+            <Text style={styles.secondaryBtnText}>🖨 Print test label</Text>
+          </TouchableOpacity>
+          <TouchableOpacity style={styles.secondaryBtn} onPress={handleQrDebug}>
+            <Text style={styles.secondaryBtnText}>⠿ Print QR debug</Text>
+          </TouchableOpacity>
+        </View>
+          </View>
+        )}
+
+        {/* ── Coffee Shorthand ── */}
+        {activeTab === 'shorthand' && (
+          <View style={styles.section}>
+            {/* ── Label Format ── */}
+        <View style={styles.card}>
+          <View style={styles.cardHeader}>
+            <Text style={styles.cardIcon}>🏷</Text>
+            <Text style={styles.cardTitle}>Label format</Text>
+          </View>
+
+          <View style={styles.autoPrintRow}>
+            <View style={styles.autoPrintLeft}>
+              <Text style={styles.autoPrintLabel}>Shorthand notation</Text>
+              <Text style={styles.autoPrintSub}>
+                Uses Artisti Coffee abbreviations on printed labels — FW, OAT, CAR — instead of full text
+              </Text>
+            </View>
+            <Switch
+              value={shorthandEnabled}
+              onValueChange={handleShorthandToggle}
+              trackColor={{ false: colors.border, true: colors.primary }}
+              thumbColor="#fff"
+            />
+          </View>
+
+          <View style={styles.shorthandPreview}>
+            <View style={styles.shorthandCol}>
+              <Text style={styles.shorthandColLabel}>Full text</Text>
+              <Text style={styles.shorthandExample}>Medium Flat White{'\n'}Oat Milk{'\n'}Caramel syrup</Text>
+            </View>
+            <Text style={styles.shorthandArrow}>→</Text>
+            <View style={styles.shorthandCol}>
+              <Text style={styles.shorthandColLabel}>Shorthand</Text>
+              <Text style={[styles.shorthandExample, styles.shorthandExampleActive]}>M FW{'\n'}OAT{'\n'}CAR</Text>
+            </View>
+          </View>
+        </View>
+          </View>
+        )}
+
+        {/* ── Tealium ── */}
+        {activeTab === 'tealium' && (
+          <View style={styles.section}>
+            {/* ── Tealium info ── */}
+        <View style={styles.card}>
+          <View style={styles.cardHeader}>
+            <Image
+              source={{ uri: 'https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcTSbhZ0mXjyDpaKqKQZJhCFsXaTfjmxmSHiBw&s' }}
+              style={{ width: 28, height: 28, borderRadius: 6 }}
+              resizeMode="contain"
+            />
+            <Text style={styles.cardTitle}>Tealium Profile</Text>
+          </View>
+          <View style={styles.tealiumRows}>
+            {[
+              ['Account', 'success-robert-rizman'],
+              ['Profile', 'coffee-demo'],
+              ['Environment', 'dev'],
+              ['iOS Key', 'xbjzdx'],
+              ['Android Key', 'd9mo8k'],
+            ].map(([label, value]) => (
+              <View key={label} style={styles.tealiumRow}>
+                <Text style={styles.tealiumLabel}>{label}</Text>
+                <Text style={styles.tealiumValue}>{value}</Text>
+              </View>
+            ))}
+          </View>
+        </View>
+          </View>
+        )}
+
+        <View style={{ height: 40 }} />
+      </ScrollView>
+
+      {/* Broadcast Modal */}
+      <Modal visible={broadcastVisible} animationType="slide" presentationStyle="pageSheet">
+        <SafeAreaView style={{ flex: 1, backgroundColor: colors.background }}>
+          <View style={styles.modalHeader}>
+            <Text style={styles.modalTitle}>📣 Broadcast</Text>
+            <TouchableOpacity onPress={() => setBroadcastVisible(false)} style={styles.modalClose}>
+              <Text style={styles.modalCloseText}>✕</Text>
+            </TouchableOpacity>
+          </View>
+          <PushBroadcastScreen onBack={() => setBroadcastVisible(false)} />
+        </SafeAreaView>
+      </Modal>
+    </SafeAreaView>
+  );
+}
+
+const styles = StyleSheet.create({
+  safe: { flex: 1, backgroundColor: colors.background },
+  tabNav: { flexGrow: 0, backgroundColor: colors.surface, borderBottomWidth: 1, borderBottomColor: colors.borderLight },
+  tabNavContent: { paddingHorizontal: spacing.md, paddingVertical: spacing.sm, gap: spacing.sm },
+  tabBtn: {
+    alignItems: 'center', paddingHorizontal: 14, paddingVertical: 8,
+    borderRadius: radius.lg, backgroundColor: colors.background, minWidth: 64,
+  },
+  tabBtnActive: { backgroundColor: colors.primary },
+  tabBtnIcon: { fontSize: 20, marginBottom: 3 },
+  tabBtnLabel: { fontSize: 10, fontWeight: '600', color: colors.textMuted },
+  tabBtnLabelActive: { color: '#fff' },
+  section: { gap: spacing.md },
+  header: {
+    flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
+    paddingHorizontal: spacing.lg, paddingTop: spacing.lg, paddingBottom: spacing.md,
+  },
+  backBtn: { width: 40, height: 40, alignItems: 'center', justifyContent: 'center' },
+  backIcon: { fontSize: 28, color: colors.textDark, fontWeight: '300' },
+  title: { ...typography.heading2 },
+
+  body: { padding: spacing.lg, gap: spacing.lg },
+
+  card: {
+    backgroundColor: colors.surface, borderRadius: radius.lg,
+    padding: spacing.lg, borderWidth: 1, borderColor: colors.borderLight,
+    gap: spacing.md, ...shadow.card,
+  },
+  cardHeader: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
+  cardIcon: { fontSize: 22 },
+  cardTitle: { ...typography.heading3 },
+  cardBody: { ...typography.caption, lineHeight: 20 },
+
+  // Default printer
+  defaultPrinterBox: {
+    flexDirection: 'row', alignItems: 'center',
+    backgroundColor: colors.primaryLight,
+    borderRadius: radius.lg, padding: spacing.md,
+    borderWidth: 1, borderColor: colors.primaryMid,
+  },
+  defaultPrinterLeft: { flex: 1 },
+  preferredBadgeRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm, flexWrap: 'wrap' },
+  defaultPrinterName: { fontSize: 15, fontWeight: '700', color: colors.textDark },
+  defaultPrinterIp: { ...typography.caption, marginTop: 2, fontFamily: 'monospace' },
+  clearBtn: {
+    width: 32, height: 32, borderRadius: radius.full,
+    backgroundColor: '#fef0ee', alignItems: 'center', justifyContent: 'center',
+    borderWidth: 1, borderColor: '#f0c0b8',
+  },
+  clearBtnText: { fontSize: 12, fontWeight: '700', color: '#c0392b' },
+  noPrinterBox: {
+    backgroundColor: colors.surfaceAlt, borderRadius: radius.md,
+    padding: spacing.md, borderWidth: 1, borderColor: colors.border,
+  },
+  noPrinterText: { ...typography.caption, lineHeight: 20 },
+
+  qlBadge: {
+    backgroundColor: '#fff3e0', borderRadius: radius.full,
+    paddingHorizontal: 8, paddingVertical: 3,
+    borderWidth: 1, borderColor: '#e07b39',
+  },
+  qlBadgeText: { fontSize: 10, fontWeight: '700', color: '#e07b39' },
+
+  // Network info
+  networkInfo: {
+    backgroundColor: colors.primaryLight, borderRadius: radius.md,
+    padding: spacing.md, borderWidth: 1, borderColor: colors.primaryMid,
+  },
+  networkInfoText: { fontSize: 13, color: colors.textMid, lineHeight: 20 },
+  networkInfoHighlight: { fontWeight: '700', color: colors.primary, fontFamily: 'monospace' },
+  noWifiBox: {
+    backgroundColor: '#fff8f0', borderRadius: radius.md,
+    padding: spacing.md, borderWidth: 1, borderColor: '#f0c0b8',
+  },
+  noWifiText: { fontSize: 13, color: '#c0392b', lineHeight: 20 },
+
+  // Scan buttons
+  scanBtn: {
+    backgroundColor: colors.primary, borderRadius: radius.lg,
+    paddingVertical: 11, alignItems: 'center',
+  },
+  scanBtnDisabled: { opacity: 0.4 },
+  scanBtnText: { color: '#fff', fontSize: 15, fontWeight: '700' },
+  stopBtn: {
+    backgroundColor: colors.surfaceAlt, borderRadius: radius.lg,
+    paddingVertical: 11, alignItems: 'center',
+    borderWidth: 1.5, borderColor: colors.border,
+  },
+  stopBtnText: { fontSize: 15, fontWeight: '600', color: colors.textMid },
+
+  // Progress
+  progressWrap: { gap: spacing.sm },
+  progressTrack: {
+    height: 6, backgroundColor: colors.borderLight,
+    borderRadius: 3, overflow: 'hidden',
+  },
+  progressFill: {
+    height: '100%', backgroundColor: colors.primary,
+    borderRadius: 3,
+  },
+  progressLabel: { ...typography.caption, color: colors.primary, textAlign: 'center' },
+
+  // Error
+  errorBox: {
+    backgroundColor: '#fef0ee', borderRadius: radius.md,
+    padding: spacing.md, borderWidth: 1, borderColor: '#f0c0b8',
+  },
+  errorText: { fontSize: 13, color: '#c0392b', lineHeight: 20 },
+
+  // Results
+  resultsWrap: {
+    borderRadius: radius.lg, borderWidth: 1,
+    borderColor: colors.borderLight, overflow: 'hidden',
+  },
+  resultsLabel: {
+    ...typography.label, color: colors.primary,
+    paddingHorizontal: spacing.md, paddingVertical: spacing.sm,
+    backgroundColor: colors.primaryLight,
+  },
+  printerResult: {
+    flexDirection: 'row', alignItems: 'center',
+    paddingHorizontal: spacing.md, paddingVertical: 10,
+    backgroundColor: colors.surface,
+  },
+  printerResultPreferred: { backgroundColor: '#fffbf0' },
+  printerResultBorder: { borderBottomWidth: 1, borderBottomColor: colors.borderLight },
+  printerResultLeft: { flex: 1 },
+  printerResultNameRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm, flexWrap: 'wrap' },
+  printerResultName: { fontSize: 14, fontWeight: '600', color: colors.textDark },
+  printerResultIp: { fontSize: 12, color: colors.textMuted, marginTop: 2, fontFamily: 'monospace' },
+  setDefaultBtn: {
+    paddingHorizontal: spacing.md, paddingVertical: spacing.sm,
+    borderRadius: radius.full, backgroundColor: colors.primary,
+  },
+  setDefaultBtnText: { fontSize: 12, fontWeight: '700', color: '#fff' },
+  defaultTag: {
+    paddingHorizontal: spacing.md, paddingVertical: spacing.sm,
+    borderRadius: radius.full, backgroundColor: colors.primaryLight,
+    borderWidth: 1, borderColor: colors.primaryMid,
+  },
+  defaultTagText: { fontSize: 12, fontWeight: '700', color: colors.primary },
+
+  noneFoundBox: {
+    backgroundColor: colors.surfaceAlt, borderRadius: radius.md,
+    padding: spacing.md, borderWidth: 1, borderColor: colors.border,
+  },
+  noneFoundText: { fontSize: 13, color: colors.textMuted, lineHeight: 20, textAlign: 'center' },
+
+  // User info card
+  userInfoRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.md },
+  userAvatar: {
+    width: 48, height: 48, borderRadius: radius.full,
+    backgroundColor: colors.primary, alignItems: 'center', justifyContent: 'center',
+  },
+  userAvatarText: { fontSize: 20, fontWeight: '700', color: '#fff' },
+  userName: { fontSize: 16, fontWeight: '700', color: colors.textDark },
+  userMeta: { ...typography.caption, marginTop: 2 },
+  userRole: { fontSize: 11, fontWeight: '700', color: colors.primary, marginTop: 2 },
+  manageBaristasBtn: {
+    backgroundColor: colors.primaryLight, borderRadius: radius.lg,
+    paddingVertical: 12, alignItems: 'center',
+    borderWidth: 1, borderColor: colors.primaryMid,
+  },
+  manageBaristasText: { fontSize: 14, fontWeight: '700', color: colors.primary },
+
+  // Auto-print
+  autoPrintRow: {
+    flexDirection: 'row', alignItems: 'center', gap: spacing.md,
+  },
+  autoPrintLeft: { flex: 1 },
+  autoPrintLabel: { fontSize: 15, fontWeight: '600', color: colors.textDark },
+  autoPrintSub: { ...typography.caption, marginTop: 2, lineHeight: 18 },
+  autoPrintActive: {
+    backgroundColor: colors.primaryLight, borderRadius: radius.md,
+    padding: spacing.md, borderWidth: 1, borderColor: colors.primaryMid,
+  },
+  autoPrintActiveText: { fontSize: 13, fontWeight: '600', color: colors.primary },
+  autoPrintWarning: {
+    backgroundColor: '#fff8f0', borderRadius: radius.md,
+    padding: spacing.md, borderWidth: 1, borderColor: '#f0c0b8',
+  },
+  autoPrintWarningText: { fontSize: 13, color: '#c0392b' },
+
+  // Shorthand preview
+  shorthandPreview: {
+    flexDirection: 'row', alignItems: 'center',
+    backgroundColor: colors.surfaceAlt, borderRadius: radius.md,
+    padding: spacing.md, borderWidth: 1, borderColor: colors.borderLight,
+    gap: spacing.md,
+  },
+  shorthandCol: { flex: 1 },
+  shorthandColLabel: { ...typography.label, marginBottom: spacing.sm },
+  shorthandExample: {
+    fontSize: 13, color: colors.textMid, lineHeight: 20,
+    fontFamily: 'monospace',
+  },
+  shorthandExampleActive: {
+    fontSize: 15, fontWeight: '700', color: colors.primary,
+    letterSpacing: 0.5,
+  },
+  shorthandArrow: { fontSize: 18, color: colors.textMuted },
+
+  // Test print
+  secondaryBtn: {
+    borderWidth: 1.5, borderColor: colors.border,
+    borderRadius: radius.lg, paddingVertical: 15,
+    alignItems: 'center', backgroundColor: colors.surfaceAlt,
+  },
+  secondaryBtnText: { fontWeight: '600', fontSize: 14, color: colors.textMid },
+
+  // Tealium
+  tealiumRows: { gap: spacing.sm },
+  tealiumRow: { flexDirection: 'row', justifyContent: 'space-between' },
+  tealiumLabel: { ...typography.caption, fontWeight: '600' },
+  tealiumValue: { ...typography.caption, color: colors.primary, fontWeight: '600' },
+  broadcastBtn: {
+    backgroundColor: colors.midnight, borderRadius: radius.xl,
+    padding: spacing.lg, alignItems: 'center', gap: 4,
+  },
+  broadcastBtnText: { color: '#fff', fontSize: 16, fontWeight: '700' },
+  broadcastBtnSub: { color: 'rgba(255,255,255,0.6)', fontSize: 12 },
+  modalHeader: {
+    flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
+    paddingHorizontal: spacing.lg, paddingVertical: spacing.md,
+    borderBottomWidth: 1, borderBottomColor: colors.borderLight,
+  },
+  modalTitle: { ...typography.heading3 },
+  modalClose: {
+    width: 32, height: 32, borderRadius: 16,
+    backgroundColor: colors.lightGray, alignItems: 'center', justifyContent: 'center',
+  },
+  modalCloseText: { fontSize: 14, color: colors.textDark, fontWeight: '600' },
+});

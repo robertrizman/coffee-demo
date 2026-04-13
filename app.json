@@ -1,0 +1,65 @@
+{
+  "expo": {
+    "name": "Coffee Demo",
+    "slug": "tealium-coffee-demo",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "icon": "./assets/images/icon.png",
+    "scheme": "coffeedemo",
+    "userInterfaceStyle": "automatic",
+    "splash": {
+      "image": "./assets/images/splash-icon.png",
+      "resizeMode": "contain",
+      "backgroundColor": "#051838"
+    },
+    "ios": {
+      "supportsTablet": false,
+      "bundleIdentifier": "com.robrizzy.coffeedemo",
+      "infoPlist": {
+        "CFBundleDisplayName": "Coffee Demo",
+        "NSCameraUsageDescription": "Used to scan order QR codes",
+        "NSUserNotificationsUsageDescription": "We'll notify you when your coffee order is ready for pickup"
+      }
+    },
+    "android": {
+      "adaptiveIcon": {
+        "foregroundImage": "./assets/images/adaptive-icon.png",
+        "backgroundColor": "#051838"
+      },
+      "package": "com.robrizzy.coffeedemo",
+      "googleServicesFile": "./google-services.json",
+      "permissions": [
+        "CAMERA",
+        "RECEIVE_BOOT_COMPLETED",
+        "VIBRATE",
+        "android.permission.CAMERA",
+        "android.permission.RECORD_AUDIO"
+      ]
+    },
+    "plugins": [
+      [
+        "expo-camera",
+        {
+          "cameraPermission": "Allow Coffee Demo to access your camera to scan order QR codes."
+        }
+      ],
+      [
+        "expo-notifications",
+        {
+          "icon": "./assets/images/notification-icon.png",
+          "color": "#006D80",
+          "sounds": []
+        }
+      ]
+    ],
+    "experiments": {
+      "typedRoutes": true
+    },
+    "extra": {
+      "router": {},
+      "eas": {
+        "projectId": "e0b60245-0625-41bc-a4b5-248e50f54c91"
+      }
+    }
+  }
+}
