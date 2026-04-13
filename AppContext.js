@@ -6,7 +6,7 @@ import { getDeviceId } from './deviceId';
 import { loadProfile, saveProfile } from './userProfile';
 import { printOrderReceipt } from './printing';
 import { AppState } from 'react-native';
-import { loadAutoPrint } from './printerConfig';
+import { loadDefaultPrinter, loadAutoPrint } from './printerConfig';
 import { setDeviceIdForMoments, onPrismDeviceIdReady, getCanonicalDeviceId } from './tealium';
 import { loadPairingRules } from './recommendations';
 
@@ -131,11 +131,11 @@ function reducer(state, action) {
 
     case 'UPDATE_PROFILE': {
       // Called when user edits their profile — persists to SecureStore
-      const { name, email } = action.payload;
-      saveProfile({ name, email });
+      const { name, email, arc_location_id = null, arc_location_name = null } = action.payload;
+      saveProfile({ name, email, arc_location_id, arc_location_name });
       return {
         ...state,
-        profile: { name, email },
+        profile: { name, email, arc_location_id, arc_location_name },
         currentOrder: { ...state.currentOrder, name, email },
       };
     }
@@ -360,10 +360,13 @@ export function AppProvider({ children }) {
 
         // Auto-print if enabled and a default printer is configured
         try {
-          const autoPrintEnabled = await loadAutoPrint();
-          if (autoPrintEnabled) {
-            console.log('[AutoPrint] Attempting print for order', order.id);
-            await printOrderReceipt(order, '', { silent: true, scanIfNeeded: true });
+          const [autoPrintEnabled, defaultPrinter] = await Promise.all([
+            loadAutoPrint(),
+            loadDefaultPrinter(),
+          ]);
+          if (autoPrintEnabled && defaultPrinter?.ip) {
+            console.log('[AutoPrint] Printing order', order.id, 'to', defaultPrinter.ip);
+            await printOrderReceipt(order, '', { silent: true });
           }
         } catch (err) {
           console.warn('[AutoPrint] Error:', err.message);

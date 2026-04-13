@@ -2,7 +2,7 @@ import React, { useEffect, useState, useCallback } from 'react';
 import {
   View, Text, ScrollView, StyleSheet, SafeAreaView,
   TouchableOpacity, ActivityIndicator, RefreshControl,
-  TextInput, Alert, Clipboard,
+  TextInput, Alert, Modal, Clipboard,
 } from 'react-native';
 import { useApp } from './AppContext';
 import { supabase } from './supabase';
@@ -54,6 +54,18 @@ export default function OrdersProfileScreen() {
   const [editName, setEditName] = useState(profile?.name || '');
   const [editEmail, setEditEmail] = useState(profile?.email || '');
 
+  // Location state
+  const [locations, setLocations] = useState([]);
+  const [locationPickerVisible, setLocationPickerVisible] = useState(false);
+  const [selectedLocationId, setSelectedLocationId] = useState(profile?.arc_location_id || null);
+  const [selectedLocationName, setSelectedLocationName] = useState(profile?.arc_location_name || null);
+  const [toast, setToast] = useState(null);
+
+  const showToast = (msg) => {
+    setToast(msg);
+    setTimeout(() => setToast(null), 2500);
+  };
+
   // Extra historical orders from Supabase not yet in local state
   // (e.g. from a previous app session before Supabase loaded)
   const [remoteOrders, setRemoteOrders] = useState([]);
@@ -93,7 +105,25 @@ export default function OrdersProfileScreen() {
 
   useEffect(() => {
     fetchRemoteOrders();
+    loadLocations();
   }, [fetchRemoteOrders]);
+
+  const loadLocations = async () => {
+    const { data } = await supabase.from('arc_locations').select('*').order('venue_name');
+    setLocations(data || []);
+  };
+
+  const isLocationActive = (loc) => {
+    if (!loc.enabled) return false;
+    const today = new Date();
+    if (loc.start_date && new Date(loc.start_date) > today) return false;
+    if (loc.end_date && new Date(loc.end_date) < today) return false;
+    return true;
+  };
+
+  const currentLocationActive = locations.length > 0 && selectedLocationId
+    ? isLocationActive(locations.find(l => l.id === selectedLocationId) || {})
+    : true;
 
   // Real-time: update status when barista marks order complete
   useEffect(() => {
@@ -114,15 +144,47 @@ export default function OrdersProfileScreen() {
   const handleSaveProfile = () => {
     if (!editName.trim()) { Alert.alert('Name required', 'Please enter your name.'); return; }
     if (!editEmail.trim() || !editEmail.includes('@')) { Alert.alert('Email required', 'Please enter a valid email.'); return; }
-    dispatch({ type: 'UPDATE_PROFILE', payload: { name: editName.trim(), email: editEmail.trim().toLowerCase() } });
+    dispatch({ type: 'UPDATE_PROFILE', payload: {
+      name: editName.trim(),
+      email: editEmail.trim().toLowerCase(),
+      arc_location_id: selectedLocationId,
+      arc_location_name: selectedLocationName,
+    }});
     setEditMode(false);
-    Alert.alert('✓ Saved', 'Your profile has been updated.');
+    // Also update push token with new location
+    if (deviceId) {
+      supabase.from('push_tokens')
+        .update({ arc_location_id: selectedLocationId, updated_at: new Date().toISOString() })
+        .eq('device_id', deviceId)
+        .then(() => console.log('[Profile] Push token location updated'));
+    }
+    showToast('✓ Profile saved');
+  };
+
+  const handleSelectLocation = (loc) => {
+    setSelectedLocationId(loc?.id || null);
+    setSelectedLocationName(loc ? `${loc.venue_name}, ${loc.state}` : null);
+    setLocationPickerVisible(false);
+    // Immediately update push token
+    if (deviceId) {
+      supabase.from('push_tokens')
+        .update({ arc_location_id: loc?.id || null, updated_at: new Date().toISOString() })
+        .eq('device_id', deviceId)
+        .then(() => console.log('[Profile] Push token location updated to:', loc?.venue_name));
+    }
+    showToast(`📍 Location set to ${loc?.venue_name || 'none'}`);
   };
 
   const pendingCount = mergedOrders.filter((o) => o.status === 'pending').length;
 
   return (
     <SafeAreaView style={styles.safe}>
+      {/* Toast notification */}
+      {toast && (
+        <View style={styles.toast} pointerEvents="none">
+          <Text style={styles.toastText}>{toast}</Text>
+        </View>
+      )}
       {/* Header */}
       <View style={styles.header}>
         <View>
@@ -244,6 +306,40 @@ export default function OrdersProfileScreen() {
                     <Text style={styles.profileValue}>{profile?.email || '—'}</Text>
                   </View>
                 </View>
+                <View style={styles.profileDivider} />
+                <View style={styles.profileRow}>
+                  <Text style={styles.profileIcon}>📍</Text>
+                  <View style={styles.profileInfo}>
+                    <Text style={styles.profileLabel}>ARC LOCATION</Text>
+                    {selectedLocationName ? (
+                      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                        <Text style={[styles.profileValue, !currentLocationActive && { color: colors.textMuted }]}>
+                          {selectedLocationName}
+                        </Text>
+                        {!currentLocationActive && (
+                          <View style={styles.locationInactiveBadge}>
+                            <Text style={styles.locationInactiveBadgeText}>⚠️ Needs update</Text>
+                          </View>
+                        )}
+                      </View>
+                    ) : (
+                      <Text style={[styles.profileValue, { color: colors.textMuted }]}>Not set</Text>
+                    )}
+                  </View>
+                </View>
+                {!currentLocationActive && selectedLocationId && (
+                  <View style={styles.locationWarning}>
+                    <Text style={styles.locationWarningText}>
+                      Your Arc location is no longer active. Please update your location to continue receiving relevant notifications.
+                    </Text>
+                    <TouchableOpacity
+                      style={styles.locationUpdateBtn}
+                      onPress={() => setLocationPickerVisible(true)}
+                    >
+                      <Text style={styles.locationUpdateBtnText}>Update location →</Text>
+                    </TouchableOpacity>
+                  </View>
+                )}
                 <TouchableOpacity
                   style={styles.editBtn}
                   onPress={() => {
@@ -285,6 +381,18 @@ export default function OrdersProfileScreen() {
                     autoCorrect={false}
                   />
                 </View>
+                <Text style={styles.fieldLabel}>ARC LOCATION</Text>
+                <TouchableOpacity
+                  style={styles.inputRow}
+                  onPress={() => setLocationPickerVisible(true)}
+                  activeOpacity={0.7}
+                >
+                  <Text style={styles.inputIcon}>📍</Text>
+                  <Text style={[styles.input, { paddingVertical: 0, lineHeight: 48, color: selectedLocationName ? colors.textDark : colors.textMuted }]}>
+                    {selectedLocationName || 'Select location'}
+                  </Text>
+                  <Text style={{ color: colors.textMuted, fontSize: 18, marginRight: 4 }}>›</Text>
+                </TouchableOpacity>
                 <View style={styles.editActions}>
                   <TouchableOpacity style={styles.cancelBtn} onPress={() => setEditMode(false)}>
                     <Text style={styles.cancelBtnText}>Cancel</Text>
@@ -325,6 +433,57 @@ export default function OrdersProfileScreen() {
           <View style={{ height: 40 }} />
         </ScrollView>
       )}
+
+      {/* Location Picker Modal */}
+      <Modal visible={locationPickerVisible} animationType="slide" presentationStyle="pageSheet">
+        <SafeAreaView style={{ flex: 1, backgroundColor: colors.background }}>
+          <View style={styles.modalHeader}>
+            <Text style={styles.modalTitle}>📍 Select Arc Location</Text>
+            <TouchableOpacity onPress={() => setLocationPickerVisible(false)} style={styles.modalCloseBtn}>
+              <Text style={styles.modalCloseBtnText}>✕</Text>
+            </TouchableOpacity>
+          </View>
+          <ScrollView contentContainerStyle={{ padding: spacing.lg, gap: spacing.sm }}>
+            {locations.map(loc => {
+              const active = isLocationActive(loc);
+              const isSelected = selectedLocationId === loc.id;
+              return (
+                <TouchableOpacity
+                  key={loc.id}
+                  style={[
+                    styles.locationItem,
+                    isSelected && styles.locationItemSelected,
+                    !active && styles.locationItemDisabled,
+                  ]}
+                  onPress={() => { if (!active) return; handleSelectLocation(loc); }}
+                  activeOpacity={active ? 0.7 : 1}
+                >
+                  <View style={{ flex: 1 }}>
+                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                      <Text style={[styles.locationItemName, !active && { color: colors.textMuted }]}>
+                        {loc.venue_name}
+                      </Text>
+                      <View style={active ? styles.locationBadgeActive : styles.locationBadgeInactive}>
+                        <Text style={active ? styles.locationBadgeActiveText : styles.locationBadgeInactiveText}>
+                          {active ? 'Active' : 'Unavailable'}
+                        </Text>
+                      </View>
+                    </View>
+                    <Text style={styles.locationItemAddress}>{loc.address}, {loc.state}</Text>
+                    {loc.start_date && (
+                      <Text style={styles.locationItemDates}>
+                        {new Date(loc.start_date).toLocaleDateString('en-AU', { day: 'numeric', month: 'short', year: 'numeric' })}
+                        {loc.end_date ? ` – ${new Date(loc.end_date).toLocaleDateString('en-AU', { day: 'numeric', month: 'short', year: 'numeric' })}` : ''}
+                      </Text>
+                    )}
+                  </View>
+                  {isSelected && <Text style={{ fontSize: 18, color: colors.primary, fontWeight: '700' }}>✓</Text>}
+                </TouchableOpacity>
+              );
+            })}
+          </ScrollView>
+        </SafeAreaView>
+      </Modal>
     </SafeAreaView>
   );
 }
@@ -467,4 +626,58 @@ const styles = StyleSheet.create({
     backgroundColor: colors.primaryLight, alignItems: 'center', justifyContent: 'center',
   },
   copyIcon: { fontSize: 16, color: colors.primary },
+  locationPickerBtn: {
+    flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
+    borderWidth: 1.5, borderColor: colors.border, borderRadius: radius.md,
+    paddingHorizontal: spacing.md, paddingVertical: 12, backgroundColor: colors.surfaceAlt,
+  },
+  locationPickerBtnText: { fontSize: 15, color: colors.textDark, flex: 1 },
+  locationInactiveBadge: {
+    backgroundColor: '#fef3c7', borderRadius: 99, paddingHorizontal: 8, paddingVertical: 2,
+  },
+  locationInactiveBadgeText: { fontSize: 10, fontWeight: '700', color: '#92400e' },
+  locationWarning: {
+    backgroundColor: '#fef3c7', borderRadius: radius.md,
+    padding: spacing.md, gap: spacing.sm,
+    borderWidth: 1, borderColor: '#fcd34d',
+  },
+  locationWarningText: { fontSize: 13, color: '#92400e', lineHeight: 18 },
+  locationUpdateBtn: {
+    backgroundColor: colors.primary, borderRadius: radius.md,
+    paddingVertical: 8, alignItems: 'center',
+  },
+  locationUpdateBtnText: { color: '#fff', fontSize: 13, fontWeight: '700' },
+  modalHeader: {
+    flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
+    paddingHorizontal: spacing.lg, paddingVertical: spacing.md,
+    borderBottomWidth: 1, borderBottomColor: colors.borderLight,
+  },
+  modalTitle: { ...typography.heading3 },
+  modalCloseBtn: {
+    width: 32, height: 32, borderRadius: 16,
+    backgroundColor: colors.surfaceAlt, alignItems: 'center', justifyContent: 'center',
+  },
+  modalCloseBtnText: { fontSize: 14, color: colors.textDark, fontWeight: '600' },
+  locationItem: {
+    flexDirection: 'row', alignItems: 'center',
+    backgroundColor: colors.surface, borderRadius: radius.lg,
+    padding: spacing.md, borderWidth: 1.5, borderColor: colors.borderLight, marginBottom: spacing.sm,
+  },
+  locationItemSelected: { borderColor: colors.primary },
+  locationItemDisabled: { opacity: 0.5 },
+  locationItemName: { fontSize: 15, fontWeight: '700', color: colors.textDark },
+  locationItemAddress: { fontSize: 13, color: colors.textMuted, marginTop: 2 },
+  locationItemDates: { fontSize: 11, color: colors.teal, marginTop: 3, fontWeight: '600' },
+  locationBadgeActive: { backgroundColor: '#dcfce7', borderRadius: 99, paddingHorizontal: 8, paddingVertical: 2 },
+  locationBadgeActiveText: { fontSize: 10, fontWeight: '700', color: '#16a34a' },
+  locationBadgeInactive: { backgroundColor: '#f1f5f9', borderRadius: 99, paddingHorizontal: 8, paddingVertical: 2 },
+  locationBadgeInactiveText: { fontSize: 10, fontWeight: '700', color: colors.textMuted },
+  toast: {
+    position: 'absolute', bottom: 32, alignSelf: 'center',
+    backgroundColor: colors.midnight, borderRadius: radius.full,
+    paddingHorizontal: spacing.lg, paddingVertical: 10,
+    zIndex: 999, shadowColor: '#000', shadowOpacity: 0.2,
+    shadowRadius: 8, elevation: 8,
+  },
+  toastText: { color: '#fff', fontSize: 14, fontWeight: '600' },
 });

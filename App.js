@@ -23,7 +23,7 @@ Notifications.setNotificationHandler({
   }),
 });
 
-async function registerPushToken() {
+async function registerPushToken(arcLocationId = null) {
   console.log('🔔 [Push] Starting registration...');
   
   try {
@@ -47,19 +47,22 @@ async function registerPushToken() {
     const token = tokenData.data;
     console.log('✅ [Push] Token received:', token);
     
-    console.log('📱 [Push] Getting device ID...');
     const deviceId = await getDeviceId();
     console.log('📱 [Push] Device ID:', deviceId);
     
-    console.log('💾 [Push] Saving to Supabase...');
-    const { data, error } = await supabase
+    const upsertData = {
+      device_id: deviceId,
+      push_token: token,
+      platform: Platform.OS,
+      updated_at: new Date().toISOString(),
+    };
+
+    // Only include arc_location_id if provided
+    if (arcLocationId) upsertData.arc_location_id = arcLocationId;
+
+    const { error } = await supabase
       .from('push_tokens')
-      .upsert({
-        device_id: deviceId,
-        push_token: token,
-        platform: Platform.OS,
-        updated_at: new Date().toISOString(),
-      }, { onConflict: 'device_id' });
+      .upsert(upsertData, { onConflict: 'device_id' });
     
     if (error) {
       console.error('❌ [Push] Supabase error:', error);
@@ -69,8 +72,7 @@ async function registerPushToken() {
     console.log('✅ [Push] Token registered successfully!');
     
   } catch (e) {
-    console.error('❌ [Push] Registration failed:', e);
-    console.error('❌ [Push] Error details:', e.message);
+    console.error('❌ [Push] Registration failed:', e.message);
   }
 }
 
@@ -109,7 +111,7 @@ function Root() {
       console.log('✅ [App] Ready state achieved');
       setTimeout(() => {
         console.log('⏰ [App] 2s delay complete, calling registerPushToken');
-        registerPushToken();
+        registerPushToken(profile?.arc_location_id || null);
       }, 2000);
     }
   }, [ready]);

@@ -10,9 +10,9 @@ import * as SecureStore from 'expo-secure-store';
 
 const PROFILE_KEY = 'coffee_demo_user_profile';
 
-export async function saveProfile({ name, email }) {
+export async function saveProfile({ name, email, arc_location_id = null, arc_location_name = null }) {
   try {
-    await SecureStore.setItemAsync(PROFILE_KEY, JSON.stringify({ name, email }));
+    await SecureStore.setItemAsync(PROFILE_KEY, JSON.stringify({ name, email, arc_location_id, arc_location_name }));
   } catch (err) {
     console.warn('[Profile] Save error:', err.message);
   }

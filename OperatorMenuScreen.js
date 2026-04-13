@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import {
   View, Text, ScrollView, Switch, TouchableOpacity,
   StyleSheet, SafeAreaView, Alert, TextInput, Modal,
+  KeyboardAvoidingView, Platform,
 } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
 import { MENU, CATEGORIES, EXTRAS, SIZES, MILK_OPTIONS } from './menu';
@@ -225,56 +226,61 @@ export default function OperatorMenuScreen() {
 
       {/* Add Item Modal */}
       <Modal visible={modalVisible} transparent animationType="slide" onRequestClose={() => setModalVisible(false)}>
-        <View style={styles.modalOverlay}>
-          <View style={styles.modalCard}>
-            <Text style={styles.modalTitle}>Add item</Text>
+        <KeyboardAvoidingView
+          style={{ flex: 1 }}
+          behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+        >
+          <View style={styles.modalOverlay}>
+            <View style={styles.modalCard}>
+              <Text style={styles.modalTitle}>Add item</Text>
 
-            <Text style={styles.fieldLabel}>CATEGORY</Text>
-            <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ maxHeight: 48 }} contentContainerStyle={{ gap: spacing.sm, alignItems: 'center', paddingVertical: 4 }}>
-              {[...ALL_CATEGORIES, ...FOOD_CATEGORIES].map((cat) => (
-                <TouchableOpacity
-                  key={cat}
-                  style={[styles.catChip, newItemCategory === cat && styles.catChipActive]}
-                  onPress={() => setNewItemCategory(cat)}
-                >
-                  <Text style={[styles.catChipText, newItemCategory === cat && styles.catChipTextActive]}>{cat}</Text>
+              <Text style={styles.fieldLabel}>CATEGORY</Text>
+              <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ maxHeight: 48 }} contentContainerStyle={{ gap: spacing.sm, alignItems: 'center', paddingVertical: 4 }}>
+                {[...ALL_CATEGORIES, ...FOOD_CATEGORIES].map((cat) => (
+                  <TouchableOpacity
+                    key={cat}
+                    style={[styles.catChip, newItemCategory === cat && styles.catChipActive]}
+                    onPress={() => setNewItemCategory(cat)}
+                  >
+                    <Text style={[styles.catChipText, newItemCategory === cat && styles.catChipTextActive]}>{cat}</Text>
+                  </TouchableOpacity>
+                ))}
+              </ScrollView>
+
+              <Text style={styles.fieldLabel}>NAME</Text>
+              <TextInput
+                style={styles.modalInput}
+                placeholder="e.g. Oat Flat White"
+                placeholderTextColor={colors.textMuted}
+                value={newItemName}
+                onChangeText={setNewItemName}
+                autoFocus
+              />
+
+              <Text style={styles.fieldLabel}>DESCRIPTION (optional)</Text>
+              <TextInput
+                style={styles.modalInput}
+                placeholder="e.g. Flat white made with oat milk"
+                placeholderTextColor={colors.textMuted}
+                value={newItemDesc}
+                onChangeText={setNewItemDesc}
+              />
+
+              <View style={styles.modalActions}>
+                <TouchableOpacity style={styles.cancelBtn} onPress={() => setModalVisible(false)}>
+                  <Text style={styles.cancelBtnText}>Cancel</Text>
                 </TouchableOpacity>
-              ))}
-            </ScrollView>
-
-            <Text style={styles.fieldLabel}>NAME</Text>
-            <TextInput
-              style={styles.modalInput}
-              placeholder="e.g. Oat Flat White"
-              placeholderTextColor={colors.textMuted}
-              value={newItemName}
-              onChangeText={setNewItemName}
-              autoFocus
-            />
-
-            <Text style={styles.fieldLabel}>DESCRIPTION (optional)</Text>
-            <TextInput
-              style={styles.modalInput}
-              placeholder="e.g. Flat white made with oat milk"
-              placeholderTextColor={colors.textMuted}
-              value={newItemDesc}
-              onChangeText={setNewItemDesc}
-            />
-
-            <View style={styles.modalActions}>
-              <TouchableOpacity style={styles.cancelBtn} onPress={() => setModalVisible(false)}>
-                <Text style={styles.cancelBtnText}>Cancel</Text>
-              </TouchableOpacity>
-              <TouchableOpacity
-                style={[styles.confirmBtn, !newItemName.trim() && styles.confirmBtnDisabled]}
-                onPress={handleAddItem}
-                disabled={!newItemName.trim()}
-              >
-                <Text style={styles.confirmBtnText}>Add item</Text>
-              </TouchableOpacity>
+                <TouchableOpacity
+                  style={[styles.confirmBtn, !newItemName.trim() && styles.confirmBtnDisabled]}
+                  onPress={handleAddItem}
+                  disabled={!newItemName.trim()}
+                >
+                  <Text style={styles.confirmBtnText}>Add item</Text>
+                </TouchableOpacity>
+              </View>
             </View>
           </View>
-        </View>
+        </KeyboardAvoidingView>
       </Modal>
     </SafeAreaView>
   );
@@ -304,6 +310,7 @@ const styles = StyleSheet.create({
   body: { paddingHorizontal: spacing.lg, paddingTop: spacing.sm, gap: spacing.md },
   sectionHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: spacing.xs },
   sectionLabel: { ...typography.label, color: colors.primary },
+  sectionHint: { fontSize: 12, color: colors.textMuted, fontStyle: 'italic', flexShrink: 1, textAlign: 'right' },
   foodHeader: { paddingTop: spacing.sm, borderTopWidth: 1, borderTopColor: colors.border, paddingBottom: spacing.xs },
   foodSectionTitle: { ...typography.label, color: colors.midnight || colors.textDark, marginBottom: 2 },
   emptyFood: {

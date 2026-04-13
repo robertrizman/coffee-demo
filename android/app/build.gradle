@@ -111,6 +111,9 @@ dependencies {
     implementation("com.tealium.prism:prism-lifecycle")
     implementation("com.tealium.prism:prism-moments-api")
 
+    // MediaPipe LLM Inference (Gemini Nano — S24+ only, fails silently on older devices)
+    implementation("com.google.mediapipe:tasks-genai:0.10.14")
+
     def isGifEnabled = (findProperty('expo.gif.enabled') ?: "") == "true";
     def isWebpEnabled = (findProperty('expo.webp.enabled') ?: "") == "true";
     def isWebpAnimatedEnabled = (findProperty('expo.webp.animated') ?: "") == "true";

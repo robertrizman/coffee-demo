@@ -63,22 +63,44 @@ export async function getAIPairing({ orders, customItems }) {
   const milkType = getMilkType(orders);
   const orderCount = orders.length;
 
-  // Try Core ML on iOS
-  if (Platform.OS === 'ios' && FoodPairingModule) {
+  // Build menu items string for LLM prompt
+  const menuItemsJson = customItems
+    ? Object.entries(customItems)
+        .filter(([cat, items]) => ['Morning Tea', 'Lunch', 'Snacks'].includes(cat) && items?.length > 0)
+        .map(([cat, items]) => `${cat}: ${items.join(', ')}`)
+        .join(' | ')
+    : '';
+
+  // Try native module (Gemini Nano on S24+ / Core ML on iOS)
+  if (FoodPairingModule) {
     try {
-      console.log('[FoodPairingAI] Calling Core ML with:', { drinkCategory, milkType, timeOfDay, dayOfWeek });
+      console.log('[FoodPairingAI] Calling native module with:', { drinkCategory, milkType, timeOfDay, dayOfWeek });
       const predictionPromise = FoodPairingModule.predict(
-        drinkCategory, milkType, timeOfDay, dayOfWeek
+        drinkCategory, milkType, timeOfDay, dayOfWeek,
+        Platform.OS === 'android' ? menuItemsJson : ''
       );
+
       const timeoutPromise = new Promise((_, reject) =>
-        setTimeout(() => reject(new Error('timeout')), 3000)
+        setTimeout(() => reject(new Error('timeout')), 5000)
       );
       const result = await Promise.race([predictionPromise, timeoutPromise]);
 
+      // If LLM returned specific items, use them directly
+      if (result.item1 && result.item2) {
+        return {
+          items: [result.item1, result.item2],
+          categories: [result.category1, result.category2],
+          reason: result.reason || null,
+          confidence: result.avgConfidence || 95,
+          source: result.source || 'on-device-llm',
+          engine: result.engine,
+          inputs: { drinkCategory, milkType, timeOfDay, orderCount, dayOfWeek },
+        };
+      }
+
+      // Random Forest returned categories — pick items from menu
       const item1 = pickItemsFromCategory(customItems, result.category1, 1);
       const item2 = pickItemsFromCategory(customItems, result.category2, 1);
-
-      // Avoid duplicates — if same category, pick second item from same category
       const allItems = result.category1 === result.category2
         ? pickItemsFromCategory(customItems, result.category1, 2)
         : [...item1, ...item2];
@@ -86,17 +108,18 @@ export async function getAIPairing({ orders, customItems }) {
       return {
         items: allItems.slice(0, 2),
         categories: [result.category1, result.category2],
+        reason: result.reason || null,
         confidence: result.avgConfidence || Math.round(((result.confidence1 + result.confidence2) / 2) * 100),
-        source: 'on-device',
-        engine: Platform.OS === 'android' ? 'Samsung NPU' : 'Apple Neural Engine',
+        source: result.source || 'on-device',
+        engine: result.engine,
         inputs: { drinkCategory, milkType, timeOfDay, orderCount, dayOfWeek },
       };
     } catch (err) {
-      console.warn('[FoodPairingAI] Core ML error, falling back:', err.message, JSON.stringify(err));
+      console.warn('[FoodPairingAI] Native module error, falling back:', err.message);
     }
   }
 
-  // Rules-based fallback (also used for Android until TFLite bridge is added)
+  // Rules-based fallback
   return getRulesPairing({ drinkCategory, milkType, timeOfDay, orderCount, customItems });
 }
 

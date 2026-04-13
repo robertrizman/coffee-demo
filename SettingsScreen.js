@@ -3,6 +3,7 @@ import {
   View, Text, ScrollView, TouchableOpacity,
   StyleSheet, SafeAreaView, Alert, Platform,
   Animated, Easing, Switch, Image, Modal, TextInput,
+  ActivityIndicator, FlatList, KeyboardAvoidingView,
 } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
 import * as Print from 'expo-print';
@@ -55,6 +56,20 @@ export default function SettingsScreen() {
   const [activeTab, setActiveTab] = useState('hours');
   const [autoCutEnabled, setAutoCutEnabled] = useState(false);
 
+  // Location management state
+  const [locations, setLocations] = useState([]);
+  const [loadingLocations, setLoadingLocations] = useState(false);
+  const [locationModalVisible, setLocationModalVisible] = useState(false);
+  const [editingLocation, setEditingLocation] = useState(null);
+  const [locVenueName, setLocVenueName] = useState('');
+  const [locAddress, setLocAddress] = useState('');
+  const [locState, setLocState] = useState('');
+  const [locEnabled, setLocEnabled] = useState(true);
+  const [locStartDate, setLocStartDate] = useState('');
+  const [locEndDate, setLocEndDate] = useState('');
+  const [locSortOrder, setLocSortOrder] = useState('0');
+  const [savingLocation, setSavingLocation] = useState(false);
+
   // Scanner state
   const [scanning, setScanning] = useState(false);
   const [scanProgress, setScanProgress] = useState(0);
@@ -75,7 +90,75 @@ export default function SettingsScreen() {
     loadShorthand().then(setShorthandEnabled);
     loadAutoCut().then(setAutoCutEnabled);
     getDeviceIP().then(setDeviceIP);
+    loadLocations();
   }, []);
+
+  const loadLocations = async () => {
+    setLoadingLocations(true);
+    const { data } = await supabase.from('arc_locations').select('*').order('sort_order', { ascending: true }).order('created_at', { ascending: true });
+    setLocations(data || []);
+    setLoadingLocations(false);
+  };
+
+  const isLocationActive = (loc) => {
+    if (!loc.enabled) return false;
+    const today = new Date();
+    if (loc.start_date && new Date(loc.start_date) > today) return false;
+    if (loc.end_date && new Date(loc.end_date) < today) return false;
+    return true;
+  };
+
+  const openAddLocation = () => {
+    setEditingLocation(null);
+    setLocVenueName(''); setLocAddress(''); setLocState('');
+    setLocEnabled(true); setLocStartDate(''); setLocEndDate('');
+    setLocSortOrder(String(locations.length));
+    setLocationModalVisible(true);
+  };
+
+  const openEditLocation = (loc) => {
+    setEditingLocation(loc);
+    setLocVenueName(loc.venue_name || '');
+    setLocAddress(loc.address || '');
+    setLocState(loc.state || '');
+    setLocEnabled(loc.enabled !== false);
+    setLocStartDate(loc.start_date || '');
+    setLocEndDate(loc.end_date || '');
+    setLocSortOrder(String(loc.sort_order ?? 0));
+    setLocationModalVisible(true);
+  };
+
+  const saveLocation = async () => {
+    if (!locVenueName.trim()) { Alert.alert('Required', 'Please enter a venue name.'); return; }
+    setSavingLocation(true);
+    const payload = {
+      venue_name: locVenueName.trim(),
+      address: locAddress.trim() || null,
+      state: locState.trim() || null,
+      enabled: locEnabled,
+      start_date: locStartDate.trim() || null,
+      end_date: locEndDate.trim() || null,
+      sort_order: parseInt(locSortOrder) || 0,
+    };
+    if (editingLocation) {
+      await supabase.from('arc_locations').update(payload).eq('id', editingLocation.id);
+    } else {
+      await supabase.from('arc_locations').insert(payload);
+    }
+    setSavingLocation(false);
+    setLocationModalVisible(false);
+    loadLocations();
+  };
+
+  const deleteLocation = (loc) => {
+    Alert.alert('Delete location', `Remove ${loc.venue_name}? This cannot be undone.`, [
+      { text: 'Cancel', style: 'cancel' },
+      { text: 'Delete', style: 'destructive', onPress: async () => {
+        await supabase.from('arc_locations').delete().eq('id', loc.id);
+        loadLocations();
+      }},
+    ]);
+  };
 
   useEffect(() => {
     Animated.timing(progressAnim, {
@@ -239,7 +322,7 @@ export default function SettingsScreen() {
   });
 
   const TABS = [
-    { id: 'hours',     icon: '🕐', label: 'Coffee Hours' },
+    { id: 'hours',     icon: '🕐', label: 'Hours & Locations' },
     { id: 'push',      icon: '🔔', label: 'Push' },
     { id: 'users',     icon: '👤', label: 'User Access' },
     { id: 'printer',   icon: '🖨', label: 'Printer' },
@@ -285,20 +368,65 @@ export default function SettingsScreen() {
         {activeTab === 'hours' && (
           <View style={styles.section}>
             <StoreHoursManager />
+
+            {/* ── Arc Locations ── */}
+            <View style={styles.card}>
+              <View style={styles.cardHeader}>
+                <Text style={styles.cardIcon}>📍</Text>
+                <Text style={styles.cardTitle}>Arc Locations</Text>
+              </View>
+              <Text style={styles.cardBody}>Manage event locations. Customers select their location during onboarding and push notifications can be filtered by location.</Text>
+
+              {loadingLocations ? (
+                <ActivityIndicator color={colors.primary} style={{ marginVertical: 8 }} />
+              ) : locations.length === 0 ? (
+                <Text style={{ color: colors.textMuted, fontSize: 13, marginTop: 4 }}>No locations added yet.</Text>
+              ) : (
+                locations.map(loc => {
+                  const active = isLocationActive(loc);
+                  return (
+                    <View key={loc.id} style={styles.locationRow}>
+                      <View style={{ flex: 1 }}>
+                        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                          <Text style={styles.locationRowName}>{loc.venue_name}</Text>
+                          <View style={[styles.locationBadge, { backgroundColor: active ? '#dcfce7' : '#f1f5f9' }]}>
+                            <Text style={[styles.locationBadgeText, { color: active ? '#16a34a' : colors.textMuted }]}>
+                              {active ? 'Active' : 'Inactive'}
+                            </Text>
+                          </View>
+                        </View>
+                        {loc.address ? <Text style={styles.locationRowAddress}>{loc.address}, {loc.state}</Text> : null}
+                        {loc.start_date ? (
+                          <Text style={styles.locationRowDates}>
+                            {new Date(loc.start_date).toLocaleDateString('en-AU', { day: 'numeric', month: 'short', year: 'numeric' })}
+                            {loc.end_date ? ` – ${new Date(loc.end_date).toLocaleDateString('en-AU', { day: 'numeric', month: 'short', year: 'numeric' })}` : ''}
+                          </Text>
+                        ) : null}
+                      </View>
+                      <View style={{ flexDirection: 'row', gap: 8 }}>
+                        <TouchableOpacity onPress={() => openEditLocation(loc)} style={styles.locationEditBtn}>
+                          <Text style={styles.locationEditBtnText}>Edit</Text>
+                        </TouchableOpacity>
+                        <TouchableOpacity onPress={() => deleteLocation(loc)} style={styles.locationDeleteBtn}>
+                          <Text style={styles.locationDeleteBtnText}>✕</Text>
+                        </TouchableOpacity>
+                      </View>
+                    </View>
+                  );
+                })
+              )}
+
+              <TouchableOpacity style={styles.addLocationBtn} onPress={openAddLocation} activeOpacity={0.8}>
+                <Text style={styles.addLocationBtnText}>+ Add Location</Text>
+              </TouchableOpacity>
+            </View>
           </View>
         )}
 
         {/* ── Push Notifications ── */}
         {activeTab === 'push' && (
           <View style={styles.section}>
-            <TouchableOpacity
-              style={styles.broadcastBtn}
-              onPress={() => setBroadcastVisible(true)}
-              activeOpacity={0.85}
-            >
-              <Text style={styles.broadcastBtnText}>📣 Push Notifications Broadcast</Text>
-              <Text style={styles.broadcastBtnSub}>Send custom messages to all customers</Text>
-            </TouchableOpacity>
+            <PushBroadcastScreen />
           </View>
         )}
 
@@ -659,6 +787,98 @@ export default function SettingsScreen() {
           <PushBroadcastScreen onBack={() => setBroadcastVisible(false)} />
         </SafeAreaView>
       </Modal>
+
+      {/* Location Add/Edit Modal */}
+      <Modal visible={locationModalVisible} animationType="slide" presentationStyle="pageSheet">
+        <SafeAreaView style={{ flex: 1, backgroundColor: colors.background }}>
+        <KeyboardAvoidingView
+          style={{ flex: 1 }}
+          behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+          keyboardVerticalOffset={0}
+        >
+          <View style={[styles.modalHeader, { paddingTop: spacing.xl, paddingBottom: spacing.md }]}>
+            <Text style={styles.modalTitle}>{editingLocation ? '✏️ Edit Location' : '📍 Add Location'}</Text>
+            <TouchableOpacity onPress={() => setLocationModalVisible(false)} style={styles.modalClose}>
+              <Text style={styles.modalCloseText}>✕</Text>
+            </TouchableOpacity>
+          </View>
+          <ScrollView
+            contentContainerStyle={{ padding: spacing.lg, gap: spacing.md, paddingBottom: 120 }}
+            keyboardShouldPersistTaps="handled"
+            showsVerticalScrollIndicator={false}
+          >
+            <Text style={styles.fieldLabel}>VENUE NAME *</Text>
+            <TextInput
+              style={styles.inputField}
+              value={locVenueName}
+              onChangeText={setLocVenueName}
+              placeholder="e.g. Saltbox Café"
+              placeholderTextColor={colors.textMuted}
+            />
+            <Text style={styles.fieldLabel}>ADDRESS</Text>
+            <TextInput
+              style={styles.inputField}
+              value={locAddress}
+              onChangeText={setLocAddress}
+              placeholder="e.g. 123 George St, Sydney"
+              placeholderTextColor={colors.textMuted}
+            />
+            <Text style={styles.fieldLabel}>STATE</Text>
+            <TextInput
+              style={styles.inputField}
+              value={locState}
+              onChangeText={setLocState}
+              placeholder="e.g. NSW"
+              placeholderTextColor={colors.textMuted}
+              autoCapitalize="characters"
+            />
+            <View style={styles.toggleRow}>
+              <View>
+                <Text style={styles.toggleLabel}>Enabled</Text>
+                <Text style={styles.toggleSub}>Location visible to customers</Text>
+              </View>
+              <Switch
+                value={locEnabled}
+                onValueChange={setLocEnabled}
+                trackColor={{ false: '#e0e0e0', true: colors.primary }}
+                thumbColor="#fff"
+              />
+            </View>
+            <Text style={styles.fieldLabel}>START DATE (optional)</Text>
+            <TextInput
+              style={styles.inputField}
+              value={locStartDate}
+              onChangeText={setLocStartDate}
+              placeholder="YYYY-MM-DD"
+              placeholderTextColor={colors.textMuted}
+              keyboardType="numbers-and-punctuation"
+            />
+            <Text style={styles.fieldLabel}>END DATE (optional)</Text>
+            <TextInput
+              style={styles.inputField}
+              value={locEndDate}
+              onChangeText={setLocEndDate}
+              placeholder="YYYY-MM-DD"
+              placeholderTextColor={colors.textMuted}
+              keyboardType="numbers-and-punctuation"
+            />
+            <Text style={{ fontSize: 12, color: colors.textMuted, lineHeight: 16 }}>
+              💡 If start/end dates are set, the location auto-enables/disables based on today's date. Leave blank to use the Enabled toggle only.
+            </Text>
+            <TouchableOpacity
+              style={[styles.saveLocationBtn, savingLocation && { opacity: 0.6 }]}
+              onPress={saveLocation}
+              disabled={savingLocation}
+            >
+              {savingLocation
+                ? <ActivityIndicator color="#fff" size="small" />
+                : <Text style={styles.saveLocationBtnText}>{editingLocation ? 'Save Changes' : 'Add Location'}</Text>
+              }
+            </TouchableOpacity>
+          </ScrollView>
+        </KeyboardAvoidingView>
+        </SafeAreaView>
+      </Modal>
     </SafeAreaView>
   );
 }
@@ -895,4 +1115,48 @@ const styles = StyleSheet.create({
     backgroundColor: colors.lightGray, alignItems: 'center', justifyContent: 'center',
   },
   modalCloseText: { fontSize: 14, color: colors.textDark, fontWeight: '600' },
+  toggleRow: {
+    flexDirection: 'row', alignItems: 'center',
+    justifyContent: 'space-between', paddingVertical: spacing.sm,
+    borderTopWidth: 1, borderTopColor: colors.borderLight, marginTop: spacing.sm,
+  },
+  toggleLabel: { fontSize: 15, fontWeight: '600', color: colors.textDark },
+  toggleSub: { fontSize: 12, color: colors.textMuted, marginTop: 2 },
+  inputField: {
+    borderWidth: 1.5, borderColor: colors.border, borderRadius: radius.md,
+    paddingHorizontal: spacing.md, paddingVertical: 12,
+    fontSize: 15, color: colors.textDark, backgroundColor: colors.surface,
+  },
+  addLocationBtn: {
+    backgroundColor: colors.primary, borderRadius: radius.lg,
+    paddingVertical: 12, alignItems: 'center', marginTop: spacing.sm,
+  },
+  addLocationBtnText: { color: '#fff', fontSize: 15, fontWeight: '700' },
+  saveLocationBtn: {
+    backgroundColor: colors.midnight, borderRadius: radius.lg,
+    paddingVertical: 14, alignItems: 'center', marginTop: spacing.md,
+  },
+  saveLocationBtnText: { color: '#fff', fontSize: 16, fontWeight: '700' },
+  locationRow: {
+    flexDirection: 'row', alignItems: 'flex-start',
+    paddingVertical: spacing.sm, borderTopWidth: 1, borderTopColor: colors.borderLight, gap: spacing.sm,
+  },
+  locationRowInfo: { flex: 1 },
+  locationRowName: { fontSize: 14, fontWeight: '700', color: colors.textDark },
+  locationRowAddress: { fontSize: 12, color: colors.textMuted, marginTop: 2 },
+  locationRowDates: { fontSize: 11, color: colors.teal, marginTop: 2, fontWeight: '600' },
+  locationEditBtn: {
+    paddingHorizontal: spacing.sm, paddingVertical: 6,
+    borderRadius: radius.md, backgroundColor: colors.primaryLight,
+  },
+  locationEditBtnText: { fontSize: 12, fontWeight: '700', color: colors.primary },
+  locationDeleteBtn: {
+    paddingHorizontal: spacing.sm, paddingVertical: 6,
+    borderRadius: radius.md, backgroundColor: '#fee2e2',
+  },
+  locationDeleteBtnText: { fontSize: 12, fontWeight: '700', color: '#ef4444' },
+  locationActiveBadge: { backgroundColor: '#dcfce7', borderRadius: 99, paddingHorizontal: 8, paddingVertical: 2, alignSelf: 'flex-start', marginTop: 4 },
+  locationActiveBadgeText: { fontSize: 10, fontWeight: '700', color: '#16a34a' },
+  locationInactiveBadge: { backgroundColor: '#f1f5f9', borderRadius: 99, paddingHorizontal: 8, paddingVertical: 2, alignSelf: 'flex-start', marginTop: 4 },
+  locationInactiveBadgeText: { fontSize: 10, fontWeight: '700', color: colors.textMuted },
 });

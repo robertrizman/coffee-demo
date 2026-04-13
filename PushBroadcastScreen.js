@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import {
   View, Text, TextInput, TouchableOpacity, StyleSheet,
   ScrollView, Alert, Switch, ActivityIndicator, Platform,
+  Modal, SafeAreaView,
 } from 'react-native';
 import { supabase } from './supabase';
 import { colors, spacing, radius, typography } from './theme';
@@ -18,10 +19,32 @@ export default function PushBroadcastScreen({ onBack }) {
   const [sending, setSending] = useState(false);
   const [broadcasts, setBroadcasts] = useState([]);
   const [loadingHistory, setLoadingHistory] = useState(true);
+  const [locations, setLocations] = useState([]);
+  const [selectedLocationId, setSelectedLocationId] = useState(null);
+  const [locationPickerVisible, setLocationPickerVisible] = useState(false);
 
   useEffect(() => {
     loadBroadcasts();
+    loadLocations();
   }, []);
+
+  const loadLocations = async () => {
+    const { data } = await supabase
+      .from('arc_locations')
+      .select('id, venue_name, state, enabled, start_date, end_date')
+      .order('venue_name');
+    setLocations(data || []);
+  };
+
+  const isLocationActive = (loc) => {
+    if (!loc.enabled) return false;
+    const today = new Date();
+    if (loc.start_date && new Date(loc.start_date) > today) return false;
+    if (loc.end_date && new Date(loc.end_date) < today) return false;
+    return true;
+  };
+
+  const selectedLocation = locations.find(l => l.id === selectedLocationId);
 
   const loadBroadcasts = async () => {
     setLoadingHistory(true);
@@ -68,6 +91,7 @@ export default function PushBroadcastScreen({ onBack }) {
           message: message.trim(),
           scheduled_at: scheduledAt,
           status: scheduledAt ? 'scheduled' : 'pending',
+          arc_location_id: selectedLocationId || null,
         })
         .select()
         .single();
@@ -122,6 +146,7 @@ export default function PushBroadcastScreen({ onBack }) {
   };
 
   return (
+    <>
     <ScrollView style={styles.container} contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
 
       {/* Compose */}
@@ -207,6 +232,26 @@ export default function PushBroadcastScreen({ onBack }) {
           </View>
         )}
 
+        {/* Location filter */}
+        <View style={styles.toggleRow}>
+          <View style={{ flex: 1 }}>
+            <Text style={styles.toggleLabel}>📍 Location filter</Text>
+            <Text style={styles.toggleSub}>
+              {selectedLocation ? `Sending to: ${selectedLocation.venue_name}` : 'Send to all locations'}
+            </Text>
+          </View>
+        </View>
+        <TouchableOpacity
+          style={styles.locationPickerBtn}
+          onPress={() => setLocationPickerVisible(true)}
+          activeOpacity={0.7}
+        >
+          <Text style={styles.locationPickerBtnText}>
+            {selectedLocation ? `📍 ${selectedLocation.venue_name}, ${selectedLocation.state}` : '🌏 All locations'}
+          </Text>
+          <Text style={{ color: colors.textMuted }}>›</Text>
+        </TouchableOpacity>
+
         <TouchableOpacity
           style={[styles.sendBtn, sending && styles.sendBtnDisabled]}
           onPress={handleSend}
@@ -264,6 +309,55 @@ export default function PushBroadcastScreen({ onBack }) {
 
       <View style={{ height: 40 }} />
     </ScrollView>
+
+    {/* Location Picker Modal */}
+    <Modal visible={locationPickerVisible} animationType="slide" presentationStyle="pageSheet">
+      <SafeAreaView style={styles.modalSafe}>
+        <View style={styles.modalHeader}>
+          <Text style={styles.modalTitle}>📍 Filter by Location</Text>
+          <TouchableOpacity onPress={() => setLocationPickerVisible(false)} style={styles.modalClose}>
+            <Text style={styles.modalCloseText}>✕</Text>
+          </TouchableOpacity>
+        </View>
+        <ScrollView contentContainerStyle={{ padding: spacing.lg, gap: spacing.sm }}>
+          {/* All locations option */}
+          <TouchableOpacity
+            style={[styles.locationItem, !selectedLocationId && styles.locationItemSelected]}
+            onPress={() => { setSelectedLocationId(null); setLocationPickerVisible(false); }}
+          >
+            <Text style={styles.locationItemName}>🌏 All locations</Text>
+            <Text style={styles.locationItemAddress}>Send to every registered device</Text>
+            {!selectedLocationId && <Text style={styles.locationItemCheck}>✓</Text>}
+          </TouchableOpacity>
+          {locations.map(loc => {
+            const active = isLocationActive(loc);
+            const isSelected = selectedLocationId === loc.id;
+            return (
+              <TouchableOpacity
+                key={loc.id}
+                style={[styles.locationItem, isSelected && styles.locationItemSelected, !active && styles.locationItemDisabled]}
+                onPress={() => { if (!active) return; setSelectedLocationId(loc.id); setLocationPickerVisible(false); }}
+                activeOpacity={active ? 0.7 : 1}
+              >
+                <View style={{ flex: 1 }}>
+                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                    <Text style={[styles.locationItemName, !active && { color: colors.textMuted }]}>{loc.venue_name}</Text>
+                    <View style={active ? styles.locationBadgeActive : styles.locationBadgeInactive}>
+                      <Text style={active ? styles.locationBadgeActiveText : styles.locationBadgeInactiveText}>
+                        {active ? 'Active' : 'Inactive'}
+                      </Text>
+                    </View>
+                  </View>
+                  <Text style={styles.locationItemAddress}>{loc.address}, {loc.state}</Text>
+                </View>
+                {isSelected && <Text style={styles.locationItemCheck}>✓</Text>}
+              </TouchableOpacity>
+            );
+          })}
+        </ScrollView>
+      </SafeAreaView>
+    </Modal>
+    </>
   );
 }
 
@@ -318,4 +412,38 @@ const styles = StyleSheet.create({
     backgroundColor: '#fee2e2', alignItems: 'center', justifyContent: 'center',
   },
   cancelBtnText: { color: '#ef4444', fontSize: 12, fontWeight: '700' },
+  locationPickerBtn: {
+    flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
+    borderWidth: 1.5, borderColor: colors.border, borderRadius: radius.md,
+    paddingHorizontal: spacing.md, paddingVertical: 12,
+    backgroundColor: colors.surface,
+  },
+  locationPickerBtnText: { fontSize: 14, fontWeight: '600', color: colors.textDark },
+  modalSafe: { flex: 1, backgroundColor: colors.background },
+  modalHeader: {
+    flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
+    paddingHorizontal: spacing.lg, paddingVertical: spacing.md,
+    borderBottomWidth: 1, borderBottomColor: colors.borderLight,
+  },
+  modalTitle: { ...typography.heading3 },
+  modalClose: {
+    width: 32, height: 32, borderRadius: 16,
+    backgroundColor: colors.surfaceAlt, alignItems: 'center', justifyContent: 'center',
+  },
+  modalCloseText: { fontSize: 14, color: colors.textDark, fontWeight: '600' },
+  locationItem: {
+    flexDirection: 'row', alignItems: 'center',
+    backgroundColor: colors.surface, borderRadius: radius.lg,
+    padding: spacing.md, borderWidth: 1.5, borderColor: colors.borderLight,
+    marginBottom: spacing.sm,
+  },
+  locationItemSelected: { borderColor: colors.primary },
+  locationItemDisabled: { opacity: 0.5 },
+  locationItemName: { fontSize: 15, fontWeight: '700', color: colors.textDark },
+  locationItemAddress: { fontSize: 13, color: colors.textMuted, marginTop: 2 },
+  locationItemCheck: { fontSize: 18, color: colors.primary, fontWeight: '700', marginLeft: spacing.sm },
+  locationBadgeActive: { backgroundColor: '#dcfce7', borderRadius: 99, paddingHorizontal: 8, paddingVertical: 2 },
+  locationBadgeActiveText: { fontSize: 10, fontWeight: '700', color: '#16a34a' },
+  locationBadgeInactive: { backgroundColor: '#f1f5f9', borderRadius: 99, paddingHorizontal: 8, paddingVertical: 2 },
+  locationBadgeInactiveText: { fontSize: 10, fontWeight: '700', color: colors.textMuted },
 });

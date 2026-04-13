@@ -12,61 +12,31 @@ const FALLBACK_RULES = {
   'Milk-Based': {
     primary: ['Morning Tea', 'Snacks'],
     keywords: ['flat white', 'latte', 'cappuccino', 'cortado', 'macchiato', 'mocha', 'hot choc'],
-    reasons: [
-      'Milk-based coffees pair beautifully with light pastries and snacks',
-      'The creamy texture of your drink calls for something sweet on the side',
-      'A latte or flat white is elevated by a fresh morning bite',
-      'Smooth milk-based coffee is the perfect match for a light treat',
-      'Your coffee\'s subtle sweetness shines alongside a light snack',
-    ],
+    reason: 'Milk-based coffees pair beautifully with light pastries and snacks',
     timeBoost: { morning: 'Morning Tea', afternoon: 'Snacks', evening: 'Snacks' },
   },
   'Espresso': {
     primary: ['Morning Tea', 'Snacks'],
     keywords: ['espresso', 'long black', 'americano', 'ristretto'],
-    reasons: [
-      'Bold espresso flavours complement sweet morning bites',
-      'The intensity of espresso is balanced by something lightly sweet',
-      'A strong espresso deserves an equally satisfying snack',
-      'Espresso\'s depth pairs perfectly with a buttery pastry',
-      'Cut through the bitterness with a sweet morning treat',
-    ],
+    reason: 'Bold espresso flavours complement sweet morning bites',
     timeBoost: { morning: 'Morning Tea', afternoon: 'Snacks', evening: 'Snacks' },
   },
   'Iced & Cold': {
     primary: ['Snacks', 'Lunch'],
     keywords: ['iced', 'cold brew', 'frappé'],
-    reasons: [
-      'Cold drinks go great with a light snack or lunch bite',
-      'Refresh yourself fully — pair your cold brew with something to eat',
-      'A chilled drink pairs naturally with a light afternoon snack',
-      'Cold coffee and a snack is the ultimate afternoon pick-me-up',
-      'Your iced drink deserves a flavourful bite alongside it',
-    ],
+    reason: 'Cold drinks go great with a light snack or lunch bite',
     timeBoost: { morning: 'Snacks', afternoon: 'Lunch', evening: 'Snacks' },
   },
   'Specialty': {
     primary: ['Morning Tea', 'Lunch'],
     keywords: ['specialty', 'pour over', 'batch brew', 'filter'],
-    reasons: [
-      'Specialty coffees are best enjoyed with something to savour',
-      'The nuanced flavours of specialty coffee shine with the right pairing',
-      'Take your time — a specialty brew deserves a thoughtful snack',
-      'Delicate filter notes are complemented by a light bite',
-      'Your specialty coffee experience is enhanced by a flavourful pairing',
-    ],
+    reason: 'Specialty coffees are best enjoyed with something to savour',
     timeBoost: { morning: 'Morning Tea', afternoon: 'Lunch', evening: 'Morning Tea' },
   },
   'Tea': {
     primary: ['Morning Tea', 'Snacks'],
     keywords: ['tea', 'chai', 'matcha', 'herbal'],
-    reasons: [
-      'Tea and light bites are a classic pairing',
-      'A warm cup of tea is perfectly complemented by something sweet',
-      'The floral notes in your tea pair beautifully with a light snack',
-      'Tea time is best shared with a delicious bite',
-      'Your tea\'s subtle flavours are enhanced by the right accompaniment',
-    ],
+    reason: 'Tea and light bites are a classic pairing',
     timeBoost: { morning: 'Morning Tea', afternoon: 'Snacks', evening: 'Snacks' },
   },
 };
@@ -176,9 +146,7 @@ export function buildRecommendation({ orders = [], customItems = {}, momentsData
     favouriteDrink,
     topCategory,
     suggestions,
-    reason: Array.isArray(pairingRule.reasons)
-      ? pairingRule.reasons[Math.floor(Math.random() * pairingRule.reasons.length)]
-      : (pairingRule.reason || null),
+    reason: pairingRule.reason,
     timeOfDay,
     totalOrders,
     pickupOrders,

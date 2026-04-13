@@ -14,11 +14,11 @@
 		B433C68898FE5F0624173DFF /* ExpoModulesProvider.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8BEE5DFC94B3BDD41E3B3F38 /* ExpoModulesProvider.swift */; };
 		BB2F792D24A3F905000567C9 /* Expo.plist in Resources */ = {isa = PBXBuildFile; fileRef = BB2F792C24A3F905000567C9 /* Expo.plist */; };
 		F11748422D0307B40044C1D9 /* AppDelegate.swift in Sources */ = {isa = PBXBuildFile; fileRef = F11748412D0307B40044C1D9 /* AppDelegate.swift */; };
-		F62941632F89F99B0072C41D /* FoodPairing1.mlmodel in Sources */ = {isa = PBXBuildFile; fileRef = F62941612F89F99B0072C41D /* FoodPairing1.mlmodel */; };
-		F62941642F89F99B0072C41D /* FoodPairing2.mlmodel in Sources */ = {isa = PBXBuildFile; fileRef = F62941622F89F99B0072C41D /* FoodPairing2.mlmodel */; };
 		F629416B2F8A06D80072C41D /* TealiumPrismModule.m in Sources */ = {isa = PBXBuildFile; fileRef = F62941672F8A06D80072C41D /* TealiumPrismModule.m */; };
 		F629416F2F8A13CE0072C41D /* TealiumPrismModule.swift in Sources */ = {isa = PBXBuildFile; fileRef = F629416E2F8A13CE0072C41D /* TealiumPrismModule.swift */; };
 		F62941702F8A13CE0072C41D /* TealiumPrismModule 2.m in Sources */ = {isa = PBXBuildFile; fileRef = F629416D2F8A13CE0072C41D /* TealiumPrismModule 2.m */; };
+		F633638F2F8CD52E0099DB61 /* FoodPairingModule.swift in Sources */ = {isa = PBXBuildFile; fileRef = F633638E2F8CD52E0099DB61 /* FoodPairingModule.swift */; };
+		F63363902F8CD52E0099DB61 /* FoodPairingModule.m in Sources */ = {isa = PBXBuildFile; fileRef = F633638D2F8CD52E0099DB61 /* FoodPairingModule.m */; };
 		F64C92D52F8C817600B3F2B2 /* BRLMPrinterKit.xcframework in Frameworks */ = {isa = PBXBuildFile; fileRef = F64C92D42F8C817600B3F2B2 /* BRLMPrinterKit.xcframework */; };
 		F64C92D62F8C817600B3F2B2 /* BRLMPrinterKit.xcframework in Embed Frameworks */ = {isa = PBXBuildFile; fileRef = F64C92D42F8C817600B3F2B2 /* BRLMPrinterKit.xcframework */; settings = {ATTRIBUTES = (CodeSignOnCopy, RemoveHeadersOnCopy, ); }; };
 		F64C92DA2F8C832D00B3F2B2 /* BrotherPrinterBridge.m in Sources */ = {isa = PBXBuildFile; fileRef = F64C92D82F8C832D00B3F2B2 /* BrotherPrinterBridge.m */; };
@@ -53,11 +53,11 @@
 		F11748412D0307B40044C1D9 /* AppDelegate.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = AppDelegate.swift; path = CoffeeDemo/AppDelegate.swift; sourceTree = "<group>"; };
 		F11748442D0722820044C1D9 /* CoffeeDemo-Bridging-Header.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; name = "CoffeeDemo-Bridging-Header.h"; path = "CoffeeDemo/CoffeeDemo-Bridging-Header.h"; sourceTree = "<group>"; };
 		F2FFF7EBAA4949C604D01143 /* libPods-CoffeeDemo.a */ = {isa = PBXFileReference; explicitFileType = archive.ar; includeInIndex = 0; path = "libPods-CoffeeDemo.a"; sourceTree = BUILT_PRODUCTS_DIR; };
-		F62941612F89F99B0072C41D /* FoodPairing1.mlmodel */ = {isa = PBXFileReference; lastKnownFileType = file.mlmodel; path = FoodPairing1.mlmodel; sourceTree = "<group>"; };
-		F62941622F89F99B0072C41D /* FoodPairing2.mlmodel */ = {isa = PBXFileReference; lastKnownFileType = file.mlmodel; path = FoodPairing2.mlmodel; sourceTree = "<group>"; };
 		F62941672F8A06D80072C41D /* TealiumPrismModule.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = TealiumPrismModule.m; sourceTree = "<group>"; };
 		F629416D2F8A13CE0072C41D /* TealiumPrismModule 2.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = "TealiumPrismModule 2.m"; sourceTree = "<group>"; };
 		F629416E2F8A13CE0072C41D /* TealiumPrismModule.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TealiumPrismModule.swift; sourceTree = "<group>"; };
+		F633638D2F8CD52E0099DB61 /* FoodPairingModule.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = FoodPairingModule.m; sourceTree = "<group>"; };
+		F633638E2F8CD52E0099DB61 /* FoodPairingModule.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FoodPairingModule.swift; sourceTree = "<group>"; };
 		F64C92D42F8C817600B3F2B2 /* BRLMPrinterKit.xcframework */ = {isa = PBXFileReference; expectedSignature = "AppleDeveloperProgram:5HCL85FLGW:Brother Industries, LTD."; lastKnownFileType = wrapper.xcframework; path = BRLMPrinterKit.xcframework; sourceTree = "<group>"; };
 		F64C92D82F8C832D00B3F2B2 /* BrotherPrinterBridge.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = BrotherPrinterBridge.m; sourceTree = "<group>"; };
 		F64C92D92F8C832D00B3F2B2 /* BrotherPrinterBridge.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BrotherPrinterBridge.swift; sourceTree = "<group>"; };
@@ -80,13 +80,13 @@
 		13B07FAE1A68108700A75B9A /* CoffeeDemo */ = {
 			isa = PBXGroup;
 			children = (
+				F633638D2F8CD52E0099DB61 /* FoodPairingModule.m */,
+				F633638E2F8CD52E0099DB61 /* FoodPairingModule.swift */,
 				F64C92D82F8C832D00B3F2B2 /* BrotherPrinterBridge.m */,
 				F64C92D92F8C832D00B3F2B2 /* BrotherPrinterBridge.swift */,
 				F629416D2F8A13CE0072C41D /* TealiumPrismModule 2.m */,
 				F629416E2F8A13CE0072C41D /* TealiumPrismModule.swift */,
 				F62941672F8A06D80072C41D /* TealiumPrismModule.m */,
-				F62941612F89F99B0072C41D /* FoodPairing1.mlmodel */,
-				F62941622F89F99B0072C41D /* FoodPairing2.mlmodel */,
 				F11748412D0307B40044C1D9 /* AppDelegate.swift */,
 				F11748442D0722820044C1D9 /* CoffeeDemo-Bridging-Header.h */,
 				BB2F792B24A3F905000567C9 /* Supporting */,
@@ -377,6 +377,8 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				F633638F2F8CD52E0099DB61 /* FoodPairingModule.swift in Sources */,
+				F63363902F8CD52E0099DB61 /* FoodPairingModule.m in Sources */,
 				F629416F2F8A13CE0072C41D /* TealiumPrismModule.swift in Sources */,
 				F62941702F8A13CE0072C41D /* TealiumPrismModule 2.m in Sources */,
 				F629416B2F8A06D80072C41D /* TealiumPrismModule.m in Sources */,
@@ -384,8 +386,6 @@
 				F64C92DA2F8C832D00B3F2B2 /* BrotherPrinterBridge.m in Sources */,
 				F64C92DB2F8C832D00B3F2B2 /* BrotherPrinterBridge.swift in Sources */,
 				B433C68898FE5F0624173DFF /* ExpoModulesProvider.swift in Sources */,
-				F62941632F89F99B0072C41D /* FoodPairing1.mlmodel in Sources */,
-				F62941642F89F99B0072C41D /* FoodPairing2.mlmodel in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
