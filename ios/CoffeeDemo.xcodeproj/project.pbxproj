@@ -61,7 +61,6 @@
 		F64C92D42F8C817600B3F2B2 /* BRLMPrinterKit.xcframework */ = {isa = PBXFileReference; expectedSignature = "AppleDeveloperProgram:5HCL85FLGW:Brother Industries, LTD."; lastKnownFileType = wrapper.xcframework; path = BRLMPrinterKit.xcframework; sourceTree = "<group>"; };
 		F64C92D82F8C832D00B3F2B2 /* BrotherPrinterBridge.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = BrotherPrinterBridge.m; sourceTree = "<group>"; };
 		F64C92D92F8C832D00B3F2B2 /* BrotherPrinterBridge.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BrotherPrinterBridge.swift; sourceTree = "<group>"; };
-		F6909D012F8A4BB0001C780F /* BRLMPrinterKit.xcframework */ = {isa = PBXFileReference; expectedSignature = "AppleDeveloperProgram:5HCL85FLGW:Brother Industries, LTD."; lastKnownFileType = wrapper.xcframework; name = BRLMPrinterKit.xcframework; path = libs/BRLMPrinterKit.xcframework; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -101,7 +100,6 @@
 		2D16E6871FA4F8E400B85C8A /* Frameworks */ = {
 			isa = PBXGroup;
 			children = (
-				F6909D012F8A4BB0001C780F /* BRLMPrinterKit.xcframework */,
 				F64C92D42F8C817600B3F2B2 /* BRLMPrinterKit.xcframework */,
 				ED297162215061F000B7C4FE /* JavaScriptCore.framework */,
 				F2FFF7EBAA4949C604D01143 /* libPods-CoffeeDemo.a */,
@@ -399,7 +397,11 @@
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				CLANG_ENABLE_MODULES = YES;
 				CODE_SIGN_ENTITLEMENTS = CoffeeDemo/CoffeeDemo.entitlements;
+				"CODE_SIGN_IDENTITY[sdk=iphoneos*]" = "iPhone Distribution";
+				CODE_SIGN_STYLE = Manual;
 				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = YHSBJ2JW4W;
+				"DEVELOPMENT_TEAM[sdk=iphoneos*]" = YHSBJ2JW4W;
 				ENABLE_BITCODE = NO;
 				"EXCLUDED_SOURCE_FILE_NAMES[arch=*]" = BRLMPrinterKit.xcframework;
 				GCC_PREPROCESSOR_DEFINITIONS = (
@@ -421,6 +423,8 @@
 				OTHER_SWIFT_FLAGS = "$(inherited) -D EXPO_CONFIGURATION_DEBUG";
 				PRODUCT_BUNDLE_IDENTIFIER = com.robrizzy.coffeedemo;
 				PRODUCT_NAME = CoffeeDemo;
+				PROVISIONING_PROFILE_SPECIFIER = "";
+				"PROVISIONING_PROFILE_SPECIFIER[sdk=iphoneos*]" = "";
 				SWIFT_OBJC_BRIDGING_HEADER = "CoffeeDemo/CoffeeDemo-Bridging-Header.h";
 				SWIFT_OPTIMIZATION_LEVEL = "-Onone";
 				SWIFT_VERSION = 5.0;
@@ -436,8 +440,15 @@
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				CLANG_ENABLE_MODULES = YES;
 				CODE_SIGN_ENTITLEMENTS = CoffeeDemo/CoffeeDemo.entitlements;
+				"CODE_SIGN_IDENTITY[sdk=iphoneos*]" = "iPhone Distribution";
+				CODE_SIGN_STYLE = Manual;
 				CURRENT_PROJECT_VERSION = 1;
-				"EXCLUDED_SOURCE_FILE_NAMES[arch=*]" = BRLMPrinterKit.xcframework;
+				DEVELOPMENT_TEAM = YHSBJ2JW4W;
+				"DEVELOPMENT_TEAM[sdk=iphoneos*]" = YHSBJ2JW4W;
+				"EXCLUDED_SOURCE_FILE_NAMES[arch=*]" = (
+					BRLMPrinterKit.xcframework,
+					BrotherPrinterBridge.swift,
+				);
 				INFOPLIST_FILE = CoffeeDemo/Info.plist;
 				IPHONEOS_DEPLOYMENT_TARGET = 15.1;
 				LD_RUNPATH_SEARCH_PATHS = (
@@ -453,6 +464,8 @@
 				OTHER_SWIFT_FLAGS = "$(inherited) -D EXPO_CONFIGURATION_RELEASE";
 				PRODUCT_BUNDLE_IDENTIFIER = com.robrizzy.coffeedemo;
 				PRODUCT_NAME = CoffeeDemo;
+				PROVISIONING_PROFILE_SPECIFIER = "";
+				"PROVISIONING_PROFILE_SPECIFIER[sdk=iphoneos*]" = "";
 				SWIFT_OBJC_BRIDGING_HEADER = "CoffeeDemo/CoffeeDemo-Bridging-Header.h";
 				SWIFT_VERSION = 5.0;
 				TARGETED_DEVICE_FAMILY = 1;
@@ -488,7 +501,7 @@
 				CLANG_WARN_SUSPICIOUS_MOVE = YES;
 				CLANG_WARN_UNREACHABLE_CODE = YES;
 				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
-				"CODE_SIGN_IDENTITY[sdk=iphoneos*]" = "iPhone Developer";
+				"CODE_SIGN_IDENTITY[sdk=iphoneos*]" = "iPhone Distribution";
 				COPY_PHASE_STRIP = NO;
 				ENABLE_STRICT_OBJC_MSGSEND = YES;
 				ENABLE_TESTABILITY = YES;
@@ -551,7 +564,7 @@
 				CLANG_WARN_SUSPICIOUS_MOVE = YES;
 				CLANG_WARN_UNREACHABLE_CODE = YES;
 				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
-				"CODE_SIGN_IDENTITY[sdk=iphoneos*]" = "iPhone Developer";
+				"CODE_SIGN_IDENTITY[sdk=iphoneos*]" = "iPhone Distribution";
 				COPY_PHASE_STRIP = YES;
 				ENABLE_NS_ASSERTIONS = NO;
 				ENABLE_STRICT_OBJC_MSGSEND = YES;
