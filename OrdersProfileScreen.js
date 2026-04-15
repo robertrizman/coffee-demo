@@ -81,6 +81,26 @@ export default function OrdersProfileScreen() {
   const [momentsUrl, setMomentsUrl] = useState('');
   const [debugTapCount, setDebugTapCount] = useState(0);
   const [momentsUnlocked, setMomentsUnlocked] = useState(false);
+  const [tealiumUuid, setTealiumUuid] = useState(null);
+
+  // Listen for Tealium UUID to be ready
+  useEffect(() => {
+    const checkTealiumUuid = () => {
+      const uuid = getCanonicalDeviceId();
+      if (uuid && uuid !== tealiumUuid) {
+        console.log('[Profile] Tealium UUID updated:', uuid);
+        setTealiumUuid(uuid);
+      }
+    };
+    
+    // Check immediately
+    checkTealiumUuid();
+    
+    // Check again after 2 seconds (Tealium should be ready)
+    const timer = setTimeout(checkTealiumUuid, 2000);
+    
+    return () => clearTimeout(timer);
+  }, []);
 
   // Filter global orders down to only this user's orders
   const myOrders = state.orders.filter((o) => {
@@ -487,16 +507,19 @@ export default function OrdersProfileScreen() {
           </View>
 
           <View style={styles.uuidCard}>
-            <Text style={styles.uuidLabel}>DEVICE UUID</Text>
+            <Text style={styles.uuidLabel}>CUSTOMER UUID (TEALIUM)</Text>
             <View style={styles.uuidRow}>
-              <Text style={styles.uuidValue} numberOfLines={1} ellipsizeMode="middle">{deviceId || '—'}</Text>
+              <Text style={styles.uuidValue} numberOfLines={1} ellipsizeMode="middle">
+                {tealiumUuid || deviceId || '—'}
+              </Text>
               <TouchableOpacity
                 style={styles.copyBtn}
                 onPress={() => {
-                  if (deviceId) {
-                    Clipboard.setString(deviceId);
+                  const uuidToCopy = tealiumUuid || deviceId;
+                  if (uuidToCopy) {
+                    Clipboard.setString(uuidToCopy);
                     trackUuidCopy({
-                      uuid: deviceId,
+                      uuid: uuidToCopy,
                       email: profile?.email || '',
                       name: profile?.name || '',
                     });
@@ -621,12 +644,12 @@ export default function OrdersProfileScreen() {
               <Text style={styles.debugCardTitle}>⚡ Moments API</Text>
               <Text style={styles.debugCardDesc}>Query the Moments API engine for this visitor's current profile data.</Text>
 
-              <Text style={styles.debugLabel}>DEVICE UUID</Text>
-              <Text style={styles.debugMono}>{(getCanonicalDeviceId() || state.deviceId || '—').toLowerCase()}</Text>
+              <Text style={styles.debugLabel}>CUSTOMER UUID (TEALIUM)</Text>
+              <Text style={styles.debugMono}>{(tealiumUuid || state.deviceId || '—').toLowerCase()}</Text>
 
               <Text style={styles.debugLabel}>ENDPOINT</Text>
               <Text style={styles.debugMono} numberOfLines={3}>
-                {`https://personalization-api.ap-southeast-2.prod.tealiumapis.com/personalization/accounts/success-robert-rizman/profiles/coffee-demo/engines/aaa7abe0-9023-49c8-8858-5fe2dbb18c39?attributeId=5120&attributeValue=${(getCanonicalDeviceId() || state.deviceId || '').toLowerCase()}`}
+                {`https://personalization-api.ap-southeast-2.prod.tealiumapis.com/personalization/accounts/success-robert-rizman/profiles/coffee-demo/engines/aaa7abe0-9023-49c8-8858-5fe2dbb18c39?attributeId=5120&attributeValue=${(tealiumUuid || state.deviceId || '').toLowerCase()}`}
               </Text>
 
               <TouchableOpacity

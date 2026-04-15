@@ -9,7 +9,7 @@ import { AuthProvider } from './AuthContext';
 import AppNavigator from './AppNavigator';
 import OnboardingScreen from './OnboardingScreen';
 import SplashLoadingScreen from './SplashLoadingScreen';
-import { trackAppOpen, initTealium } from './tealium';
+import { trackAppOpen, initTealium, getCanonicalDeviceId } from './tealium';
 import { supabase } from './supabase';
 import { getDeviceId } from './deviceId';
 import { LogBox } from 'react-native';
@@ -49,8 +49,15 @@ async function registerPushToken(arcLocationId = null) {
     const token = tokenData.data;
     console.log('✅ [Push] Token received:', token);
     
-    const deviceId = await getDeviceId();
-    console.log('📱 [Push] Device ID:', deviceId);
+    // CRITICAL FIX: Use Tealium customer_uuid (from PRISM), not local device ID
+    // This must match what's stored in orders.teal_app_uuid / orders.device_id
+    const tealiumUuid = getCanonicalDeviceId();
+    const fallbackUuid = await getDeviceId();
+    const deviceId = tealiumUuid || fallbackUuid;
+    
+    console.log('📱 [Push] Tealium UUID:', tealiumUuid);
+    console.log('📱 [Push] Fallback UUID:', fallbackUuid);
+    console.log('📱 [Push] Using device_id for push_tokens:', deviceId);
     
     const upsertData = {
       device_id: deviceId,
@@ -71,10 +78,11 @@ async function registerPushToken(arcLocationId = null) {
       throw error;
     }
     
-    console.log('✅ [Push] Token registered successfully!');
+    console.log('✅ [Push] Token registered successfully with device_id:', deviceId);
     
   } catch (e) {
     console.error('❌ [Push] Registration failed:', e.message);
+    console.error('❌ [Push] Stack:', e.stack);
   }
 }
 
@@ -86,11 +94,16 @@ function Root() {
 
   useEffect(() => {
     console.log('🚀 [App] Initializing...');
+    
+    let tealiumReady = false;
+    
     initTealium().then(() => {
       console.log('📊 [Tealium] Initialized');
+      tealiumReady = true;
       trackAppOpen();
     }).catch((e) => {
       console.error('❌ [Tealium] Init failed:', e);
+      tealiumReady = true; // Continue even if Tealium fails
     });
 
     const t = setTimeout(() => {
@@ -104,10 +117,15 @@ function Root() {
   useEffect(() => {
     if (ready) {
       console.log('✅ [App] Ready state achieved');
+      
+      // Wait a bit longer to ensure Tealium UUID is available
       setTimeout(() => {
+        const tealiumUuid = getCanonicalDeviceId();
+        console.log('📱 [App] Tealium UUID before push registration:', tealiumUuid);
+        
         registerPushToken(profile?.arc_location_id || null);
         requestLocationSilently();
-      }, 2000);
+      }, 3000); // Increased from 2s to 3s to give Tealium more time
 
       // Re-check location when user returns from Settings
       const sub = AppState.addEventListener('change', (nextState) => {
@@ -248,7 +266,7 @@ export default function App() {
   return (
     <SafeAreaProvider>
       <StatusBar 
-        translucent={true} 
+        translucent={false} 
         backgroundColor="#f0fafb" 
         barStyle="dark-content"
       />

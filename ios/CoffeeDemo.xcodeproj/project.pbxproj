@@ -40,7 +40,7 @@
 /* End PBXCopyFilesBuildPhase section */
 
 /* Begin PBXFileReference section */
-		13B07F961A680F5B00A75B9A /* CoffeeDemo.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = CoffeeDemo.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		13B07F961A680F5B00A75B9A /* Architect Arc Cafe.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = "Architect Arc Cafe.app"; sourceTree = BUILT_PRODUCTS_DIR; };
 		13B07FB51A68108700A75B9A /* Images.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; name = Images.xcassets; path = CoffeeDemo/Images.xcassets; sourceTree = "<group>"; };
 		13B07FB61A68108700A75B9A /* Info.plist */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = text.plist.xml; name = Info.plist; path = CoffeeDemo/Info.plist; sourceTree = "<group>"; };
 		5777151CAB57AFF3DF622E0A /* PrivacyInfo.xcprivacy */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.xml; name = PrivacyInfo.xcprivacy; path = CoffeeDemo/PrivacyInfo.xcprivacy; sourceTree = "<group>"; };
@@ -149,7 +149,7 @@
 		83CBBA001A601CBA00E9B192 /* Products */ = {
 			isa = PBXGroup;
 			children = (
-				13B07F961A680F5B00A75B9A /* CoffeeDemo.app */,
+				13B07F961A680F5B00A75B9A /* Architect Arc Cafe.app */,
 			);
 			name = Products;
 			sourceTree = "<group>";
@@ -194,7 +194,7 @@
 			);
 			name = CoffeeDemo;
 			productName = CoffeeDemo;
-			productReference = 13B07F961A680F5B00A75B9A /* CoffeeDemo.app */;
+			productReference = 13B07F961A680F5B00A75B9A /* Architect Arc Cafe.app */;
 			productType = "com.apple.product-type.application";
 		};
 /* End PBXNativeTarget section */
@@ -401,7 +401,7 @@
 				"CODE_SIGN_IDENTITY[sdk=iphoneos*]" = "iPhone Distribution";
 				CODE_SIGN_STYLE = Manual;
 				CURRENT_PROJECT_VERSION = 1;
-				DEVELOPMENT_TEAM = "";
+				DEVELOPMENT_TEAM = YHSBJ2JW4W;
 				"DEVELOPMENT_TEAM[sdk=iphoneos*]" = YHSBJ2JW4W;
 				ENABLE_BITCODE = NO;
 				"EXCLUDED_SOURCE_FILE_NAMES[arch=*]" = BRLMPrinterKit.xcframework;
@@ -423,9 +423,9 @@
 				);
 				OTHER_SWIFT_FLAGS = "$(inherited) -D EXPO_CONFIGURATION_DEBUG";
 				PRODUCT_BUNDLE_IDENTIFIER = com.robrizzy.coffeedemo;
-				PRODUCT_NAME = CoffeeDemo;
-				PROVISIONING_PROFILE_SPECIFIER = "";
-				"PROVISIONING_PROFILE_SPECIFIER[sdk=iphoneos*]" = "";
+				PRODUCT_NAME = "Architect Arc Cafe";
+				PROVISIONING_PROFILE_SPECIFIER = "Tealium Arc Cafe App Store";
+				"PROVISIONING_PROFILE_SPECIFIER[sdk=iphoneos*]" = "Tealium Arc Cafe App Store";
 				SWIFT_OBJC_BRIDGING_HEADER = "CoffeeDemo/CoffeeDemo-Bridging-Header.h";
 				SWIFT_OPTIMIZATION_LEVEL = "-Onone";
 				SWIFT_VERSION = 5.0;
@@ -445,7 +445,7 @@
 				"CODE_SIGN_IDENTITY[sdk=iphoneos*]" = "iPhone Distribution";
 				CODE_SIGN_STYLE = Manual;
 				CURRENT_PROJECT_VERSION = 1;
-				DEVELOPMENT_TEAM = "";
+				DEVELOPMENT_TEAM = YHSBJ2JW4W;
 				"DEVELOPMENT_TEAM[sdk=iphoneos*]" = YHSBJ2JW4W;
 				"EXCLUDED_SOURCE_FILE_NAMES[arch=*]" = (
 					BRLMPrinterKit.xcframework,
@@ -465,9 +465,9 @@
 				);
 				OTHER_SWIFT_FLAGS = "$(inherited) -D EXPO_CONFIGURATION_RELEASE";
 				PRODUCT_BUNDLE_IDENTIFIER = com.robrizzy.coffeedemo;
-				PRODUCT_NAME = CoffeeDemo;
-				PROVISIONING_PROFILE_SPECIFIER = "";
-				"PROVISIONING_PROFILE_SPECIFIER[sdk=iphoneos*]" = "";
+				PRODUCT_NAME = "Architect Arc Cafe";
+				PROVISIONING_PROFILE_SPECIFIER = "Tealium Arc Cafe App Store";
+				"PROVISIONING_PROFILE_SPECIFIER[sdk=iphoneos*]" = "Tealium Arc Cafe App Store";
 				SWIFT_OBJC_BRIDGING_HEADER = "CoffeeDemo/CoffeeDemo-Bridging-Header.h";
 				SWIFT_VERSION = 5.0;
 				TARGETED_DEVICE_FAMILY = 1;

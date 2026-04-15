@@ -6,6 +6,7 @@ import {
 import { WebView } from 'react-native-webview';
 import { useNavigation } from '@react-navigation/native';
 import { CameraView, useCameraPermissions } from 'expo-camera';
+import { useKeepAwake } from 'expo-keep-awake';
 import { useApp } from './AppContext';
 import { supabase } from './supabase';
 import { useAuth } from './AuthContext';
@@ -54,6 +55,10 @@ export default function OperatorOrdersScreen() {
   const [qrDataUrls, setQrDataUrls] = useState({});
   const cameraRef = useRef(null);
   const lastScan = useRef(null);
+
+  // Keep screen awake when either scanner is active
+  const isCameraActive = scannerOpen || inlineScannerVisible;
+  useKeepAwake('qr-scanner', { enabled: isCameraActive });
 
   const filtered = state.orders.filter((o) => {
     if (tab === 'Pending') return o.status === 'pending';

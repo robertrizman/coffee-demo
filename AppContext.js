@@ -370,7 +370,18 @@ export function AppProvider({ children }) {
           ]);
           if (autoPrintEnabled && defaultPrinter?.ip) {
             console.log('[AutoPrint] Printing order', order.id, 'to', defaultPrinter.ip);
-            await printOrderReceipt(order, '', { silent: true });
+            const result = await printOrderReceipt(order, '', { silent: true });
+            
+            // Mark as printed if successful
+            if (result && result.ok) {
+              console.log('[AutoPrint] ✓ Print successful, marking as printed');
+              await supabase
+                .from('orders')
+                .update({ printed: true, printed_at: new Date().toISOString() })
+                .eq('id', order.id);
+            } else {
+              console.log('[AutoPrint] ✗ Print failed, leaving printed=false');
+            }
           }
         } catch (err) {
           console.warn('[AutoPrint] Error:', err.message);
@@ -408,8 +419,9 @@ export function AppProvider({ children }) {
 
   // Refetch orders when app comes to foreground after sleep
   useEffect(() => {
-    const appStateSub = AppState.addEventListener('change', (nextState) => {
+    const appStateSub = AppState.addEventListener('change', async (nextState) => {
       if (nextState === 'active') {
+        // Refetch orders and store config
         supabase.from('orders').select('*').order('placed_at', { ascending: false }).limit(50)
           .then(({ data }) => {
             if (data) dispatch({ type: 'LOAD_ORDERS', payload: data.map(rowToOrder) });
@@ -418,6 +430,61 @@ export function AppProvider({ children }) {
           .then(({ data }) => { if (data) dispatch({ type: 'SET_STORE_CONFIG', payload: data }); });
         supabase.from('store_breaks').select('*').order('start_time')
           .then(({ data }) => { if (data) dispatch({ type: 'SET_STORE_BREAKS', payload: data }); });
+        
+        // PRINT QUEUE: Check for unprinted orders
+        try {
+          const [autoPrintEnabled, defaultPrinter] = await Promise.all([
+            loadAutoPrint(),
+            loadDefaultPrinter(),
+          ]);
+          
+          if (autoPrintEnabled && defaultPrinter?.ip) {
+            console.log('[PrintQueue] Checking for unprinted orders...');
+            
+            const { data: unprintedOrders, error } = await supabase
+              .from('orders')
+              .select('*')
+              .eq('printed', false)
+              .eq('status', 'pending')
+              .order('placed_at', { ascending: true })
+              .limit(20);
+            
+            if (error) {
+              console.warn('[PrintQueue] Query error:', error.message);
+              return;
+            }
+            
+            if (unprintedOrders && unprintedOrders.length > 0) {
+              console.log(`[PrintQueue] 📋 Found ${unprintedOrders.length} unprinted orders, printing now...`);
+              
+              for (const row of unprintedOrders) {
+                const order = rowToOrder(row);
+                console.log(`[PrintQueue] Printing ${order.id}...`);
+                
+                const result = await printOrderReceipt(order, '', { silent: true });
+                
+                if (result && result.ok) {
+                  console.log(`[PrintQueue] ✓ ${order.id} printed successfully`);
+                  await supabase
+                    .from('orders')
+                    .update({ printed: true, printed_at: new Date().toISOString() })
+                    .eq('id', order.id);
+                } else {
+                  console.log(`[PrintQueue] ✗ ${order.id} print failed, will retry on next wake`);
+                }
+                
+                // Small delay between prints to avoid overwhelming the printer
+                await new Promise(resolve => setTimeout(resolve, 500));
+              }
+              
+              console.log('[PrintQueue] ✅ Print queue complete');
+            } else {
+              console.log('[PrintQueue] No unprinted orders found');
+            }
+          }
+        } catch (err) {
+          console.warn('[PrintQueue] Error:', err.message);
+        }
       }
     });
     return () => appStateSub.remove();

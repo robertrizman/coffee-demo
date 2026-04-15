@@ -18,9 +18,10 @@ export default function ItemDetailScreen() {
   const isClosed = !state.storeOpen;
 
   const isTea = item.category === 'Tea';
+  const isIcedCold = item.category === 'Iced & Cold';
 
   const [size, setSize] = useState('Medium');
-  const [milk, setMilk] = useState(isTea ? 'No Milk' : 'Full Cream');
+  const [milk, setMilk] = useState((isTea || isIcedCold) ? 'No Milk' : 'Full Cream');
   const [extras, setExtras] = useState([]);
   const [specialRequest, setSpecialRequest] = useState('');
 
@@ -123,10 +124,10 @@ export default function ItemDetailScreen() {
           ))}
         </View>
 
-        {/* MILK — tea shows simplified milk/no milk options */}
+        {/* MILK — tea and iced drinks show No Milk first */}
         <Text style={styles.sectionLabel}>{isTea ? 'MILK (OPTIONAL)' : 'MILK'}</Text>
         <View style={styles.chipWrap}>
-          {(isTea ? ['No Milk', ...availableMilk.filter(m => m !== 'No Milk')] : availableMilk).map((m) => (
+          {((isTea || isIcedCold) ? ['No Milk', ...availableMilk.filter(m => m !== 'No Milk')] : availableMilk).map((m) => (
             <TouchableOpacity
               key={m}
               style={[styles.chip, effectiveMilk === m && styles.chipActive]}
