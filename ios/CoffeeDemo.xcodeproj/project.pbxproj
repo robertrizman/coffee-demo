@@ -398,9 +398,11 @@
 				CLANG_ENABLE_MODULES = YES;
 				CODE_SIGN_ENTITLEMENTS = CoffeeDemo/CoffeeDemo.entitlements;
 				CODE_SIGN_IDENTITY = "Apple Development";
-				CODE_SIGN_STYLE = Automatic;
+				"CODE_SIGN_IDENTITY[sdk=iphoneos*]" = "iPhone Distribution";
+				CODE_SIGN_STYLE = Manual;
 				CURRENT_PROJECT_VERSION = 1;
-				DEVELOPMENT_TEAM = YHSBJ2JW4W;
+				DEVELOPMENT_TEAM = "";
+				"DEVELOPMENT_TEAM[sdk=iphoneos*]" = YHSBJ2JW4W;
 				ENABLE_BITCODE = NO;
 				"EXCLUDED_SOURCE_FILE_NAMES[arch=*]" = BRLMPrinterKit.xcframework;
 				GCC_PREPROCESSOR_DEFINITIONS = (
@@ -423,6 +425,7 @@
 				PRODUCT_BUNDLE_IDENTIFIER = com.robrizzy.coffeedemo;
 				PRODUCT_NAME = CoffeeDemo;
 				PROVISIONING_PROFILE_SPECIFIER = "";
+				"PROVISIONING_PROFILE_SPECIFIER[sdk=iphoneos*]" = "";
 				SWIFT_OBJC_BRIDGING_HEADER = "CoffeeDemo/CoffeeDemo-Bridging-Header.h";
 				SWIFT_OPTIMIZATION_LEVEL = "-Onone";
 				SWIFT_VERSION = 5.0;
@@ -439,9 +442,11 @@
 				CLANG_ENABLE_MODULES = YES;
 				CODE_SIGN_ENTITLEMENTS = CoffeeDemo/CoffeeDemo.entitlements;
 				CODE_SIGN_IDENTITY = "Apple Development";
-				CODE_SIGN_STYLE = Automatic;
+				"CODE_SIGN_IDENTITY[sdk=iphoneos*]" = "iPhone Distribution";
+				CODE_SIGN_STYLE = Manual;
 				CURRENT_PROJECT_VERSION = 1;
-				DEVELOPMENT_TEAM = YHSBJ2JW4W;
+				DEVELOPMENT_TEAM = "";
+				"DEVELOPMENT_TEAM[sdk=iphoneos*]" = YHSBJ2JW4W;
 				"EXCLUDED_SOURCE_FILE_NAMES[arch=*]" = (
 					BRLMPrinterKit.xcframework,
 					BrotherPrinterBridge.swift,
@@ -462,6 +467,7 @@
 				PRODUCT_BUNDLE_IDENTIFIER = com.robrizzy.coffeedemo;
 				PRODUCT_NAME = CoffeeDemo;
 				PROVISIONING_PROFILE_SPECIFIER = "";
+				"PROVISIONING_PROFILE_SPECIFIER[sdk=iphoneos*]" = "";
 				SWIFT_OBJC_BRIDGING_HEADER = "CoffeeDemo/CoffeeDemo-Bridging-Header.h";
 				SWIFT_VERSION = 5.0;
 				TARGETED_DEVICE_FAMILY = 1;
