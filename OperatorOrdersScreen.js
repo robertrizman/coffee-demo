@@ -6,7 +6,6 @@ import {
 import { WebView } from 'react-native-webview';
 import { useNavigation } from '@react-navigation/native';
 import { CameraView, useCameraPermissions } from 'expo-camera';
-import { useKeepAwake } from 'expo-keep-awake';
 import { useApp } from './AppContext';
 import { supabase } from './supabase';
 import { useAuth } from './AuthContext';
@@ -55,10 +54,6 @@ export default function OperatorOrdersScreen() {
   const [qrDataUrls, setQrDataUrls] = useState({});
   const cameraRef = useRef(null);
   const lastScan = useRef(null);
-
-  // Keep screen awake when either scanner is active
-  const isCameraActive = scannerOpen || inlineScannerVisible;
-  useKeepAwake('qr-scanner', { enabled: isCameraActive });
 
   const filtered = state.orders.filter((o) => {
     if (tab === 'Pending') return o.status === 'pending';
@@ -237,6 +232,17 @@ export default function OperatorOrdersScreen() {
         { ...order, drink_summary: drinkSummary },
         order.tealAppUuid || order.deviceId
       );
+      
+      // Trigger Edge Function to send push notification
+      console.log('[QR] Calling Edge Function:', data);
+      fetch(data, { method: 'GET' })
+        .then((res) => {
+          console.log('[QR] Edge Function response:', res.status, res.ok);
+        })
+        .catch((err) => {
+          console.warn('[QR] Edge Function error:', err.message);
+        });
+      
       setScanFeedback('success');
       setScanLabel(`✓ ${order.name || orderId} — order complete!`);
       setTimeout(() => { setScanning(true); lastScan.current = null; setScanFeedback(null); setScanLabel(''); }, 2500);
