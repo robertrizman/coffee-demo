@@ -68,6 +68,11 @@ export default function SettingsScreen() {
   const [locStartDate, setLocStartDate] = useState('');
   const [locEndDate, setLocEndDate] = useState('');
   const [locSortOrder, setLocSortOrder] = useState('0');
+  const [locLat, setLocLat] = useState('');
+  const [locLng, setLocLng] = useState('');
+  const [locGeoEnabled, setLocGeoEnabled] = useState(false);
+  const [locGeoRadius, setLocGeoRadius] = useState('1000');
+  const [detectingCoords, setDetectingCoords] = useState(false);
   const [savingLocation, setSavingLocation] = useState(false);
 
   // Scanner state
@@ -113,6 +118,8 @@ export default function SettingsScreen() {
     setLocVenueName(''); setLocAddress(''); setLocState('');
     setLocEnabled(true); setLocStartDate(''); setLocEndDate('');
     setLocSortOrder(String(locations.length));
+    setLocLat(''); setLocLng('');
+    setLocGeoEnabled(false); setLocGeoRadius('1000');
     setLocationModalVisible(true);
   };
 
@@ -125,7 +132,29 @@ export default function SettingsScreen() {
     setLocStartDate(loc.start_date || '');
     setLocEndDate(loc.end_date || '');
     setLocSortOrder(String(loc.sort_order ?? 0));
+    setLocLat(loc.latitude ? String(loc.latitude) : '');
+    setLocLng(loc.longitude ? String(loc.longitude) : '');
+    setLocGeoEnabled(loc.geo_check_enabled === true);
+    setLocGeoRadius(String(loc.geo_radius_meters || 1000));
     setLocationModalVisible(true);
+  };
+
+  const detectCoords = async () => {
+    setDetectingCoords(true);
+    try {
+      const { status } = await Location.requestForegroundPermissionsAsync();
+      if (status !== 'granted') {
+        Alert.alert('Permission needed', 'Please allow location access to detect coordinates.');
+        setDetectingCoords(false);
+        return;
+      }
+      const loc = await Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.High });
+      setLocLat(String(loc.coords.latitude.toFixed(6)));
+      setLocLng(String(loc.coords.longitude.toFixed(6)));
+    } catch (e) {
+      Alert.alert('Error', 'Could not detect location: ' + e.message);
+    }
+    setDetectingCoords(false);
   };
 
   const saveLocation = async () => {
@@ -139,6 +168,10 @@ export default function SettingsScreen() {
       start_date: locStartDate.trim() || null,
       end_date: locEndDate.trim() || null,
       sort_order: parseInt(locSortOrder) || 0,
+      latitude: locLat ? parseFloat(locLat) : null,
+      longitude: locLng ? parseFloat(locLng) : null,
+      geo_check_enabled: locGeoEnabled,
+      geo_radius_meters: parseInt(locGeoRadius) || 1000,
     };
     if (editingLocation) {
       await supabase.from('arc_locations').update(payload).eq('id', editingLocation.id);
@@ -865,6 +898,73 @@ export default function SettingsScreen() {
             <Text style={{ fontSize: 12, color: colors.textMuted, lineHeight: 16 }}>
               💡 If start/end dates are set, the location auto-enables/disables based on today's date. Leave blank to use the Enabled toggle only.
             </Text>
+
+            {/* ── Geo Check ── */}
+            <View style={styles.sectionDivider} />
+            <Text style={styles.sectionHeading}>📍 Geo Verification</Text>
+
+            <View style={styles.toggleRow}>
+              <View style={{ flex: 1 }}>
+                <Text style={styles.toggleLabel}>Enable geo check</Text>
+                <Text style={styles.toggleSub}>Warn customers outside the radius</Text>
+              </View>
+              <Switch
+                value={locGeoEnabled}
+                onValueChange={setLocGeoEnabled}
+                trackColor={{ false: '#e0e0e0', true: colors.primary }}
+                thumbColor="#fff"
+              />
+            </View>
+
+            {locGeoEnabled && (
+              <>
+                <Text style={styles.fieldLabel}>RADIUS (METERS)</Text>
+                <TextInput
+                  style={styles.inputField}
+                  value={locGeoRadius}
+                  onChangeText={setLocGeoRadius}
+                  placeholder="1000"
+                  placeholderTextColor={colors.textMuted}
+                  keyboardType="numeric"
+                />
+
+                <Text style={styles.fieldLabel}>LATITUDE</Text>
+                <TextInput
+                  style={styles.inputField}
+                  value={locLat}
+                  onChangeText={setLocLat}
+                  placeholder="-33.891635"
+                  placeholderTextColor={colors.textMuted}
+                  keyboardType="numbers-and-punctuation"
+                />
+
+                <Text style={styles.fieldLabel}>LONGITUDE</Text>
+                <TextInput
+                  style={styles.inputField}
+                  value={locLng}
+                  onChangeText={setLocLng}
+                  placeholder="151.212044"
+                  placeholderTextColor={colors.textMuted}
+                  keyboardType="numbers-and-punctuation"
+                />
+
+                <TouchableOpacity
+                  style={[styles.detectCoordsBtn, detectingCoords && { opacity: 0.6 }]}
+                  onPress={detectCoords}
+                  disabled={detectingCoords}
+                  activeOpacity={0.8}
+                >
+                  {detectingCoords
+                    ? <ActivityIndicator color="#fff" size="small" />
+                    : <Text style={styles.detectCoordsBtnText}>📡 Use my current location</Text>
+                  }
+                </TouchableOpacity>
+                <Text style={{ fontSize: 11, color: colors.textMuted, lineHeight: 15 }}>
+                  Tap the button while at the venue to auto-fill coordinates.
+                </Text>
+              </>
+            )}
+
             <TouchableOpacity
               style={[styles.saveLocationBtn, savingLocation && { opacity: 0.6 }]}
               onPress={saveLocation}
@@ -886,14 +986,16 @@ export default function SettingsScreen() {
 const styles = StyleSheet.create({
   safe: { flex: 1, backgroundColor: colors.background },
   tabNav: { flexGrow: 0, backgroundColor: colors.surface, borderBottomWidth: 1, borderBottomColor: colors.borderLight },
-  tabNavContent: { paddingHorizontal: spacing.md, paddingVertical: spacing.sm, gap: spacing.sm },
+  tabNavContent: { paddingHorizontal: spacing.md, paddingVertical: spacing.sm, gap: spacing.sm, alignItems: 'center' },
   tabBtn: {
-    alignItems: 'center', paddingHorizontal: 14, paddingVertical: 8,
-    borderRadius: radius.lg, backgroundColor: colors.background, minWidth: 64,
+    alignItems: 'center', justifyContent: 'center',
+    paddingHorizontal: 12, paddingVertical: 8,
+    borderRadius: radius.lg, backgroundColor: colors.background,
+    height: 52,
   },
   tabBtnActive: { backgroundColor: colors.primary },
-  tabBtnIcon: { fontSize: 20, marginBottom: 3 },
-  tabBtnLabel: { fontSize: 10, fontWeight: '600', color: colors.textMuted },
+  tabBtnIcon: { fontSize: 20, marginBottom: 2 },
+  tabBtnLabel: { fontSize: 10, fontWeight: '600', color: colors.textMuted, textAlign: 'center' },
   tabBtnLabelActive: { color: '#fff' },
   section: { gap: spacing.md },
   header: {
@@ -905,6 +1007,7 @@ const styles = StyleSheet.create({
   title: { ...typography.heading2 },
 
   body: { padding: spacing.lg, gap: spacing.lg },
+  bodyNoPadding: { gap: spacing.lg },
 
   card: {
     backgroundColor: colors.surface, borderRadius: radius.lg,
@@ -1137,6 +1240,13 @@ const styles = StyleSheet.create({
     paddingVertical: 14, alignItems: 'center', marginTop: spacing.md,
   },
   saveLocationBtnText: { color: '#fff', fontSize: 16, fontWeight: '700' },
+  sectionDivider: { height: 1, backgroundColor: colors.borderLight, marginVertical: spacing.md },
+  sectionHeading: { fontSize: 13, fontWeight: '700', color: colors.textMuted, letterSpacing: 0.5, textTransform: 'uppercase', marginBottom: spacing.sm },
+  detectCoordsBtn: {
+    backgroundColor: colors.primary, borderRadius: radius.md,
+    paddingVertical: 12, alignItems: 'center',
+  },
+  detectCoordsBtnText: { color: '#fff', fontSize: 14, fontWeight: '700' },
   locationRow: {
     flexDirection: 'row', alignItems: 'flex-start',
     paddingVertical: spacing.sm, borderTopWidth: 1, borderTopColor: colors.borderLight, gap: spacing.sm,

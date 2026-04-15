@@ -76,7 +76,7 @@ class FoodPairingModule: NSObject {
       : menuItems
 
     let prompt = """
-    You are a café food pairing assistant. Suggest the best 2 food categories to pair with a coffee order.
+    You are a cafe food pairing assistant. Suggest the best 2 food categories to pair with a coffee order.
 
     Drink: \(drink)\(milk != "No Milk" ? " with \(milk)" : "")
     Time: \(time) on a \(day)

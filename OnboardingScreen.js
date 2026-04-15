@@ -4,6 +4,7 @@ import {
   StyleSheet, SafeAreaView, KeyboardAvoidingView,
   Platform, ScrollView, Linking, Modal, FlatList, ActivityIndicator,
 } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { saveProfile } from './userProfile';
 import { supabase } from './supabase';
 import { colors, typography, spacing, radius, shadow } from './theme';
@@ -11,6 +12,7 @@ import { TakeawayCupIcon, UserIcon, LockIcon, EmailIcon } from './CoffeeIcons';
 import { trackCustomerRegistration } from './tealium';
 
 export default function OnboardingScreen({ onComplete }) {
+  const insets = useSafeAreaInsets();
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
   const [consentAccepted, setConsentAccepted] = useState(false);
@@ -85,7 +87,7 @@ export default function OnboardingScreen({ onComplete }) {
       behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
     >
       <SafeAreaView style={styles.safe}>
-        <ScrollView contentContainerStyle={styles.inner} keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false}>
+        <ScrollView contentContainerStyle={[styles.inner, { paddingTop: Math.max(insets.top + spacing.lg, spacing.xl) }]} keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false}>
 
           {/* Logo */}
           <View style={styles.logoArea}>
@@ -281,9 +283,9 @@ const styles = StyleSheet.create({
   safe: { flex: 1, backgroundColor: colors.background },
   inner: {
     flexGrow: 1,
-    justifyContent: 'center',
     padding: spacing.lg,
     gap: spacing.xl,
+    paddingBottom: spacing.xl,
   },
 
   logoArea: { alignItems: 'center', gap: spacing.sm },
@@ -391,7 +393,9 @@ const styles = StyleSheet.create({
   modalSafe: { flex: 1, backgroundColor: colors.background },
   modalHeader: {
     flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
-    paddingHorizontal: spacing.lg, paddingVertical: spacing.md,
+    paddingHorizontal: spacing.lg,
+    paddingTop: spacing.xl,
+    paddingBottom: spacing.md,
     borderBottomWidth: 1, borderBottomColor: colors.borderLight,
   },
   modalTitle: { ...typography.heading3 },

@@ -6,6 +6,7 @@ import {
 import { useApp } from './AppContext';
 import { colors, spacing, radius } from './theme';
 import { track } from './tealium';
+import { HandshakeIcon, PeopleIcon, ClockIcon, StarIcon, CheckIcon } from './CoffeeIcons';
 
 const OFFER_URL = 'https://tealium.com/ai-accelerator/';
 
@@ -32,7 +33,8 @@ export default function OffersScreen() {
         {/* Header */}
         <View style={styles.header}>
           <View style={styles.badge}>
-            <Text style={styles.badgeText}>⏳ Limited-time offer</Text>
+            <ClockIcon size={12} color="#856404" />
+            <Text style={styles.badgeText}>Limited-time offer</Text>
           </View>
           <Text style={styles.title}>AI Accelerator</Text>
           <Text style={styles.subtitle}>Jump‑start your next AI initiative with Tealium</Text>
@@ -50,7 +52,7 @@ export default function OffersScreen() {
           <View style={styles.checkList}>
             {['Agents', 'Next-best-experience', 'AI-powered personalization', 'Decisioning'].map(item => (
               <View key={item} style={styles.checkRow}>
-                <View style={styles.checkIcon}><Text style={styles.checkMark}>✓</Text></View>
+                <View style={styles.checkIcon}><CheckIcon size={14} color="#fff" /></View>
                 <Text style={styles.checkText}>{item}</Text>
               </View>
             ))}
@@ -59,12 +61,15 @@ export default function OffersScreen() {
 
         {/* Expert support card */}
         <View style={styles.card}>
-          <Text style={styles.cardTitle}>🤝 Hands-on Expert Support</Text>
+          <View style={styles.cardTitleRow}>
+            <HandshakeIcon size={20} color={colors.midnight} />
+            <Text style={styles.cardTitle}>Hands-on Expert Support</Text>
+          </View>
           <Text style={styles.cardBody}>Tealium experts by your side at no extra cost to help design, implement and prove value from your AI use case.</Text>
           <View style={styles.checkList}>
             {['Design your use case', 'Optimize its implementation', 'Get your initiative live'].map(item => (
               <View key={item} style={styles.checkRow}>
-                <View style={styles.checkIconSmall}><Text style={styles.checkMarkSmall}>✓</Text></View>
+                <View style={styles.checkIconSmall}><CheckIcon size={11} color="#fff" /></View>
                 <Text style={styles.checkTextSmall}>{item}</Text>
               </View>
             ))}
@@ -73,14 +78,17 @@ export default function OffersScreen() {
 
         {/* Who is it for */}
         <View style={styles.card}>
-          <Text style={styles.cardTitle}>👥 Who is this for?</Text>
+          <View style={styles.cardTitleRow}>
+            <PeopleIcon size={20} color={colors.midnight} />
+            <Text style={styles.cardTitle}>Who is this for?</Text>
+          </View>
           {[
             'Existing and new Tealium customers',
             'Teams looking to prove value from AI quickly',
             'Organizations with a data cloud or AI investment',
           ].map(item => (
             <View key={item} style={styles.checkRow}>
-              <View style={styles.checkIconSmall}><Text style={styles.checkMarkSmall}>✓</Text></View>
+              <View style={styles.checkIconSmall}><CheckIcon size={11} color="#fff" /></View>
               <Text style={styles.checkTextSmall}>{item}</Text>
             </View>
           ))}
@@ -93,7 +101,8 @@ export default function OffersScreen() {
 
         {/* CTA */}
         <TouchableOpacity style={styles.ctaBtn} onPress={handleInterested} activeOpacity={0.85}>
-          <Text style={styles.ctaBtnText}>✦  I'm Interested</Text>
+          <StarIcon size={18} color="#fff" />
+          <Text style={styles.ctaBtnText}>I'm Interested</Text>
         </TouchableOpacity>
 
         <View style={{ height: 32 }} />
@@ -107,6 +116,7 @@ const styles = StyleSheet.create({
   content: { padding: spacing.lg, gap: spacing.md },
   header: { alignItems: 'center', paddingVertical: spacing.lg, gap: 8 },
   badge: {
+    flexDirection: 'row', alignItems: 'center', gap: 6,
     backgroundColor: '#fff3cd', borderRadius: radius.full,
     paddingHorizontal: 14, paddingVertical: 5,
     borderWidth: 1, borderColor: '#ffc107',
@@ -134,6 +144,7 @@ const styles = StyleSheet.create({
     borderColor: colors.borderLight,
   },
   cardTitle: { fontSize: 16, fontWeight: '700', color: colors.midnight },
+  cardTitleRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
   cardBody: { fontSize: 14, color: colors.textMuted, lineHeight: 20 },
 
   checkList: { gap: 8, marginTop: 4 },
@@ -142,13 +153,11 @@ const styles = StyleSheet.create({
     width: 24, height: 24, borderRadius: 12,
     backgroundColor: colors.teal, alignItems: 'center', justifyContent: 'center',
   },
-  checkMark: { color: '#fff', fontSize: 13, fontWeight: '800' },
   checkText: { fontSize: 15, fontWeight: '600', color: '#fff', flex: 1 },
   checkIconSmall: {
     width: 20, height: 20, borderRadius: 10,
     backgroundColor: colors.primary, alignItems: 'center', justifyContent: 'center',
   },
-  checkMarkSmall: { color: '#fff', fontSize: 11, fontWeight: '800' },
   checkTextSmall: { fontSize: 14, color: colors.textMuted, flex: 1 },
 
   tcs: { fontSize: 12, color: colors.textMuted, textAlign: 'center', lineHeight: 18 },
@@ -157,7 +166,10 @@ const styles = StyleSheet.create({
     backgroundColor: colors.primary,
     borderRadius: radius.full,
     padding: 16,
+    flexDirection: 'row',
     alignItems: 'center',
+    justifyContent: 'center',
+    gap: spacing.sm,
     marginTop: 4,
   },
   ctaBtnText: { color: '#fff', fontSize: 17, fontWeight: '800', letterSpacing: 0.3 },

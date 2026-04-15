@@ -1,5 +1,7 @@
-import React, { useEffect, useState } from 'react';
-import { StatusBar, Platform } from 'react-native';
+import React, { useEffect, useState, useRef } from 'react';
+import { StatusBar, Platform, AppState, PermissionsAndroid } from 'react-native';
+import Geolocation from '@react-native-community/geolocation';
+Geolocation.setRNConfiguration({ skipPermissionRequests: true });
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import * as Notifications from 'expo-notifications';
 import { AppProvider, useApp } from './AppContext';
@@ -90,31 +92,115 @@ function Root() {
     }).catch((e) => {
       console.error('❌ [Tealium] Init failed:', e);
     });
-    
+
     const t = setTimeout(() => {
-      console.log('⏰ [App] Timeout reached, setting ready');
+      console.log('⏰ [App] 5s splash complete, setting ready');
       setReady(true);
     }, 5000);
-    
+
     return () => clearTimeout(t);
   }, []);
-
-  useEffect(() => {
-    if (profileLoaded) {
-      console.log('👤 [App] Profile loaded, setting ready');
-      setReady(true);
-    }
-  }, [profileLoaded]);
 
   useEffect(() => {
     if (ready) {
       console.log('✅ [App] Ready state achieved');
       setTimeout(() => {
-        console.log('⏰ [App] 2s delay complete, calling registerPushToken');
         registerPushToken(profile?.arc_location_id || null);
+        requestLocationSilently();
       }, 2000);
+
+      // Re-check location when user returns from Settings
+      const sub = AppState.addEventListener('change', (nextState) => {
+        if (nextState === 'active') {
+          requestLocationSilently();
+        }
+      });
+      return () => sub.remove();
     }
   }, [ready]);
+
+  const locationWatchRef = useRef(null);
+  const lastLocationRef = useRef(null);
+
+  const requestLocationSilently = async () => {
+    console.log('[Location] requestLocationSilently called, platform:', Platform.OS);
+    if (!Geolocation) {
+      console.log('[Location] geolocation not available');
+      return;
+    }
+    console.log('[Location] geolocation available');
+
+    // Android requires explicit runtime permission request
+    if (Platform.OS === 'android') {
+      try {
+        const already = await PermissionsAndroid.check(
+          PermissionsAndroid.PERMISSIONS.ACCESS_FINE_LOCATION
+        );
+        console.log('[Location] Android already granted:', already);
+        if (!already) {
+          const granted = await PermissionsAndroid.request(
+            PermissionsAndroid.PERMISSIONS.ACCESS_FINE_LOCATION,
+            {
+              title: 'Location Access',
+              message: 'We need your location to confirm you are at the venue.',
+              buttonPositive: 'Allow',
+              buttonNegative: 'Deny',
+            }
+          );
+          console.log('[Location] Android permission result:', granted);
+          if (granted !== PermissionsAndroid.RESULTS.GRANTED) {
+            dispatch({ type: 'SET_CUSTOMER_LOCATION', payload: { granted: false, denied: true } });
+            console.log('[Location] Android permission denied');
+            return;
+          }
+        }
+      } catch (e) {
+        console.warn('[Location] Android permission error:', e.message);
+        return;
+      }
+    }
+
+    console.log('[Location] Calling getCurrentPosition...');
+    // Get position immediately first
+    Geolocation.getCurrentPosition(
+      (position) => {
+        const { latitude, longitude } = position.coords;
+        const last = lastLocationRef.current;
+        if (!last || last.latitude !== latitude || last.longitude !== longitude || !last.granted) {
+          const payload = { latitude, longitude, granted: true, denied: false };
+          lastLocationRef.current = payload;
+          dispatch({ type: 'SET_CUSTOMER_LOCATION', payload });
+          console.log(`[Location] ✅ Got position: ${latitude}, ${longitude}`);
+        }
+      },
+      (error) => {
+        console.log('[Location] ❌ getCurrentPosition error code:', error.code, 'message:', error.message);
+        dispatch({ type: 'SET_CUSTOMER_LOCATION', payload: { granted: false, denied: true } });
+      },
+      { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 }
+    );
+
+    // Also watch for ongoing updates — clear previous watcher first
+    if (locationWatchRef.current !== null) {
+      Geolocation.clearWatch(locationWatchRef.current);
+    }
+    locationWatchRef.current = Geolocation.watchPosition(
+      (position) => {
+        const { latitude, longitude } = position.coords;
+        const last = lastLocationRef.current;
+        if (!last || last.latitude !== latitude || last.longitude !== longitude) {
+          const payload = { latitude, longitude, granted: true, denied: false };
+          lastLocationRef.current = payload;
+          dispatch({ type: 'SET_CUSTOMER_LOCATION', payload });
+          console.log(`[Location] Watch update: ${latitude}, ${longitude}`);
+        }
+      },
+      (error) => {
+        console.log('[Location] Watch error code:', error.code, 'message:', error.message);
+      },
+      { enableHighAccuracy: true, timeout: 10000, maximumAge: 30000, distanceFilter: 50 }
+    );
+  };
 
   if (!ready) {
     console.log('⏳ [App] Showing splash screen');

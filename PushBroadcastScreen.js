@@ -319,7 +319,7 @@ export default function PushBroadcastScreen({ onBack }) {
             <Text style={styles.modalCloseText}>✕</Text>
           </TouchableOpacity>
         </View>
-        <ScrollView contentContainerStyle={{ padding: spacing.lg, gap: spacing.sm }}>
+        <ScrollView contentContainerStyle={{ paddingHorizontal: spacing.sm, paddingVertical: spacing.md, gap: spacing.sm }}>
           {/* All locations option */}
           <TouchableOpacity
             style={[styles.locationItem, !selectedLocationId && styles.locationItemSelected]}
@@ -363,7 +363,7 @@ export default function PushBroadcastScreen({ onBack }) {
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: colors.background },
-  content: { padding: spacing.lg, gap: spacing.md },
+  content: { paddingHorizontal: 0, paddingVertical: 0, gap: spacing.md },
   card: {
     backgroundColor: colors.surface, borderRadius: radius.xl,
     padding: spacing.lg, gap: spacing.sm,

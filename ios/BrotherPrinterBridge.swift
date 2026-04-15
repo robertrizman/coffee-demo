@@ -1,7 +1,7 @@
 import Foundation
 import React
 
-#if !targetEnvironment(simulator)
+#if !targetEnvironment(simulator) && canImport(BRLMPrinterKit)
 import BRLMPrinterKit
 #endif
 
@@ -22,7 +22,7 @@ class BrotherPrinter: NSObject {
 
     #if targetEnvironment(simulator)
     rejecter("SIMULATOR", "Brother printing not supported on simulator — use a physical device", nil)
-    #else
+    #elseif canImport(BRLMPrinterKit)
     guard let url = URL(string: pdfUri) else {
       rejecter("PDF_ERROR", "Invalid PDF URI", nil)
       return
@@ -59,6 +59,8 @@ class BrotherPrinter: NSObject {
     } else {
       resolver(["success": true, "ip": printerIP])
     }
+    #else
+    rejecter("UNAVAILABLE", "Brother printing not available in this build", nil)
     #endif
   }
 }

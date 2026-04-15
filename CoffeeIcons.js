@@ -116,6 +116,21 @@ export const LockIcon = ({ size = 24, color = '#006D80' }) => (
   <MCI name="lock-outline" size={size} color={color} />
 );
 
+/** Eye — show password */
+export const EyeIcon = ({ size = 24, color = '#006D80' }) => (
+  <MCI name="eye-outline" size={size} color={color} />
+);
+
+/** Eye off — hide password */
+export const EyeOffIcon = ({ size = 24, color = '#006D80' }) => (
+  <MCI name="eye-off-outline" size={size} color={color} />
+);
+
+/** Location pin */
+export const LocationPinIcon = ({ size = 24, color = '#006D80' }) => (
+  <MCI name="map-marker-outline" size={size} color={color} />
+);
+
 /** Trash / delete */
 export const TrashIcon = ({ size = 24, color = '#006D80' }) => (
   <MCI name="trash-can-outline" size={size} color={color} />
@@ -159,4 +174,29 @@ export const BackIcon = ({ size = 24, color = '#006D80' }) => (
 /** Forward / chevron */
 export const ChevronIcon = ({ size = 24, color = '#006D80' }) => (
   <Ionicons name="chevron-forward" size={size} color={color} />
+);
+
+/** Handshake / partnership */
+export const HandshakeIcon = ({ size = 24, color = '#006D80' }) => (
+  <MCI name="handshake-outline" size={size} color={color} />
+);
+
+/** Group / people */
+export const PeopleIcon = ({ size = 24, color = '#006D80' }) => (
+  <MCI name="account-group-outline" size={size} color={color} />
+);
+
+/** Clock / timer */
+export const ClockIcon = ({ size = 24, color = '#006D80' }) => (
+  <MCI name="clock-outline" size={size} color={color} />
+);
+
+/** Star / interest */
+export const StarIcon = ({ size = 24, color = '#006D80' }) => (
+  <MCI name="star-four-points-outline" size={size} color={color} />
+);
+
+/** Copy / clipboard */
+export const CopyIcon = ({ size = 24, color = '#006D80' }) => (
+  <MCI name="content-copy" size={size} color={color} />
 );

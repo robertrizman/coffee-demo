@@ -7,7 +7,7 @@ import {
 import { useNavigation } from '@react-navigation/native';
 import { MENU, CATEGORIES } from './menu';
 import { useApp } from './AppContext';
-import { trackMenuView, trackItemView, queryMomentsAPI, trackAIPairingOpened, trackAIPairingResult } from './tealium';
+import { trackMenuView, trackItemView, queryMomentsAPI, trackAIPairingOpened, trackAIPairingResult, trackAIPairingCarousel } from './tealium';
 import { colors, typography, spacing, radius, shadow } from './theme';
 import { EspressoIcon, LatteIcon, IcedCupIcon, HotChocIcon, ChaiIcon, TeaIcon, ChevronIcon } from './CoffeeIcons';
 import { buildRecommendation } from './recommendations';
@@ -118,12 +118,15 @@ export default function MenuScreen() {
   const [currentSlide, setCurrentSlide] = useState(0);
   const [slides, setSlides] = useState([]);
   const carouselRef = useRef(null);
+  const isProgrammaticScroll = useRef(false);
   const thinkingAnim = useRef(new Animated.Value(0)).current;
   const fadeAnim = useRef(new Animated.Value(0)).current;
 
   const goToSlide = (index) => {
     setCurrentSlide(index);
+    isProgrammaticScroll.current = true;
     carouselRef.current?.scrollTo({ x: index * slideWidth, animated: true });
+    trackAIPairingCarousel(index);
   };
 
   const FOOD_CATEGORIES = ['Morning Tea', 'Lunch', 'Snacks'];
@@ -395,6 +398,11 @@ export default function MenuScreen() {
                   onMomentumScrollEnd={(e) => {
                     const index = Math.round(e.nativeEvent.contentOffset.x / slideWidth);
                     setCurrentSlide(index);
+                    if (isProgrammaticScroll.current) {
+                      isProgrammaticScroll.current = false;
+                    } else {
+                      trackAIPairingCarousel(index);
+                    }
                   }}
                   style={{ width: slideWidth }}
                   contentContainerStyle={{ flexDirection: 'row' }}

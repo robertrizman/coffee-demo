@@ -1,6 +1,6 @@
 {
   "expo": {
-    "name": "Coffee Demo",
+    "name": "Tealium Arc Cafe",
     "slug": "tealium-coffee-demo",
     "version": "1.0.0",
     "orientation": "portrait",
@@ -10,21 +10,22 @@
     "splash": {
       "image": "./assets/images/splash-icon.png",
       "resizeMode": "contain",
-      "backgroundColor": "#051838"
+      "backgroundColor": "#FFFFFF"
     },
     "ios": {
       "supportsTablet": false,
       "bundleIdentifier": "com.robrizzy.coffeedemo",
       "infoPlist": {
-        "CFBundleDisplayName": "Coffee Demo",
-        "NSCameraUsageDescription": "Used to scan order QR codes",
+        "CFBundleDisplayName": "Tealium Arc Cafe",
+        "NSCameraUsageDescription": "Allow Tealium Arc Cafe to access your camera to scan order QR codes.",
+        "NSLocationWhenInUseUsageDescription": "We need your location to confirm you are at the venue to place an order.",
         "NSUserNotificationsUsageDescription": "We'll notify you when your coffee order is ready for pickup"
       }
     },
     "android": {
       "adaptiveIcon": {
         "foregroundImage": "./assets/images/adaptive-icon.png",
-        "backgroundColor": "#051838"
+        "backgroundColor": "#FFFFFF"
       },
       "package": "com.robrizzy.coffeedemo",
       "googleServicesFile": "./google-services.json",
@@ -33,21 +34,23 @@
         "RECEIVE_BOOT_COMPLETED",
         "VIBRATE",
         "android.permission.CAMERA",
-        "android.permission.RECORD_AUDIO"
+        "android.permission.RECORD_AUDIO",
+        "android.permission.ACCESS_FINE_LOCATION",
+        "android.permission.ACCESS_COARSE_LOCATION"
       ]
     },
     "plugins": [
       [
         "expo-camera",
         {
-          "cameraPermission": "Allow Coffee Demo to access your camera to scan order QR codes."
+          "cameraPermission": "Allow Tealium Arc Cafe to access your camera to scan order QR codes."
         }
       ],
       [
         "expo-notifications",
         {
           "icon": "./assets/images/notification-icon.png",
-          "color": "#006D80",
+          "color": "#FFFFFF",
           "sounds": []
         }
       ]

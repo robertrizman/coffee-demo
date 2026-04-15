@@ -2,12 +2,25 @@ import React, { useState, useEffect, useRef } from 'react';
 import {
   View, Text, ScrollView, TouchableOpacity,
   StyleSheet, SafeAreaView, TextInput, Alert,
-  KeyboardAvoidingView, Platform, Modal, Animated, Easing,
+  KeyboardAvoidingView, Platform, Modal, Animated, Easing, Linking,
 } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
 import { useApp, generateOrderId, generateSequentialOrderId } from './AppContext';
-import { trackRemoveFromOrder, trackEmailEntered, trackOrderPlaced } from './tealium';
+import { trackRemoveFromOrder, trackEmailEntered, trackOrderPlaced, track } from './tealium';
 import { colors, typography, spacing, radius, shadow } from './theme';
+import { LocationPinIcon } from './CoffeeIcons';
+import { supabase } from './supabase';
+import Geolocation from '@react-native-community/geolocation';
+
+function getDistanceMeters(lat1, lon1, lat2, lon2) {
+  const R = 6371000;
+  const dLat = (lat2 - lat1) * Math.PI / 180;
+  const dLon = (lon2 - lon1) * Math.PI / 180;
+  const a = Math.sin(dLat/2) * Math.sin(dLat/2) +
+    Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) *
+    Math.sin(dLon/2) * Math.sin(dLon/2);
+  return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+}
 
 export default function OrderSummaryScreen() {
   const navigation = useNavigation();
@@ -18,7 +31,101 @@ export default function OrderSummaryScreen() {
   const [email, setEmail] = useState(state.profile?.email || currentOrder.email || '');
   const [emailSubmitted, setEmailSubmitted] = useState(false);
   const [confirmVisible, setConfirmVisible] = useState(false);
+  const [geoWarning, setGeoWarning] = useState(null); // null | 'outside' | 'denied' | 'ok'
+  const [locationName, setLocationName] = useState('');
   const [brewingVisible, setBrewingVisible] = useState(false);
+  const geoChannelRef = useRef(null);
+
+  useEffect(() => {
+    const locationId = state.profile?.arc_location_id;
+    const customerLoc = state.customerLocation;
+
+    // iOS: trigger location permission prompt if not yet granted
+    if (Platform.OS === 'ios' && (!customerLoc || (!customerLoc.granted && !customerLoc.denied))) {
+      Geolocation.getCurrentPosition(
+        (position) => {
+          dispatch({ type: 'SET_CUSTOMER_LOCATION', payload: {
+            latitude: position.coords.latitude,
+            longitude: position.coords.longitude,
+            granted: true,
+            denied: false,
+          }});
+        },
+        () => {
+          dispatch({ type: 'SET_CUSTOMER_LOCATION', payload: { granted: false, denied: true } });
+        },
+        { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 }
+      );
+    }
+
+    const runGeoCheck = async () => {
+      if (!locationId) return;
+      try {
+        const { data: loc } = await supabase
+          .from('arc_locations')
+          .select('venue_name, latitude, longitude, geo_check_enabled, geo_radius_meters')
+          .eq('id', locationId)
+          .single();
+
+        if (!loc || !loc.geo_check_enabled || !loc.latitude || !loc.longitude) {
+          setGeoWarning(null);
+          return;
+        }
+
+        setLocationName(loc.venue_name);
+
+        if (!customerLoc || customerLoc.denied) {
+          setGeoWarning('denied');
+          return;
+        }
+
+        if (!customerLoc.granted) return;
+
+        const dist = getDistanceMeters(
+          customerLoc.latitude, customerLoc.longitude,
+          loc.latitude, loc.longitude
+        );
+        const radius = loc.geo_radius_meters || 1000;
+        console.log(`[Geo] Distance to ${loc.venue_name}: ${Math.round(dist)}m (limit: ${radius}m)`);
+        setGeoWarning(dist > radius ? 'outside' : 'ok');
+      } catch (e) {
+        console.warn('[Geo] Check failed:', e.message);
+      }
+    };
+
+    runGeoCheck();
+
+    if (!locationId) return;
+
+    // Remove existing channel before creating new one
+    if (geoChannelRef.current) {
+      supabase.removeChannel(geoChannelRef.current);
+      geoChannelRef.current = null;
+    }
+
+    // Real-time — re-check when admin updates arc_locations
+    const channel = supabase
+      .channel(`geo-loc-${locationId}-${Date.now()}`)
+      .on('postgres_changes', {
+        event: 'UPDATE',
+        schema: 'public',
+        table: 'arc_locations',
+        filter: `id=eq.${locationId}`,
+      }, () => {
+        console.log('[Geo] Location settings updated by admin');
+        runGeoCheck();
+      })
+      .subscribe();
+
+    geoChannelRef.current = channel;
+
+    return () => {
+      if (geoChannelRef.current) {
+        supabase.removeChannel(geoChannelRef.current);
+        geoChannelRef.current = null;
+      }
+    };
+  }, [state.customerLocation, state.profile?.arc_location_id]);
 
   // Animation values
   const fillAnim = useRef(new Animated.Value(0)).current;   // coffee fill 0→1
@@ -101,6 +208,26 @@ export default function OrderSummaryScreen() {
     if (!name) { Alert.alert('Name required', 'Please enter your name.'); return; }
     if (!email || !email.includes('@')) { Alert.alert('Email required', 'Please enter your email address.'); return; }
     if (currentOrder.items.length === 0) { Alert.alert('No items', 'Please add at least one drink.'); return; }
+
+    // Log and track customer location on review
+    const loc = state.customerLocation;
+    if (loc?.granted) {
+      console.log(`[Order] Review pressed — location: lat=${loc.latitude}, lng=${loc.longitude}`);
+    } else {
+      console.log('[Order] Review pressed — location not available');
+    }
+    track('order_review', {
+      tealium_event: 'order_review',
+      customer_name: name,
+      customer_email: email,
+      customer_latitude: loc?.latitude || '',
+      customer_longitude: loc?.longitude || '',
+      customer_location_granted: loc?.granted ? 'true' : 'false',
+      arc_location_id: state.profile?.arc_location_id || '',
+      arc_location_name: state.profile?.arc_location_name || '',
+      item_count: currentOrder.items.length,
+    });
+
     setConfirmVisible(true);
   };
 
@@ -111,12 +238,23 @@ export default function OrderSummaryScreen() {
     dispatch({ type: 'SET_EMAIL', payload: email });
 
     const orderId = await generateSequentialOrderId();
+
+    // Log customer location
+    const loc = state.customerLocation;
+    if (loc?.granted) {
+      console.log(`[Order] Customer location: lat=${loc.latitude}, lng=${loc.longitude}`);
+    } else {
+      console.log('[Order] Customer location: not available');
+    }
     dispatch({ type: 'PLACE_ORDER', payload: { station: null, orderId } });
     trackOrderPlaced({
       id: orderId,
       name,
       email,
       items: currentOrder.items,
+      customerLocation: state.customerLocation || null,
+      arc_location_id: state.profile?.arc_location_id || '',
+      arc_location_name: state.profile?.arc_location_name || '',
     });
 
     // Show brewing animation, then navigate
@@ -294,12 +432,45 @@ export default function OrderSummaryScreen() {
               </View>
             </ScrollView>
 
+            {/* Geo Warning */}
+            {(geoWarning === 'outside' || geoWarning === 'denied') && (
+              <View style={styles.geoWarning}>
+                <LocationPinIcon size={20} color="#92400e" />
+                <View style={{ flex: 1 }}>
+                  {geoWarning === 'outside' && (
+                    <>
+                      <Text style={styles.geoWarningTitle}>You're a bit far from {locationName}</Text>
+                      <Text style={styles.geoWarningText}>
+                        Orders can only be placed when you're close to the venue. Please try again when closer to {locationName} to continue.
+                      </Text>
+                    </>
+                  )}
+                  {geoWarning === 'denied' && (
+                    <>
+                      <Text style={styles.geoWarningTitle}>Location access required</Text>
+                      <Text style={styles.geoWarningText}>
+                        Please enable location services to place an order at {locationName || 'this venue'}.{' '}
+                        <Text style={styles.geoWarningLink} onPress={() => Linking.openSettings()}>
+                          Open Settings →
+                        </Text>
+                      </Text>
+                    </>
+                  )}
+                </View>
+              </View>
+            )}
+
             {/* Actions */}
             <View style={styles.modalActions}>
               <TouchableOpacity style={styles.editBtn} onPress={() => setConfirmVisible(false)}>
                 <Text style={styles.editBtnText}>Cancel</Text>
               </TouchableOpacity>
-              <TouchableOpacity style={styles.confirmBtn} onPress={handleConfirm} activeOpacity={0.85}>
+              <TouchableOpacity
+                style={[styles.confirmBtn, (geoWarning === 'outside' || geoWarning === 'denied') && styles.confirmBtnDisabled]}
+                onPress={handleConfirm}
+                activeOpacity={0.85}
+                disabled={geoWarning === 'outside' || geoWarning === 'denied'}
+              >
                 <Text style={styles.confirmBtnText}>Confirm ☕</Text>
               </TouchableOpacity>
             </View>
@@ -522,7 +693,17 @@ const styles = StyleSheet.create({
     flex: 2, paddingVertical: 11, borderRadius: radius.lg,
     backgroundColor: colors.primary, alignItems: 'center',
   },
+  confirmBtnDisabled: { backgroundColor: colors.textMuted, opacity: 0.6 },
   confirmBtnText: { color: '#fff', fontSize: 16, fontWeight: '700', letterSpacing: 0.3 },
+  geoWarning: {
+    flexDirection: 'row', alignItems: 'flex-start', gap: spacing.sm,
+    backgroundColor: '#fef3c7', borderRadius: radius.md,
+    padding: spacing.md, borderWidth: 1, borderColor: '#fcd34d',
+    marginHorizontal: spacing.lg, marginBottom: spacing.sm,
+  },
+  geoWarningTitle: { fontSize: 14, fontWeight: '700', color: '#92400e', marginBottom: 4 },
+  geoWarningText: { fontSize: 13, color: '#92400e', lineHeight: 18 },
+  geoWarningLink: { fontWeight: '700', textDecorationLine: 'underline' },
 
   // ── Brewing modal ──────────────────────────────────────
   brewOverlay: {

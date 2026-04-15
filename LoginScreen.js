@@ -4,15 +4,35 @@ import {
   StyleSheet, SafeAreaView, KeyboardAvoidingView,
   Platform, ActivityIndicator, ScrollView,
 } from 'react-native';
-import Svg, { Path } from 'react-native-svg';
+import Svg, { Path, Circle } from 'react-native-svg';
 import { useAuth } from './AuthContext';
 import { colors, typography, spacing, radius, shadow } from './theme';
 import { UserIcon, LockIcon } from './CoffeeIcons';
+
+function EyeIcon({ size = 18, color = '#006D80' }) {
+  return (
+    <Svg width={size} height={size} viewBox="0 0 24 24" fill="none">
+      <Path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z" stroke={color} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+      <Circle cx="12" cy="12" r="3" stroke={color} strokeWidth="2"/>
+    </Svg>
+  );
+}
+
+function EyeOffIcon({ size = 18, color = '#006D80' }) {
+  return (
+    <Svg width={size} height={size} viewBox="0 0 24 24" fill="none">
+      <Path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94" stroke={color} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+      <Path d="M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19" stroke={color} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+      <Path d="M1 1l22 22" stroke={color} strokeWidth="2" strokeLinecap="round"/>
+    </Svg>
+  );
+}
 
 export default function LoginScreen() {
   const { login, authError, authLoading, setAuthError } = useAuth();
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
+  const [showPassword, setShowPassword] = useState(false);
 
   const handleLogin = async () => {
     setAuthError('');
@@ -55,7 +75,7 @@ export default function LoginScreen() {
                 <Path d="m97.12,16.13h-2.45l-1.11-7-2.81,7h-2.61l-2.75-7-1.13,7h-2.37l1.58-9.01h3.41l2.55,6.6,2.71-6.6h3.38l1.61,9.01Z"/>
               </Svg>
             </View>
-            <Text style={styles.appName}>Coffee Demo</Text>
+            <Text style={styles.appName}>Architect Arc Cafe</Text>
             <Text style={styles.tagline}>Barista Sign In</Text>
           </View>
 
@@ -87,13 +107,23 @@ export default function LoginScreen() {
                 placeholderTextColor={colors.textMuted}
                 value={password}
                 onChangeText={setPassword}
-                secureTextEntry
+                secureTextEntry={!showPassword}
                 autoCapitalize="none"
                 autoCorrect={false}
                 returnKeyType="done"
                 onSubmitEditing={handleLogin}
                 editable={!authLoading}
               />
+              <TouchableOpacity
+                onPress={() => setShowPassword(v => !v)}
+                style={styles.eyeBtn}
+                activeOpacity={0.6}
+              >
+                {showPassword
+                  ? <EyeOffIcon size={18} color={colors.textMuted} />
+                  : <EyeIcon size={18} color={colors.textMuted} />
+                }
+              </TouchableOpacity>
             </View>
 
             {authError ? (
@@ -157,6 +187,7 @@ const styles = StyleSheet.create({
     borderWidth: 1.5, borderColor: colors.border, paddingHorizontal: spacing.md,
   },
   input: { flex: 1, height: 48, fontSize: 16, color: colors.textDark },
+  eyeBtn: { padding: 6 },
   errorBox: {
     backgroundColor: '#fef0ee', borderRadius: radius.md,
     padding: spacing.md, borderWidth: 1, borderColor: '#f0c0b8',

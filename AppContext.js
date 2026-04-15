@@ -41,6 +41,7 @@ const initialState = {
   orders: [],
   menuEnabled: buildDefaultMenuEnabled(),
   customItems: buildDefaultCustomItems(),
+  customerLocation: null, // { latitude, longitude, granted, denied }
   menuConfigLoaded: false,
   deviceId: null,
   profile: null,
@@ -106,6 +107,9 @@ function reducer(state, action) {
 
     case 'SET_DEVICE_ID':
       return { ...state, deviceId: action.payload };
+
+    case 'SET_CUSTOMER_LOCATION':
+      return { ...state, customerLocation: action.payload };
 
     case 'SET_STORE_CONFIG':
       return {

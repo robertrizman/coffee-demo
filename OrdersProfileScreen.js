@@ -6,8 +6,9 @@ import {
 } from 'react-native';
 import { useApp } from './AppContext';
 import { supabase } from './supabase';
-import { trackProfileTab, trackEditProfile } from './tealium';
+import { trackProfileTab, trackEditProfile, trackProfileUpdated, trackUuidCopy, joinTrace, leaveTrace, getCanonicalDeviceId } from './tealium';
 import { colors, typography, spacing, radius, shadow } from './theme';
+import { UserIcon, EmailIcon, LocationPinIcon, TakeawayCupIcon, CheckIcon, CopyIcon, EditIcon } from './CoffeeIcons';
 
 function timeAgo(ts) {
   const secs = Math.floor((Date.now() - ts) / 1000);
@@ -72,6 +73,14 @@ export default function OrdersProfileScreen() {
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [activeTab, setActiveTab] = useState('orders');
+  const [traceId, setTraceId] = useState('');
+  const [traceActive, setTraceActive] = useState(false);
+  const [traceStatus, setTraceStatus] = useState('');
+  const [momentsData, setMomentsData] = useState(null);
+  const [momentsLoading, setMomentsLoading] = useState(false);
+  const [momentsUrl, setMomentsUrl] = useState('');
+  const [debugTapCount, setDebugTapCount] = useState(0);
+  const [momentsUnlocked, setMomentsUnlocked] = useState(false);
 
   // Filter global orders down to only this user's orders
   const myOrders = state.orders.filter((o) => {
@@ -144,12 +153,14 @@ export default function OrdersProfileScreen() {
   const handleSaveProfile = () => {
     if (!editName.trim()) { Alert.alert('Name required', 'Please enter your name.'); return; }
     if (!editEmail.trim() || !editEmail.includes('@')) { Alert.alert('Email required', 'Please enter a valid email.'); return; }
-    dispatch({ type: 'UPDATE_PROFILE', payload: {
+    const updatedProfile = {
       name: editName.trim(),
       email: editEmail.trim().toLowerCase(),
       arc_location_id: selectedLocationId,
       arc_location_name: selectedLocationName,
-    }});
+    };
+    dispatch({ type: 'UPDATE_PROFILE', payload: updatedProfile });
+    trackProfileUpdated(updatedProfile);
     setEditMode(false);
     // Also update push token with new location
     if (deviceId) {
@@ -176,6 +187,53 @@ export default function OrdersProfileScreen() {
   };
 
   const pendingCount = mergedOrders.filter((o) => o.status === 'pending').length;
+
+  const handleJoinTrace = async () => {
+    if (!traceId.trim()) return;
+    try {
+      await joinTrace(traceId.trim());
+      setTraceActive(true);
+      setTraceStatus(`✅ Trace started: ${traceId.trim()}`);
+      console.log('[Debug] Joined trace:', traceId.trim());
+      // Auto-hide after 3 seconds
+      setTimeout(() => setTraceStatus(''), 3000);
+    } catch (e) {
+      setTraceStatus(`❌ Error: ${e.message}`);
+      setTimeout(() => setTraceStatus(''), 3000);
+    }
+  };
+
+  const handleLeaveTrace = async () => {
+    try {
+      await leaveTrace();
+      setTraceActive(false);
+      setTraceId('');
+      setTraceStatus('✅ Trace stopped');
+      console.log('[Debug] Left trace and ended session');
+      // Auto-hide after 3 seconds
+      setTimeout(() => setTraceStatus(''), 3000);
+    } catch (e) {
+      setTraceStatus(`❌ Error: ${e.message}`);
+      setTimeout(() => setTraceStatus(''), 3000);
+    }
+  };
+
+  const handleQueryMoments = async () => {
+    const deviceId = getCanonicalDeviceId() || state.deviceId;
+    if (!deviceId) { setTraceStatus('No device ID available'); return; }
+    const url = `https://personalization-api.ap-southeast-2.prod.tealiumapis.com/personalization/accounts/success-robert-rizman/profiles/coffee-demo/engines/aaa7abe0-9023-49c8-8858-5fe2dbb18c39?attributeId=5120&attributeValue=${encodeURIComponent(deviceId.toLowerCase())}`;
+    setMomentsUrl(url);
+    setMomentsLoading(true);
+    try {
+      const res = await fetch(url, { headers: { 'Content-Type': 'application/json' } });
+      const data = await res.json();
+      setMomentsData(data);
+      console.log('[Debug] Moments API response:', JSON.stringify(data));
+    } catch (e) {
+      setMomentsData({ error: e.message });
+    }
+    setMomentsLoading(false);
+  };
 
   return (
     <SafeAreaView style={styles.safe}>
@@ -209,6 +267,23 @@ export default function OrdersProfileScreen() {
           <Text style={[styles.tabText, activeTab === 'profile' && styles.tabTextActive]}>Profile</Text>
           {activeTab === 'profile' && <View style={styles.tabUnderline} />}
         </TouchableOpacity>
+        <TouchableOpacity 
+          style={styles.tabWrap} 
+          onPress={() => { 
+            setActiveTab('debug'); 
+            trackProfileTab('debug');
+            // Increment tap counter
+            const newCount = debugTapCount + 1;
+            setDebugTapCount(newCount);
+            if (newCount >= 10 && !momentsUnlocked) {
+              setMomentsUnlocked(true);
+              showToast('🎉 Moments API unlocked!');
+            }
+          }}
+        >
+          <Text style={[styles.tabText, activeTab === 'debug' && styles.tabTextActive]}>Debug</Text>
+          {activeTab === 'debug' && <View style={styles.tabUnderline} />}
+        </TouchableOpacity>
       </View>
       <View style={styles.divider} />
 
@@ -227,7 +302,7 @@ export default function OrdersProfileScreen() {
           >
             {mergedOrders.length === 0 ? (
               <View style={styles.emptyState}>
-                <Text style={styles.emptyIcon}>☕</Text>
+                <TakeawayCupIcon size={56} color={colors.border} />
                 <Text style={styles.emptyTitle}>No orders yet</Text>
                 <Text style={styles.emptySubtitle}>Your orders will appear here once you place one</Text>
               </View>
@@ -264,11 +339,10 @@ export default function OrdersProfileScreen() {
                   </View>
                   {order.status === 'complete' && (
                     <View style={styles.readyBanner}>
-                      <Text style={styles.readyText}>
-                        {order.fulfilledAt && (Date.now() - order.fulfilledAt) > 30 * 60 * 1000
-                          ? '✓ Collected'
-                          : '☕ Ready for pickup!'}
-                      </Text>
+                      {order.fulfilledAt && (Date.now() - order.fulfilledAt) > 30 * 60 * 1000
+                        ? <><CheckIcon size={14} color={colors.primary} /><Text style={styles.readyText}>Collected</Text></>
+                        : <><TakeawayCupIcon size={14} color={colors.primary} /><Text style={styles.readyText}>Ready for pickup!</Text></>
+                      }
                     </View>
                   )}
                   {order.status === 'cancelled' && (
@@ -292,7 +366,7 @@ export default function OrdersProfileScreen() {
             {!editMode ? (
               <>
                 <View style={styles.profileRow}>
-                  <Text style={styles.profileIcon}>👤</Text>
+                  <UserIcon size={22} color={colors.textMid} />
                   <View style={styles.profileInfo}>
                     <Text style={styles.profileLabel}>NAME</Text>
                     <Text style={styles.profileValue}>{profile?.name || '—'}</Text>
@@ -300,7 +374,7 @@ export default function OrdersProfileScreen() {
                 </View>
                 <View style={styles.profileDivider} />
                 <View style={styles.profileRow}>
-                  <Text style={styles.profileIcon}>✉</Text>
+                  <EmailIcon size={22} color={colors.textMid} />
                   <View style={styles.profileInfo}>
                     <Text style={styles.profileLabel}>EMAIL</Text>
                     <Text style={styles.profileValue}>{profile?.email || '—'}</Text>
@@ -308,7 +382,7 @@ export default function OrdersProfileScreen() {
                 </View>
                 <View style={styles.profileDivider} />
                 <View style={styles.profileRow}>
-                  <Text style={styles.profileIcon}>📍</Text>
+                  <LocationPinIcon size={22} color={colors.textMid} />
                   <View style={styles.profileInfo}>
                     <Text style={styles.profileLabel}>ARC LOCATION</Text>
                     {selectedLocationName ? (
@@ -357,7 +431,7 @@ export default function OrdersProfileScreen() {
                 <Text style={styles.cardTitle}>Edit profile</Text>
                 <Text style={styles.fieldLabel}>NAME</Text>
                 <View style={styles.inputRow}>
-                  <Text style={styles.inputIcon}>👤</Text>
+                  <UserIcon size={16} color={colors.textMuted} />
                   <TextInput
                     style={styles.input}
                     value={editName}
@@ -369,7 +443,7 @@ export default function OrdersProfileScreen() {
                 </View>
                 <Text style={styles.fieldLabel}>EMAIL</Text>
                 <View style={styles.inputRow}>
-                  <Text style={styles.inputIcon}>✉</Text>
+                  <EmailIcon size={16} color={colors.textMuted} />
                   <TextInput
                     style={styles.input}
                     value={editEmail}
@@ -387,7 +461,7 @@ export default function OrdersProfileScreen() {
                   onPress={() => setLocationPickerVisible(true)}
                   activeOpacity={0.7}
                 >
-                  <Text style={styles.inputIcon}>📍</Text>
+                  <LocationPinIcon size={16} color={colors.textMuted} />
                   <Text style={[styles.input, { paddingVertical: 0, lineHeight: 48, color: selectedLocationName ? colors.textDark : colors.textMuted }]}>
                     {selectedLocationName || 'Select location'}
                   </Text>
@@ -421,11 +495,16 @@ export default function OrdersProfileScreen() {
                 onPress={() => {
                   if (deviceId) {
                     Clipboard.setString(deviceId);
-                    Alert.alert('Copied', 'UUID copied to clipboard.');
+                    trackUuidCopy({
+                      uuid: deviceId,
+                      email: profile?.email || '',
+                      name: profile?.name || '',
+                    });
+                    showToast('UUID copied to clipboard');
                   }
                 }}
               >
-                <Text style={styles.copyIcon}>⎘</Text>
+                <CopyIcon size={16} color={colors.primary} />
               </TouchableOpacity>
             </View>
           </View>
@@ -438,7 +517,7 @@ export default function OrdersProfileScreen() {
       <Modal visible={locationPickerVisible} animationType="slide" presentationStyle="pageSheet">
         <SafeAreaView style={{ flex: 1, backgroundColor: colors.background }}>
           <View style={styles.modalHeader}>
-            <Text style={styles.modalTitle}>📍 Select Arc Location</Text>
+            <View style={styles.modalTitleRow}><LocationPinIcon size={20} color={colors.midnight} /><Text style={styles.modalTitle}>Select Arc Location</Text></View>
             <TouchableOpacity onPress={() => setLocationPickerVisible(false)} style={styles.modalCloseBtn}>
               <Text style={styles.modalCloseBtnText}>✕</Text>
             </TouchableOpacity>
@@ -484,6 +563,99 @@ export default function OrdersProfileScreen() {
           </ScrollView>
         </SafeAreaView>
       </Modal>
+
+      {/* ── Debug Tab ── */}
+      {activeTab === 'debug' && (
+        <ScrollView contentContainerStyle={styles.debugContent} showsVerticalScrollIndicator={false}>
+
+          {/* Trace Section */}
+          <View style={styles.debugCard}>
+            <Text style={styles.debugCardTitle}>🔍 Tealium Trace</Text>
+            <Text style={styles.debugCardDesc}>
+              Enter a Trace ID from Tealium iQ to begin a live trace session. All events will include the trace ID for real-time monitoring.
+            </Text>
+
+            <Text style={styles.debugLabel}>TRACE ID</Text>
+            <View style={styles.debugInputRow}>
+              <TextInput
+                style={styles.debugInput}
+                placeholder="Enter trace ID"
+                placeholderTextColor={colors.textMuted}
+                value={traceId}
+                onChangeText={setTraceId}
+                autoCapitalize="none"
+                autoCorrect={false}
+                editable={!traceActive}
+              />
+            </View>
+
+            <View style={styles.debugBtnRow}>
+              <TouchableOpacity
+                style={[styles.debugBtn, (!traceId.trim() || traceActive) && styles.debugBtnDisabled]}
+                onPress={handleJoinTrace}
+                disabled={!traceId.trim() || traceActive}
+                activeOpacity={0.8}
+              >
+                <Text style={styles.debugBtnText}>Start Trace</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[styles.debugBtn, styles.debugBtnDanger, !traceActive && styles.debugBtnDisabled]}
+                onPress={handleLeaveTrace}
+                disabled={!traceActive}
+                activeOpacity={0.8}
+              >
+                <Text style={styles.debugBtnText}>Stop Trace</Text>
+              </TouchableOpacity>
+            </View>
+
+            {traceStatus ? (
+              <View style={[styles.debugStatusBadge, traceActive && styles.debugStatusBadgeActive]}>
+                <Text style={[styles.debugStatusText, traceActive && styles.debugStatusTextActive]}>{traceStatus}</Text>
+              </View>
+            ) : null}
+          </View>
+
+          {/* Moments API Section */}
+          {momentsUnlocked && (
+            <View style={styles.debugCard}>
+              <Text style={styles.debugCardTitle}>⚡ Moments API</Text>
+              <Text style={styles.debugCardDesc}>Query the Moments API engine for this visitor's current profile data.</Text>
+
+              <Text style={styles.debugLabel}>DEVICE UUID</Text>
+              <Text style={styles.debugMono}>{(getCanonicalDeviceId() || state.deviceId || '—').toLowerCase()}</Text>
+
+              <Text style={styles.debugLabel}>ENDPOINT</Text>
+              <Text style={styles.debugMono} numberOfLines={3}>
+                {`https://personalization-api.ap-southeast-2.prod.tealiumapis.com/personalization/accounts/success-robert-rizman/profiles/coffee-demo/engines/aaa7abe0-9023-49c8-8858-5fe2dbb18c39?attributeId=5120&attributeValue=${(getCanonicalDeviceId() || state.deviceId || '').toLowerCase()}`}
+              </Text>
+
+              <TouchableOpacity
+                style={[styles.debugBtn, styles.debugBtnPrimary, momentsLoading && styles.debugBtnDisabled]}
+                onPress={handleQueryMoments}
+                disabled={momentsLoading}
+                activeOpacity={0.8}
+              >
+                {momentsLoading
+                  ? <ActivityIndicator size="small" color="#fff" />
+                  : <Text style={styles.debugBtnText}>Query Moments API</Text>
+                }
+              </TouchableOpacity>
+
+              {momentsData && (
+                <View style={styles.debugResponseWrap}>
+                  <Text style={styles.debugLabel}>RESPONSE</Text>
+                  <ScrollView style={styles.debugResponseScroll} nestedScrollEnabled>
+                    <Text style={styles.debugMono}>{JSON.stringify(momentsData, null, 2)}</Text>
+                  </ScrollView>
+                </View>
+              )}
+            </View>
+          )}
+
+          <View style={{ height: 40 }} />
+        </ScrollView>
+      )}
+
     </SafeAreaView>
   );
 }
@@ -563,8 +735,8 @@ const styles = StyleSheet.create({
   itemMods: { ...typography.caption, marginTop: 2 },
   readyBanner: {
     backgroundColor: colors.primaryLight, paddingVertical: spacing.sm,
-    paddingHorizontal: spacing.md, alignItems: 'center',
-    borderTopWidth: 1, borderTopColor: colors.primaryMid,
+    paddingHorizontal: spacing.md, flexDirection: 'row', alignItems: 'center',
+    gap: spacing.xs, borderTopWidth: 1, borderTopColor: colors.primaryMid,
   },
   readyText: { fontSize: 14, fontWeight: '700', color: colors.primary },
 
@@ -653,6 +825,7 @@ const styles = StyleSheet.create({
     borderBottomWidth: 1, borderBottomColor: colors.borderLight,
   },
   modalTitle: { ...typography.heading3 },
+  modalTitleRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
   modalCloseBtn: {
     width: 32, height: 32, borderRadius: 16,
     backgroundColor: colors.surfaceAlt, alignItems: 'center', justifyContent: 'center',
@@ -680,4 +853,45 @@ const styles = StyleSheet.create({
     shadowRadius: 8, elevation: 8,
   },
   toastText: { color: '#fff', fontSize: 14, fontWeight: '600' },
+
+  // ── Debug tab ──
+  debugContent: { padding: spacing.lg, gap: spacing.md },
+  debugCard: {
+    backgroundColor: colors.surface, borderRadius: radius.xl,
+    padding: spacing.lg, gap: spacing.sm,
+    borderWidth: 1, borderColor: colors.borderLight,
+  },
+  debugCardTitle: { fontSize: 16, fontWeight: '700', color: colors.midnight },
+  debugCardDesc: { fontSize: 13, color: colors.textMuted, lineHeight: 18 },
+  debugLabel: { fontSize: 11, fontWeight: '700', color: colors.textMuted, letterSpacing: 1, textTransform: 'uppercase', marginTop: spacing.sm },
+  debugInputRow: {
+    flexDirection: 'row', alignItems: 'center',
+    backgroundColor: colors.surfaceAlt, borderRadius: radius.lg,
+    borderWidth: 1.5, borderColor: colors.border, paddingHorizontal: spacing.md,
+  },
+  debugInput: { flex: 1, height: 44, fontSize: 15, color: colors.textDark, fontFamily: 'monospace' },
+  debugBtnRow: { flexDirection: 'row', gap: spacing.sm, marginTop: spacing.xs },
+  debugBtn: {
+    flex: 1, paddingVertical: 10, borderRadius: radius.lg,
+    backgroundColor: colors.midnight, alignItems: 'center',
+  },
+  debugBtnPrimary: { backgroundColor: colors.primary },
+  debugBtnDanger: { backgroundColor: '#dc2626' },
+  debugBtnDisabled: { opacity: 0.35 },
+  debugBtnText: { color: '#fff', fontSize: 14, fontWeight: '700' },
+  debugStatusBadge: {
+    backgroundColor: colors.surfaceAlt, borderRadius: radius.md,
+    padding: spacing.sm, marginTop: spacing.xs,
+    borderWidth: 1, borderColor: colors.border,
+  },
+  debugStatusBadgeActive: { backgroundColor: '#dcfce7', borderColor: '#16a34a' },
+  debugStatusText: { fontSize: 13, color: colors.textMid, fontWeight: '600' },
+  debugStatusTextActive: { color: '#16a34a' },
+  debugMono: {
+    fontSize: 11, color: colors.textMid, fontFamily: 'monospace',
+    backgroundColor: colors.surfaceAlt, borderRadius: radius.sm,
+    padding: spacing.sm, lineHeight: 16,
+  },
+  debugResponseWrap: { marginTop: spacing.sm, gap: spacing.xs },
+  debugResponseScroll: { maxHeight: 200, backgroundColor: colors.surfaceAlt, borderRadius: radius.md, padding: spacing.sm },
 });

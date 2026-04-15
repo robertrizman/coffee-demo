@@ -238,6 +238,11 @@ export function trackOrderPlaced(order) {
       item_extras: (item.extras || []).join(', '),
       drink_summary: drinkSummary,
       time_of_day: timeOfDay,
+      customer_latitude: order.customerLocation?.latitude || '',
+      customer_longitude: order.customerLocation?.longitude || '',
+      customer_location_granted: order.customerLocation?.granted ? 'true' : 'false',
+      arc_location_id: order.arc_location_id || '',
+      arc_location_name: order.arc_location_name || '',
     });
   });
 }
@@ -335,8 +340,40 @@ export function trackEditProfile() {
   track('edit_profile_clicked', { tealium_event: 'edit_profile_clicked' });
 }
 
+export function trackProfileUpdated({ name, email, arc_location_id, arc_location_name }) {
+  track('profile_updated', {
+    tealium_event: 'profile_updated',
+    customer_name: name || '',
+    customer_email: email || '',
+    arc_location_id: arc_location_id || '',
+    arc_location_name: arc_location_name || '',
+  });
+}
+
+export function trackUuidCopy({ uuid, email, name }) {
+  track('uuid_copy', {
+    tealium_event: 'uuid_copy',
+    teal_app_uuid: uuid || '',
+    customer_email: email || '',
+    customer_name: name || '',
+  });
+}
+
 export function trackAIPairingOpened() {
-  track('ai_pairing_opened', { tealium_event: 'ai_pairing_opened' });
+  track('ai_pairing_opened', {
+    tealium_event: 'ai_pairing_opened',
+    carousel_position: 1,
+    carousel_name: 'llm_profile_pairing',
+  });
+}
+
+export function trackAIPairingCarousel(slideIndex) {
+  const carouselNames = ['llm_profile_pairing', 'connector_pairing'];
+  track('ai_pairing_carousel', {
+    tealium_event: 'ai_pairing_carousel',
+    carousel_position: slideIndex + 1,
+    carousel_name: carouselNames[slideIndex] || `slide_${slideIndex + 1}`,
+  });
 }
 
 export function trackAIPairingResult(recommendation) {
