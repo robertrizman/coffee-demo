@@ -6,7 +6,7 @@ import { getDeviceId } from './deviceId';
 import { loadProfile, saveProfile } from './userProfile';
 import { printOrderReceipt } from './printing';
 import { AppState } from 'react-native';
-import { loadDefaultPrinter, loadAutoPrint } from './printerConfig';
+import { loadDefaultPrinter, loadAutoPrint, loadBluetoothPrinter } from './printerConfig';
 import { setDeviceIdForMoments, onPrismDeviceIdReady, getCanonicalDeviceId } from './tealium';
 import { loadPairingRules } from './recommendations';
 
@@ -362,14 +362,16 @@ export function AppProvider({ children }) {
         const order = rowToOrder(p.new);
         dispatch({ type: 'REALTIME_ORDER_ADDED', payload: order });
 
-        // Auto-print if enabled and a default printer is configured
+        // Auto-print if enabled and a printer is configured (WiFi or Bluetooth)
         try {
-          const [autoPrintEnabled, defaultPrinter] = await Promise.all([
+          const [autoPrintEnabled, defaultPrinter, bluetoothPrinter] = await Promise.all([
             loadAutoPrint(),
             loadDefaultPrinter(),
+            loadBluetoothPrinter(),
           ]);
-          if (autoPrintEnabled && defaultPrinter?.ip) {
-            console.log('[AutoPrint] Printing order', order.id, 'to', defaultPrinter.ip);
+          const hasPrinter = defaultPrinter?.ip || bluetoothPrinter?.bluetoothAddress;
+          if (autoPrintEnabled && hasPrinter) {
+            console.log('[AutoPrint] Printing order', order.id, bluetoothPrinter?.bluetoothAddress ? 'via Bluetooth' : 'to ' + defaultPrinter?.ip);
             const result = await printOrderReceipt(order, '', { silent: true });
             
             // Mark as printed if successful
@@ -433,12 +435,14 @@ export function AppProvider({ children }) {
         
         // PRINT QUEUE: Check for unprinted orders
         try {
-          const [autoPrintEnabled, defaultPrinter] = await Promise.all([
+          const [autoPrintEnabled, defaultPrinter, bluetoothPrinter] = await Promise.all([
             loadAutoPrint(),
             loadDefaultPrinter(),
+            loadBluetoothPrinter(),
           ]);
-          
-          if (autoPrintEnabled && defaultPrinter?.ip) {
+          const hasPrinter = defaultPrinter?.ip || bluetoothPrinter?.bluetoothAddress;
+
+          if (autoPrintEnabled && hasPrinter) {
             console.log('[PrintQueue] Checking for unprinted orders...');
             
             const { data: unprintedOrders, error } = await supabase

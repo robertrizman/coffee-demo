@@ -54,6 +54,7 @@ export default function SettingsScreen() {
   const [bluetoothPrinter, setBluetoothPrinter] = useState(null);
   const [bluetoothPrinters, setBluetoothPrinters] = useState([]);
   const [scanningBluetooth, setScanningBluetooth] = useState(false);
+  const [pairingAddress, setPairingAddress] = useState(null);
   const [connectionType, setConnectionType] = useState('wifi'); // 'wifi' | 'bluetooth'
   const [deviceIP, setDeviceIP] = useState(null);
   const [autoPrintEnabled, setAutoPrintEnabled] = useState(false);
@@ -227,21 +228,30 @@ export default function SettingsScreen() {
   }, [scanProgress, scanTotal]);
 
   const startBluetoothScan = async () => {
-    // Request Bluetooth permissions on Android 12+
     if (Platform.OS === 'android') {
       const { PermissionsAndroid } = require('react-native');
       try {
-        const granted = await PermissionsAndroid.requestMultiple([
-          'android.permission.BLUETOOTH_SCAN',
-          'android.permission.BLUETOOTH_CONNECT',
-        ]);
+        // Android 12+ needs BLUETOOTH_SCAN + BLUETOOTH_CONNECT
+        // Android < 12 needs ACCESS_FINE_LOCATION for startDiscovery()
+        const permissionsToRequest = Platform.Version >= 31
+          ? [
+              'android.permission.BLUETOOTH_SCAN',
+              'android.permission.BLUETOOTH_CONNECT',
+            ]
+          : [
+              'android.permission.BLUETOOTH_SCAN',
+              'android.permission.BLUETOOTH_CONNECT',
+              'android.permission.ACCESS_FINE_LOCATION',
+            ];
+
+        const granted = await PermissionsAndroid.requestMultiple(permissionsToRequest);
         const allGranted = Object.values(granted).every(
           v => v === PermissionsAndroid.RESULTS.GRANTED
         );
         if (!allGranted) {
           Alert.alert(
-            'Bluetooth Permission Required',
-            'Please allow Bluetooth access in Settings to scan for printers.',
+            'Permission Required',
+            'Bluetooth and location permissions are needed to discover nearby printers. Please allow them in Settings.',
             [
               { text: 'Cancel', style: 'cancel' },
               { text: 'Open Settings', onPress: () => { const { Linking } = require('react-native'); Linking.openSettings(); } },
@@ -264,18 +274,20 @@ export default function SettingsScreen() {
         Alert.alert('Not available', 'Bluetooth printing requires the Android app build.');
         return;
       }
-      console.log('[BT] Starting Bluetooth discovery...');
+      console.log('[BT] Starting active Bluetooth discovery (~12s)...');
+      // discoverBluetoothPrinters now uses startDiscovery() — actively scans for
+      // nearby devices, not just bonded ones. Resolves when discovery finishes (~12s).
       const printers = await BrotherPrinter.discoverBluetoothPrinters();
-      console.log('[BT] Found printers:', JSON.stringify(printers));
+      console.log('[BT] Discovery complete. Found:', JSON.stringify(printers));
       setBluetoothPrinters(printers || []);
       if (!printers || printers.length === 0) {
         Alert.alert(
-          'No printers found',
-          'Make sure:\n• Bluetooth is enabled on this device\n• Brother printer is powered on\n• Printer Bluetooth is enabled\n• You are within range (~10m)'
+          'No devices found',
+          'Make sure:\n• Bluetooth is enabled on this device\n• Brother printer is powered on and in range (~10m)\n• Printer is in discoverable/pairing mode'
         );
       }
     } catch (e) {
-      console.warn('[BT] Scan error:', e.message);
+      console.warn('[BT] Discovery error:', e.message);
       Alert.alert('Bluetooth Error', e.message);
     } finally {
       setScanningBluetooth(false);
@@ -283,50 +295,98 @@ export default function SettingsScreen() {
   };
 
   const handleSetBluetoothPrinter = async (printer) => {
-    const saved = { ...printer, bluetoothAddress: printer.address, connectionType: 'bluetooth' };
+    // Ensure device is bonded before saving — Brother SDK requires a paired connection
+    const { NativeModules } = require('react-native');
+    const BrotherPrinter = NativeModules.BrotherPrinter;
+    if (BrotherPrinter) {
+      setPairingAddress(printer.address);
+      try {
+        const result = await BrotherPrinter.pairBluetoothDevice(printer.address);
+        if (!result?.alreadyPaired) {
+          console.log('[BT] Paired successfully with', printer.name);
+        }
+      } catch (e) {
+        setPairingAddress(null);
+        Alert.alert(
+          'Pairing Failed',
+          (e.message || 'Could not pair with the printer.') +
+          '\n\nTo pair the QL-820NWB:\n1. Press and hold the Bluetooth button for 3 seconds until the LED flashes blue\n2. Tap the printer in the list again'
+        );
+        return;
+      }
+      setPairingAddress(null);
+    }
+
+    // Extract QL model from printer name e.g. "QL-820NWB6138" → "QL-820NWB"
+    const modelMatch = (printer.name || '').match(/QL-\d+[A-Z]*/i);
+    const model = modelMatch ? modelMatch[0].toUpperCase() : null;
+    const isQL = !!model;
+
+    const saved = {
+      ...printer,
+      bluetoothAddress: printer.address,
+      connectionType: 'bluetooth',
+      model: model || null,
+      printer_type: isQL ? 'brother_ql' : null,
+      supports_auto_cut: isQL,
+    };
     await saveBluetoothPrinter(saved);
 
-    // Update default printer with bluetooth address and connection type
-    if (defaultPrinter) {
-      const updated = { ...defaultPrinter, bluetoothAddress: printer.address, connectionType: 'bluetooth' };
-      await saveDefaultPrinter(updated);
-      setDefaultPrinter(updated);
-    }
+    // Bluetooth takes precedence — clear WiFi printer so only one is active
+    await clearDefaultPrinter();
+    setDefaultPrinter(null);
+
     setBluetoothPrinter(saved);
     setConnectionType('bluetooth');
     await saveConnectionType('bluetooth');
 
     // Save to Supabase printers table
     try {
-      const { data: existing } = await supabase
-        .from('printers')
-        .select('id')
-        .eq('bluetooth_address', printer.address)
-        .single();
-
       const payload = {
         name: printer.name,
+        ip: null,
         bluetooth_address: printer.address,
+        mac_address: printer.address,
         connection_type: 'bluetooth',
-        model: 'QL-820NWB',
-        printer_type: 'brother_ql',
-        supports_auto_cut: true,
+        model: model || null,
+        printer_type: isQL ? 'brother_ql' : 'generic',
+        supports_auto_cut: isQL,
         last_seen_at: new Date().toISOString(),
       };
 
+      // Step 1: check if a row exists for this bluetooth_address
+      const { data: existing, error: lookupError } = await supabase
+        .from('printers')
+        .select('id')
+        .eq('bluetooth_address', printer.address)
+        .maybeSingle();
+
+      if (lookupError) {
+        console.warn('[Settings] Lookup error:', lookupError.message, lookupError.code);
+        throw new Error(`Lookup failed: ${lookupError.message} (${lookupError.code})`);
+      }
+
       let printerId;
       if (existing) {
-        await supabase.from('printers').update(payload).eq('bluetooth_address', printer.address);
+        const { error: updateError } = await supabase
+          .from('printers').update(payload).eq('id', existing.id);
+        if (updateError) throw new Error(`Update failed: ${updateError.message}`);
         printerId = existing.id;
+        console.log('[Settings] Updated Bluetooth printer in DB:', existing.id);
       } else {
-        const { data: newPrinter } = await supabase.from('printers').insert(payload).select('id').single();
-        printerId = newPrinter?.id;
+        const { data: inserted, error: insertError } = await supabase
+          .from('printers').insert(payload).select('id').single();
+        if (insertError) throw new Error(`Insert failed: ${insertError.message} (${insertError.code})`);
+        printerId = inserted.id;
+        console.log('[Settings] Inserted Bluetooth printer in DB:', printerId);
       }
 
       // Link to barista account
       if (barista?.id && printerId) {
-        await supabase.from('baristas').update({ printer_id: printerId }).eq('id', barista.id);
-        console.log('[Settings] Saved Bluetooth printer to barista account');
+        const { error: linkError } = await supabase
+          .from('baristas').update({ printer_id: printerId }).eq('id', barista.id);
+        if (linkError) console.warn('[Settings] Could not link printer to barista:', linkError.message);
+        else console.log('[Settings] Linked Bluetooth printer to barista:', barista.name);
       }
     } catch (err) {
       console.warn('[Settings] Could not save Bluetooth printer to DB:', err.message);
@@ -337,16 +397,21 @@ export default function SettingsScreen() {
 
   const handleClearBluetoothPrinter = async () => {
     await clearBluetoothPrinter();
-    if (defaultPrinter) {
-      const updated = { ...defaultPrinter };
-      delete updated.bluetoothAddress;
-      updated.connectionType = 'wifi';
-      await saveDefaultPrinter(updated);
-      setDefaultPrinter(updated);
-    }
     setBluetoothPrinter(null);
     setConnectionType('wifi');
     await saveConnectionType('wifi');
+    // Clear auto-cut — no QL printer is active
+    setAutoCutEnabled(false);
+    await saveAutoCut(false);
+    // Unlink printer from barista account in Supabase
+    if (barista?.id) {
+      try {
+        await supabase.from('baristas').update({ printer_id: null }).eq('id', barista.id);
+        console.log('[Settings] Unlinked printer from barista account');
+      } catch (err) {
+        console.warn('[Settings] Could not unlink printer from DB:', err.message);
+      }
+    }
   };
 
   const startScan = async () => {
@@ -398,13 +463,6 @@ export default function SettingsScreen() {
     setDefaultPrinter(normalizedPrinter);
 
     try {
-      // Step 1: Save/update printer in printers table
-      const { data: existing } = await supabase
-        .from('printers')
-        .select('id')
-        .eq('ip', normalizedPrinter.ip)
-        .single();
-
       const payload = {
         name: normalizedPrinter.name,
         ip: normalizedPrinter.ip,
@@ -416,21 +474,21 @@ export default function SettingsScreen() {
         last_seen_at: new Date().toISOString(),
       };
 
-      let printerId;
-      if (existing) {
-        await supabase.from('printers').update(payload).eq('ip', normalizedPrinter.ip);
-        printerId = existing.id;
-      } else {
-        const { data: newPrinter } = await supabase.from('printers').insert(payload).select('id').single();
-        printerId = newPrinter?.id;
-      }
+      // Upsert on ip — handles both first-add and re-add cleanly
+      const { data: upsertedPrinter, error: upsertError } = await supabase
+        .from('printers')
+        .upsert(payload, { onConflict: 'ip' })
+        .select('id')
+        .single();
 
-      // Step 2: Save printer to barista account (shared across all devices)
-      if (barista?.id && printerId) {
+      if (upsertError) throw upsertError;
+
+      // Link to barista account
+      if (barista?.id && upsertedPrinter?.id) {
         await supabase.from('baristas')
-          .update({ printer_id: printerId })
+          .update({ printer_id: upsertedPrinter.id })
           .eq('id', barista.id);
-        console.log('[Settings] Saved printer to barista account:', barista.name, printerId);
+        console.log('[Settings] Saved printer to barista account:', barista.name, upsertedPrinter.id);
       }
     } catch (err) {
       console.warn('[Settings] Could not save printer to DB:', err.message);
@@ -449,6 +507,18 @@ export default function SettingsScreen() {
         text: 'Remove', style: 'destructive', onPress: async () => {
           await clearDefaultPrinter();
           setDefaultPrinter(null);
+          // Clear auto-cut — no QL printer is active
+          setAutoCutEnabled(false);
+          await saveAutoCut(false);
+          // Unlink printer from barista account in Supabase
+          if (barista?.id) {
+            try {
+              await supabase.from('baristas').update({ printer_id: null }).eq('id', barista.id);
+              console.log('[Settings] Unlinked printer from barista account');
+            } catch (err) {
+              console.warn('[Settings] Could not unlink printer from DB:', err.message);
+            }
+          }
         },
       },
     ]);
@@ -460,10 +530,10 @@ export default function SettingsScreen() {
   };
 
   const handleAutoPrintToggle = async (value) => {
-    if (value && !defaultPrinter) {
+    if (value && !defaultPrinter && !bluetoothPrinter) {
       Alert.alert(
-        'No default printer',
-        'Please scan for and set a default printer before enabling auto-print.',
+        'No printer configured',
+        'Please set a WiFi or Bluetooth printer before enabling auto-print.',
       );
       return;
     }
@@ -873,28 +943,36 @@ export default function SettingsScreen() {
             activeOpacity={0.85}
           >
             <Text style={styles.scanBtnText}>
-              {scanningBluetooth ? '🔍 Scanning...' : '📶 Scan for Bluetooth printers'}
+              {scanningBluetooth ? '🔍 Discovering... (~12s)' : '📶 Discover Bluetooth printers'}
             </Text>
           </TouchableOpacity>
 
           {bluetoothPrinters.length > 0 && (
             <View style={{ marginTop: spacing.sm, gap: spacing.sm }}>
-              {bluetoothPrinters.map((printer) => (
-                <TouchableOpacity
-                  key={printer.address}
-                  style={[styles.printerRow, bluetoothPrinter?.address === printer.address && styles.printerRowActive]}
-                  onPress={() => handleSetBluetoothPrinter(printer)}
-                  activeOpacity={0.8}
-                >
-                  <View style={{ flex: 1 }}>
-                    <Text style={styles.printerName}>{printer.name}</Text>
-                    <Text style={styles.printerIP}>{printer.address}</Text>
-                  </View>
-                  {bluetoothPrinter?.address === printer.address && (
-                    <Text style={{ color: colors.primary, fontWeight: '700' }}>✓</Text>
-                  )}
-                </TouchableOpacity>
-              ))}
+              {bluetoothPrinters.map((printer) => {
+                const isPairing = pairingAddress === printer.address;
+                const isActive = bluetoothPrinter?.address === printer.address;
+                return (
+                  <TouchableOpacity
+                    key={printer.address}
+                    style={[styles.printerRow, isActive && styles.printerRowActive, isPairing && { opacity: 0.7 }]}
+                    onPress={() => !pairingAddress && handleSetBluetoothPrinter(printer)}
+                    activeOpacity={0.8}
+                    disabled={!!pairingAddress}
+                  >
+                    <View style={{ flex: 1 }}>
+                      <Text style={styles.printerName}>{printer.name}</Text>
+                      <Text style={styles.printerIP}>{printer.address}</Text>
+                    </View>
+                    {isPairing
+                      ? <ActivityIndicator size="small" color={colors.primary} />
+                      : isActive
+                      ? <Text style={{ color: colors.primary, fontWeight: '700' }}>✓</Text>
+                      : null
+                    }
+                  </TouchableOpacity>
+                );
+              })}
             </View>
           )}
         </View>
@@ -921,18 +999,18 @@ export default function SettingsScreen() {
             />
           </View>
 
-          {autoPrintEnabled && defaultPrinter && (
+          {autoPrintEnabled && (bluetoothPrinter || defaultPrinter) && (
             <View style={styles.autoPrintActive}>
               <Text style={styles.autoPrintActiveText}>
-                ✓ Active — printing to {defaultPrinter.name} ({defaultPrinter.ip})
+                ✓ Active — printing to {bluetoothPrinter ? `${bluetoothPrinter.name} (Bluetooth)` : `${defaultPrinter.name} (${defaultPrinter.ip})`}
               </Text>
             </View>
           )}
 
-          {autoPrintEnabled && !defaultPrinter && (
+          {autoPrintEnabled && !defaultPrinter && !bluetoothPrinter && (
             <View style={styles.autoPrintWarning}>
               <Text style={styles.autoPrintWarningText}>
-                ⚠️ No default printer set — scan for printers above first
+                ⚠️ No printer set — scan for a WiFi or Bluetooth printer above first
               </Text>
             </View>
           )}
@@ -943,8 +1021,8 @@ export default function SettingsScreen() {
             </Text>
           )}
         </View>
-            {/* Auto-cut for Brother QL */}
-            {defaultPrinter?.model?.toLowerCase().includes('ql') && (
+            {/* Auto-cut for Brother QL — shown for both WiFi and Bluetooth QL printers */}
+            {(defaultPrinter?.model?.toLowerCase().includes('ql') || bluetoothPrinter?.model?.toLowerCase().includes('ql')) && (
               <View style={styles.card}>
                 <View style={styles.cardHeader}>
                   <Text style={styles.cardIcon}>✂️</Text>

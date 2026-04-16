@@ -10,7 +10,7 @@
 
 import React, { createContext, useContext, useState } from 'react';
 import { supabase } from './supabase';
-import { saveDefaultPrinter } from './printerConfig';
+import { saveDefaultPrinter, saveBluetoothPrinter, saveAutoCut } from './printerConfig';
 import { getDeviceId } from './deviceId';
 
 const AuthContext = createContext(null);
@@ -57,7 +57,8 @@ export function AuthProvider({ children }) {
         .select(`
           printer_id,
           printers (
-            id, name, ip, port, model, printer_type, supports_auto_cut
+            id, name, ip, port, model, printer_type, supports_auto_cut,
+            bluetooth_address, connection_type, mac_address
           )
         `)
         .eq('id', data.id)
@@ -65,16 +66,38 @@ export function AuthProvider({ children }) {
 
       if (baristaWithPrinter?.printers) {
         const printer = baristaWithPrinter.printers;
-        await saveDefaultPrinter({
-          id: printer.id,
-          ip: printer.ip,
-          port: printer.port || 9100,
-          name: printer.name,
-          model: printer.model || null,
-          printer_type: printer.printer_type || null,
-          supports_auto_cut: printer.supports_auto_cut === true,
-        });
-        console.log('[Auth] Loaded barista printer:', printer.name, printer.ip);
+        if (printer.connection_type === 'bluetooth' && printer.bluetooth_address) {
+          await saveBluetoothPrinter({
+            name: printer.name,
+            address: printer.bluetooth_address,
+            bluetoothAddress: printer.bluetooth_address,
+            connectionType: 'bluetooth',
+            model: printer.model || null,
+            printer_type: printer.printer_type || null,
+            supports_auto_cut: printer.supports_auto_cut === true,
+          });
+          if (printer.supports_auto_cut) await saveAutoCut(true);
+          // Backfill mac_address from bluetooth_address if missing
+          if (!printer.mac_address) {
+            await supabase
+              .from('printers')
+              .update({ mac_address: printer.bluetooth_address })
+              .eq('id', printer.id);
+          }
+          console.log('[Auth] Loaded barista Bluetooth printer:', printer.name, printer.bluetooth_address);
+        } else if (printer.ip) {
+          await saveDefaultPrinter({
+            id: printer.id,
+            ip: printer.ip,
+            port: printer.port || 9100,
+            name: printer.name,
+            model: printer.model || null,
+            printer_type: printer.printer_type || null,
+            supports_auto_cut: printer.supports_auto_cut === true,
+          });
+          if (printer.supports_auto_cut) await saveAutoCut(true);
+          console.log('[Auth] Loaded barista WiFi printer:', printer.name, printer.ip);
+        }
       } else {
         console.log('[Auth] No printer assigned to this barista account');
       }

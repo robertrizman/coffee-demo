@@ -242,16 +242,20 @@ export async function printOrderReceipt(order, visitorId = '', options = {}) {
   const autoCutEnabled = await loadAutoCut();
   const { printer } = await resolvePrinterForCurrentNetwork({ scanIfNeeded });
 
-  if (printer?.ip) {
+  if (printer) {
     try {
+      // Brother QL handles both Bluetooth and WiFi internally
       if (printer.printer_type === 'brother_ql') {
         await printBrotherQL(printer, order, visitorId, useShorthand, autoCutEnabled);
         return { ok: true, printer, fallback: false, route: 'brother_sdk' };
       }
 
-      const html = await buildLabelsHtml(order, visitorId, useShorthand);
-      const success = await printToIPSilent(printer, html);
-      if (success) return { ok: true, printer, fallback: false, route: 'legacy' };
+      // WiFi-only path for generic/MFC printers
+      if (printer.ip) {
+        const html = await buildLabelsHtml(order, visitorId, useShorthand);
+        const success = await printToIPSilent(printer, html);
+        if (success) return { ok: true, printer, fallback: false, route: 'legacy' };
+      }
     } catch (err) {
       console.warn('[Printer] Native/legacy silent print failed:', err.message);
     }

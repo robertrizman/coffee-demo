@@ -1,4 +1,4 @@
-import { loadDefaultPrinter, saveDefaultPrinter } from './printerConfig';
+import { loadDefaultPrinter, saveDefaultPrinter, loadBluetoothPrinter } from './printerConfig';
 import { getDeviceIP, deriveSubnet, scanForPrinters } from './printerScanner';
 
 function withTimeout(ms, fn) {
@@ -63,6 +63,22 @@ export async function probePrinter(printer, timeoutMs = 2000) {
 
 export async function resolvePrinterForCurrentNetwork(options = {}) {
   const { scanIfNeeded = false } = options;
+
+  // Bluetooth printer takes precedence — no network probe needed
+  const btPrinter = await loadBluetoothPrinter();
+  if (btPrinter?.bluetoothAddress) {
+    console.log('[Resolver] Using Bluetooth printer:', btPrinter.name, btPrinter.bluetoothAddress);
+    return {
+      printer: {
+        ...btPrinter,
+        printer_type: 'brother_ql',
+        connectionType: 'bluetooth',
+        supports_auto_cut: true,
+      },
+      source: 'bluetooth',
+    };
+  }
+
   const localPrinter = await loadDefaultPrinter();
   const deviceIP = await getDeviceIP();
   const subnet = deviceIP ? deriveSubnet(deviceIP) : null;

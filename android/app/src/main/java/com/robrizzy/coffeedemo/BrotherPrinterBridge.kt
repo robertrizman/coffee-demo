@@ -7,7 +7,6 @@ import com.facebook.react.bridge.*
 import com.brother.sdk.lmprinter.Channel
 import com.brother.sdk.lmprinter.PrinterDriverGenerator
 import com.brother.sdk.lmprinter.PrinterModel
-import com.brother.sdk.lmprinter.PrinterSearcher
 import com.brother.sdk.lmprinter.setting.QLPrintSettings
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -145,7 +144,6 @@ class BrotherPrinterBridge(reactContext: ReactApplicationContext) :
     fun discoverBluetoothPrinters(promise: Promise) {
         val context = reactApplicationContext
 
-        // Check Bluetooth is available and enabled
         val bluetoothManager = context.getSystemService(Context.BLUETOOTH_SERVICE) as? BluetoothManager
         val adapter = bluetoothManager?.adapter
         if (adapter == null || !adapter.isEnabled) {
@@ -153,28 +151,183 @@ class BrotherPrinterBridge(reactContext: ReactApplicationContext) :
             return
         }
 
-        CoroutineScope(Dispatchers.IO).launch {
-            try {
-                val result = PrinterSearcher.startBluetoothSearch(context)
-                val printers = Arguments.createArray()
+        // Accumulate discovered devices as (name, address) pairs to avoid WritableMap reuse issues
+        val discovered = mutableListOf<Pair<String, String>>()
+        var resolved = false
+        var broadcastReceiver: android.content.BroadcastReceiver? = null
 
-                result.channels.forEach { channel ->
-                    val printer = Arguments.createMap().apply {
-                        putString("name", channel.extraInfo[Channel.ExtraInfoKey.ModelName] ?: "Brother Printer")
-                        putString("address", channel.channelInfo)
-                        putString("type", "bluetooth")
+        fun resolveDiscovery() {
+            if (resolved) return
+            resolved = true
+            try { broadcastReceiver?.let { context.unregisterReceiver(it) } } catch (e: Exception) { /* already unregistered */ }
+            val result = Arguments.createArray()
+            discovered.forEach { (name, address) ->
+                val map = Arguments.createMap()
+                map.putString("name", name)
+                map.putString("address", address)
+                map.putString("type", "bluetooth")
+                result.pushMap(map)
+            }
+            promise.resolve(result)
+        }
+
+        broadcastReceiver = object : android.content.BroadcastReceiver() {
+            override fun onReceive(ctx: Context?, intent: android.content.Intent?) {
+                when (intent?.action) {
+                    android.bluetooth.BluetoothDevice.ACTION_FOUND -> {
+                        val device: android.bluetooth.BluetoothDevice? =
+                            if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.TIRAMISU) {
+                                intent.getParcelableExtra(
+                                    android.bluetooth.BluetoothDevice.EXTRA_DEVICE,
+                                    android.bluetooth.BluetoothDevice::class.java
+                                )
+                            } else {
+                                @Suppress("DEPRECATION")
+                                intent.getParcelableExtra(android.bluetooth.BluetoothDevice.EXTRA_DEVICE)
+                            }
+                        device?.let {
+                            val name = try { it.name ?: "" } catch (e: SecurityException) { "" }
+                            val address = it.address ?: return@let
+
+                            // Filter 1: Bluetooth device class — printers are under the IMAGING major class
+                            val majorClass = try {
+                                it.bluetoothClass?.majorDeviceClass
+                            } catch (e: Exception) { null }
+                            val isImagingClass = majorClass == android.bluetooth.BluetoothClass.Device.Major.IMAGING
+
+                            // Filter 2: Known Brother label/receipt printer model name prefixes
+                            val isPrinterName = name.matches(
+                                Regex("(?i)(QL|PT|TD|MW|RJ|PJ|VC)-.*|Brother.*")
+                            )
+
+                            if (!isImagingClass && !isPrinterName) return@let
+
+                            val displayName = name.ifEmpty { "Brother Printer" }
+                            if (discovered.none { d -> d.second == address }) {
+                                discovered.add(Pair(displayName, address))
+                            }
+                        }
                     }
-                    printers.pushMap(printer)
-                }
-
-                withContext(Dispatchers.Main) {
-                    promise.resolve(printers)
-                }
-            } catch (e: Exception) {
-                withContext(Dispatchers.Main) {
-                    promise.reject("DISCOVERY_ERROR", "Bluetooth discovery failed: ${e.message}", e)
+                    BluetoothAdapter.ACTION_DISCOVERY_FINISHED -> resolveDiscovery()
                 }
             }
         }
+
+        val filter = android.content.IntentFilter().apply {
+            addAction(android.bluetooth.BluetoothDevice.ACTION_FOUND)
+            addAction(BluetoothAdapter.ACTION_DISCOVERY_FINISHED)
+        }
+        context.registerReceiver(broadcastReceiver, filter)
+
+        if (adapter.isDiscovering) adapter.cancelDiscovery()
+
+        val started = adapter.startDiscovery()
+        if (!started) {
+            try { context.unregisterReceiver(broadcastReceiver) } catch (e: Exception) { /* ignore */ }
+            promise.reject("DISCOVERY_ERROR", "Could not start Bluetooth discovery. Ensure location and Bluetooth permissions are granted.")
+            return
+        }
+
+        // Safety timeout — Android guarantees ACTION_DISCOVERY_FINISHED but this guards edge cases
+        android.os.Handler(android.os.Looper.getMainLooper()).postDelayed({ resolveDiscovery() }, 15_000)
+    }
+
+    // ── Bluetooth Pairing ─────────────────────────────────
+    //
+    // The Brother SDK requires the device to be bonded (paired) before
+    // Channel.newBluetoothChannel() can open an RFCOMM stream.
+    // This method checks the bond state and initiates pairing if needed.
+
+    @ReactMethod
+    fun pairBluetoothDevice(address: String, promise: Promise) {
+        val context = reactApplicationContext
+        val bluetoothManager = context.getSystemService(Context.BLUETOOTH_SERVICE) as? BluetoothManager
+        val adapter = bluetoothManager?.adapter
+
+        if (adapter == null || !adapter.isEnabled) {
+            promise.reject("BLUETOOTH_OFF", "Bluetooth is not enabled.")
+            return
+        }
+
+        val device = try {
+            adapter.getRemoteDevice(address)
+        } catch (e: Exception) {
+            promise.reject("DEVICE_ERROR", "Invalid Bluetooth address: $address")
+            return
+        }
+
+        // Already bonded — nothing to do
+        if (device.bondState == android.bluetooth.BluetoothDevice.BOND_BONDED) {
+            val result = Arguments.createMap()
+            result.putBoolean("success", true)
+            result.putBoolean("alreadyPaired", true)
+            promise.resolve(result)
+            return
+        }
+
+        var receiver: android.content.BroadcastReceiver? = null
+        var resolved = false
+
+        fun finish(success: Boolean, alreadyPaired: Boolean = false, errorMsg: String? = null) {
+            if (resolved) return
+            resolved = true
+            try { receiver?.let { context.unregisterReceiver(it) } } catch (e: Exception) { /* ignore */ }
+            if (success) {
+                val result = Arguments.createMap()
+                result.putBoolean("success", true)
+                result.putBoolean("alreadyPaired", alreadyPaired)
+                promise.resolve(result)
+            } else {
+                promise.reject("PAIR_FAILED", errorMsg ?: "Pairing failed")
+            }
+        }
+
+        receiver = object : android.content.BroadcastReceiver() {
+            override fun onReceive(ctx: Context?, intent: android.content.Intent?) {
+                if (intent?.action != android.bluetooth.BluetoothDevice.ACTION_BOND_STATE_CHANGED) return
+                val changed: android.bluetooth.BluetoothDevice? =
+                    if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.TIRAMISU) {
+                        intent.getParcelableExtra(
+                            android.bluetooth.BluetoothDevice.EXTRA_DEVICE,
+                            android.bluetooth.BluetoothDevice::class.java
+                        )
+                    } else {
+                        @Suppress("DEPRECATION")
+                        intent.getParcelableExtra(android.bluetooth.BluetoothDevice.EXTRA_DEVICE)
+                    }
+                if (changed?.address != address) return
+
+                when (changed.bondState) {
+                    android.bluetooth.BluetoothDevice.BOND_BONDED ->
+                        finish(true)
+                    android.bluetooth.BluetoothDevice.BOND_NONE ->
+                        finish(false, errorMsg = "Pairing was rejected or cancelled. Make sure the printer is in pairing mode.")
+                    // BOND_BONDING — still in progress, wait
+                }
+            }
+        }
+
+        context.registerReceiver(
+            receiver,
+            android.content.IntentFilter(android.bluetooth.BluetoothDevice.ACTION_BOND_STATE_CHANGED)
+        )
+
+        // Cancel any active discovery — Android cannot scan and pair simultaneously
+        if (adapter.isDiscovering) adapter.cancelDiscovery()
+
+        val started = try { device.createBond() } catch (e: Exception) { false }
+        if (!started) {
+            try { context.unregisterReceiver(receiver) } catch (e: Exception) { /* ignore */ }
+            promise.reject(
+                "PAIR_FAILED",
+                "Could not start pairing. Hold the Bluetooth button on the printer for 3 seconds to enter pairing mode, then try again."
+            )
+            return
+        }
+
+        // 30-second safety timeout — gives the user time to accept the system pairing dialog
+        android.os.Handler(android.os.Looper.getMainLooper()).postDelayed({
+            finish(false, errorMsg = "Pairing timed out. Hold the Bluetooth button on the printer to enter pairing mode, then try again.")
+        }, 30_000)
     }
 }
