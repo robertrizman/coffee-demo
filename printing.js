@@ -208,14 +208,27 @@ export async function buildBrotherQLLabelsHtml(order, visitorId = '', useShortha
 async function printBrotherQL(printer, order, visitorId, useShorthand, autoCutEnabled) {
   const html = await buildBrotherQLLabelsHtml(order, visitorId, useShorthand);
 
-  // Use native Brother SDK on Android if available
   if (isBrotherPrinterAvailable()) {
     const pdf = await Print.printToFileAsync({ html, width: 108, height: 130, base64: false });
-    await BrotherPrinter.printQLPdf(printer.ip, pdf.uri, !!autoCutEnabled);
-    return true;
+
+    const connectionType = printer.connectionType || 'wifi'; // 'wifi' | 'bluetooth'
+
+    if (connectionType === 'bluetooth' && printer.bluetoothAddress) {
+      console.log('[Printer] Using Bluetooth:', printer.bluetoothAddress);
+      await BrotherPrinter.printQLPdfBluetooth(printer.bluetoothAddress, pdf.uri, !!autoCutEnabled);
+      return true;
+    }
+
+    if (connectionType === 'wifi' && printer.ip) {
+      console.log('[Printer] Using WiFi:', printer.ip);
+      await BrotherPrinter.printQLPdf(printer.ip, pdf.uri, !!autoCutEnabled);
+      return true;
+    }
+
+    throw new Error(`No ${connectionType} printer configured. Please set up a printer in Settings.`);
   }
 
-  // iOS fallback — send via IPP raw socket
+  // iOS fallback — IPP over WiFi
   console.log('[Printer] BrotherPrinter SDK not available, falling back to IPP');
   const success = await printToIPSilent(printer, html);
   if (success) return true;

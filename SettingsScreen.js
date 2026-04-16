@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
+import Geolocation from '@react-native-community/geolocation';
 import {
   View, Text, ScrollView, TouchableOpacity,
   StyleSheet, SafeAreaView, Alert, Platform,
@@ -11,7 +12,7 @@ import { trackSettingsOpen, trackPrinterTest } from './tealium';
 import { buildLabelsHtml, buildQrDebugHtml } from './printing';
 import { useAuth } from './AuthContext';
 import { supabase } from './supabase';
-import { saveDefaultPrinter, loadDefaultPrinter, clearDefaultPrinter, saveAutoPrint, loadAutoPrint, saveShorthand, loadShorthand, saveAutoCut, loadAutoCut } from './printerConfig';
+import { saveDefaultPrinter, loadDefaultPrinter, clearDefaultPrinter, saveAutoPrint, loadAutoPrint, saveShorthand, loadShorthand, saveAutoCut, loadAutoCut, saveBluetoothPrinter, loadBluetoothPrinter, clearBluetoothPrinter, saveConnectionType, loadConnectionType } from './printerConfig';
 import { scanForPrinters, getDeviceIP, deriveSubnet } from './printerScanner';
 import StoreHoursManager from './StoreHoursManager';
 import PushBroadcastScreen from './PushBroadcastScreen';
@@ -50,6 +51,10 @@ export default function SettingsScreen() {
   const { barista, isOwner } = useAuth();
 
   const [defaultPrinter, setDefaultPrinter] = useState(null);
+  const [bluetoothPrinter, setBluetoothPrinter] = useState(null);
+  const [bluetoothPrinters, setBluetoothPrinters] = useState([]);
+  const [scanningBluetooth, setScanningBluetooth] = useState(false);
+  const [connectionType, setConnectionType] = useState('wifi'); // 'wifi' | 'bluetooth'
   const [deviceIP, setDeviceIP] = useState(null);
   const [autoPrintEnabled, setAutoPrintEnabled] = useState(false);
   const [shorthandEnabled, setShorthandEnabled] = useState(false);
@@ -91,6 +96,8 @@ export default function SettingsScreen() {
   useEffect(() => {
     trackSettingsOpen();
     loadDefaultPrinter().then(setDefaultPrinter);
+    loadBluetoothPrinter().then(setBluetoothPrinter);
+    loadConnectionType().then(setConnectionType);
     loadAutoPrint().then(setAutoPrintEnabled);
     loadShorthand().then(setShorthandEnabled);
     loadAutoCut().then(setAutoCutEnabled);
@@ -142,15 +149,33 @@ export default function SettingsScreen() {
   const detectCoords = async () => {
     setDetectingCoords(true);
     try {
-      const { status } = await Location.requestForegroundPermissionsAsync();
+      const { status } = await new Promise((resolve) => {
+        if (Platform.OS === 'android') {
+          const { PermissionsAndroid } = require('react-native');
+          PermissionsAndroid.request(PermissionsAndroid.PERMISSIONS.ACCESS_FINE_LOCATION)
+            .then(result => resolve({ status: result === PermissionsAndroid.RESULTS.GRANTED ? 'granted' : 'denied' }));
+        } else {
+          resolve({ status: 'granted' }); // iOS prompts automatically via Geolocation
+        }
+      });
       if (status !== 'granted') {
         Alert.alert('Permission needed', 'Please allow location access to detect coordinates.');
         setDetectingCoords(false);
         return;
       }
-      const loc = await Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.High });
-      setLocLat(String(loc.coords.latitude.toFixed(6)));
-      setLocLng(String(loc.coords.longitude.toFixed(6)));
+      Geolocation.getCurrentPosition(
+        (position) => {
+          setLocLat(String(position.coords.latitude.toFixed(6)));
+          setLocLng(String(position.coords.longitude.toFixed(6)));
+          setDetectingCoords(false);
+        },
+        (error) => {
+          Alert.alert('Error', 'Could not detect location: ' + error.message);
+          setDetectingCoords(false);
+        },
+        { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 }
+      );
+      return; // early return since Geolocation is callback-based
     } catch (e) {
       Alert.alert('Error', 'Could not detect location: ' + e.message);
     }
@@ -200,6 +225,129 @@ export default function SettingsScreen() {
       useNativeDriver: false,
     }).start();
   }, [scanProgress, scanTotal]);
+
+  const startBluetoothScan = async () => {
+    // Request Bluetooth permissions on Android 12+
+    if (Platform.OS === 'android') {
+      const { PermissionsAndroid } = require('react-native');
+      try {
+        const granted = await PermissionsAndroid.requestMultiple([
+          'android.permission.BLUETOOTH_SCAN',
+          'android.permission.BLUETOOTH_CONNECT',
+        ]);
+        const allGranted = Object.values(granted).every(
+          v => v === PermissionsAndroid.RESULTS.GRANTED
+        );
+        if (!allGranted) {
+          Alert.alert(
+            'Bluetooth Permission Required',
+            'Please allow Bluetooth access in Settings to scan for printers.',
+            [
+              { text: 'Cancel', style: 'cancel' },
+              { text: 'Open Settings', onPress: () => { const { Linking } = require('react-native'); Linking.openSettings(); } },
+            ]
+          );
+          return;
+        }
+      } catch (e) {
+        console.warn('[BT] Permission error:', e.message);
+      }
+    }
+
+    setScanningBluetooth(true);
+    setBluetoothPrinters([]);
+
+    try {
+      const { NativeModules } = require('react-native');
+      const BrotherPrinter = NativeModules.BrotherPrinter;
+      if (!BrotherPrinter) {
+        Alert.alert('Not available', 'Bluetooth printing requires the Android app build.');
+        return;
+      }
+      console.log('[BT] Starting Bluetooth discovery...');
+      const printers = await BrotherPrinter.discoverBluetoothPrinters();
+      console.log('[BT] Found printers:', JSON.stringify(printers));
+      setBluetoothPrinters(printers || []);
+      if (!printers || printers.length === 0) {
+        Alert.alert(
+          'No printers found',
+          'Make sure:\n• Bluetooth is enabled on this device\n• Brother printer is powered on\n• Printer Bluetooth is enabled\n• You are within range (~10m)'
+        );
+      }
+    } catch (e) {
+      console.warn('[BT] Scan error:', e.message);
+      Alert.alert('Bluetooth Error', e.message);
+    } finally {
+      setScanningBluetooth(false);
+    }
+  };
+
+  const handleSetBluetoothPrinter = async (printer) => {
+    const saved = { ...printer, bluetoothAddress: printer.address, connectionType: 'bluetooth' };
+    await saveBluetoothPrinter(saved);
+
+    // Update default printer with bluetooth address and connection type
+    if (defaultPrinter) {
+      const updated = { ...defaultPrinter, bluetoothAddress: printer.address, connectionType: 'bluetooth' };
+      await saveDefaultPrinter(updated);
+      setDefaultPrinter(updated);
+    }
+    setBluetoothPrinter(saved);
+    setConnectionType('bluetooth');
+    await saveConnectionType('bluetooth');
+
+    // Save to Supabase printers table
+    try {
+      const { data: existing } = await supabase
+        .from('printers')
+        .select('id')
+        .eq('bluetooth_address', printer.address)
+        .single();
+
+      const payload = {
+        name: printer.name,
+        bluetooth_address: printer.address,
+        connection_type: 'bluetooth',
+        model: 'QL-820NWB',
+        printer_type: 'brother_ql',
+        supports_auto_cut: true,
+        last_seen_at: new Date().toISOString(),
+      };
+
+      let printerId;
+      if (existing) {
+        await supabase.from('printers').update(payload).eq('bluetooth_address', printer.address);
+        printerId = existing.id;
+      } else {
+        const { data: newPrinter } = await supabase.from('printers').insert(payload).select('id').single();
+        printerId = newPrinter?.id;
+      }
+
+      // Link to barista account
+      if (barista?.id && printerId) {
+        await supabase.from('baristas').update({ printer_id: printerId }).eq('id', barista.id);
+        console.log('[Settings] Saved Bluetooth printer to barista account');
+      }
+    } catch (err) {
+      console.warn('[Settings] Could not save Bluetooth printer to DB:', err.message);
+    }
+
+    Alert.alert('Bluetooth printer set', `${printer.name} is now the active printer.`);
+  };
+
+  const handleClearBluetoothPrinter = async () => {
+    await clearBluetoothPrinter();
+    if (defaultPrinter) {
+      const updated = { ...defaultPrinter };
+      delete updated.bluetoothAddress;
+      updated.connectionType = 'wifi';
+      await saveDefaultPrinter(updated);
+      setDefaultPrinter(updated);
+    }
+    setBluetoothPrinter(null);
+    setConnectionType('wifi');
+    await saveConnectionType('wifi');
+  };
 
   const startScan = async () => {
     setScanning(true);
@@ -531,7 +679,7 @@ export default function SettingsScreen() {
             </View>
           )}
         </View>
-            {/* ── WiFi Scanner ── */}
+
         <View style={styles.card}>
           <View style={styles.cardHeader}>
             <Text style={styles.cardIcon}>📡</Text>
@@ -649,6 +797,108 @@ export default function SettingsScreen() {
             </View>
           )}
         </View>
+
+            {/* ── Connection Type ── */}
+        <View style={styles.card}>
+          <View style={styles.cardHeader}>
+            <Text style={styles.cardIcon}>🔌</Text>
+            <Text style={styles.cardTitle}>Connection Type</Text>
+          </View>
+          <Text style={{ fontSize: 13, color: colors.textMuted, marginBottom: spacing.sm }}>
+            Select how the barista phone connects to the printer.
+          </Text>
+          <View style={styles.connectionTypeRow}>
+            <TouchableOpacity
+              style={[styles.connectionTypeBtn, connectionType === 'wifi' && styles.connectionTypeBtnActive]}
+              onPress={async () => {
+                setConnectionType('wifi');
+                await saveConnectionType('wifi');
+                if (defaultPrinter) {
+                  const updated = { ...defaultPrinter, connectionType: 'wifi' };
+                  await saveDefaultPrinter(updated);
+                  setDefaultPrinter(updated);
+                }
+              }}
+              activeOpacity={0.8}
+            >
+              <Text style={[styles.connectionTypeBtnText, connectionType === 'wifi' && styles.connectionTypeBtnTextActive]}>
+                📡  WiFi
+              </Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={[styles.connectionTypeBtn, connectionType === 'bluetooth' && styles.connectionTypeBtnActive]}
+              onPress={async () => {
+                setConnectionType('bluetooth');
+                await saveConnectionType('bluetooth');
+                if (defaultPrinter) {
+                  const updated = { ...defaultPrinter, connectionType: 'bluetooth' };
+                  await saveDefaultPrinter(updated);
+                  setDefaultPrinter(updated);
+                }
+              }}
+              activeOpacity={0.8}
+            >
+              <Text style={[styles.connectionTypeBtnText, connectionType === 'bluetooth' && styles.connectionTypeBtnTextActive]}>
+                📶  Bluetooth
+              </Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+
+            {/* ── Bluetooth Printer ── */}
+        <View style={styles.card}>
+          <View style={styles.cardHeader}>
+            <Text style={styles.cardIcon}>📶</Text>
+            <Text style={styles.cardTitle}>Bluetooth Printer</Text>
+          </View>
+
+          {bluetoothPrinter ? (
+            <View style={styles.btPrinterRow}>
+              <View style={{ flex: 1 }}>
+                <Text style={styles.btPrinterName}>{bluetoothPrinter.name}</Text>
+                <Text style={styles.btPrinterAddress}>{bluetoothPrinter.address}</Text>
+              </View>
+              <TouchableOpacity onPress={handleClearBluetoothPrinter} style={styles.btClearBtn}>
+                <Text style={styles.btClearBtnText}>Remove</Text>
+              </TouchableOpacity>
+            </View>
+          ) : (
+            <Text style={styles.noPrinterText}>No Bluetooth printer paired</Text>
+          )}
+
+          <TouchableOpacity
+            style={[styles.scanBtn, scanningBluetooth && styles.scanBtnDisabled]}
+            onPress={startBluetoothScan}
+            disabled={scanningBluetooth}
+            activeOpacity={0.85}
+          >
+            <Text style={styles.scanBtnText}>
+              {scanningBluetooth ? '🔍 Scanning...' : '📶 Scan for Bluetooth printers'}
+            </Text>
+          </TouchableOpacity>
+
+          {bluetoothPrinters.length > 0 && (
+            <View style={{ marginTop: spacing.sm, gap: spacing.sm }}>
+              {bluetoothPrinters.map((printer) => (
+                <TouchableOpacity
+                  key={printer.address}
+                  style={[styles.printerRow, bluetoothPrinter?.address === printer.address && styles.printerRowActive]}
+                  onPress={() => handleSetBluetoothPrinter(printer)}
+                  activeOpacity={0.8}
+                >
+                  <View style={{ flex: 1 }}>
+                    <Text style={styles.printerName}>{printer.name}</Text>
+                    <Text style={styles.printerIP}>{printer.address}</Text>
+                  </View>
+                  {bluetoothPrinter?.address === printer.address && (
+                    <Text style={{ color: colors.primary, fontWeight: '700' }}>✓</Text>
+                  )}
+                </TouchableOpacity>
+              ))}
+            </View>
+          )}
+        </View>
+
             {/* ── Auto-Print Service ── */}
         <View style={styles.card}>
           <View style={styles.cardHeader}>
@@ -1069,6 +1319,30 @@ const styles = StyleSheet.create({
   },
   scanBtnDisabled: { opacity: 0.4 },
   scanBtnText: { color: '#fff', fontSize: 15, fontWeight: '700' },
+  btPrinterRow: {
+    flexDirection: 'row', alignItems: 'center',
+    backgroundColor: colors.primaryLight, borderRadius: radius.md,
+    padding: spacing.md, gap: spacing.sm,
+    borderWidth: 1, borderColor: colors.primaryMid,
+    marginBottom: spacing.sm,
+  },
+  btPrinterName: { fontSize: 14, fontWeight: '700', color: colors.textDark },
+  btPrinterAddress: { fontSize: 12, color: colors.textMuted, marginTop: 2 },
+  btClearBtn: {
+    paddingHorizontal: spacing.md, paddingVertical: 6,
+    borderRadius: radius.full, borderWidth: 1, borderColor: colors.border,
+  },
+  btClearBtnText: { fontSize: 13, color: colors.textMid, fontWeight: '600' },
+  noPrinterText: { fontSize: 14, color: colors.textMuted, marginBottom: spacing.sm },
+  connectionTypeRow: { flexDirection: 'row', gap: spacing.sm },
+  connectionTypeBtn: {
+    flex: 1, paddingVertical: 10, borderRadius: radius.lg,
+    borderWidth: 1.5, borderColor: colors.border,
+    backgroundColor: colors.surface, alignItems: 'center',
+  },
+  connectionTypeBtnActive: { backgroundColor: colors.primary, borderColor: colors.primary },
+  connectionTypeBtnText: { fontSize: 14, fontWeight: '600', color: colors.textMid },
+  connectionTypeBtnTextActive: { color: '#fff' },
   stopBtn: {
     backgroundColor: colors.surfaceAlt, borderRadius: radius.lg,
     paddingVertical: 11, alignItems: 'center',

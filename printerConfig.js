@@ -8,6 +8,33 @@ import * as SecureStore from 'expo-secure-store';
 
 const PRINTER_KEY = 'coffee_demo_default_printer';
 const AUTO_PRINT_KEY = 'coffee_demo_auto_print';
+const BLUETOOTH_PRINTER_KEY = 'coffee_demo_bluetooth_printer';
+
+export async function saveBluetoothPrinter(printer) {
+  try {
+    await SecureStore.setItemAsync(BLUETOOTH_PRINTER_KEY, JSON.stringify(printer));
+  } catch (err) {
+    console.warn('[Printer] Save Bluetooth error:', err.message);
+  }
+}
+
+export async function loadBluetoothPrinter() {
+  try {
+    const raw = await SecureStore.getItemAsync(BLUETOOTH_PRINTER_KEY);
+    return raw ? JSON.parse(raw) : null;
+  } catch (err) {
+    console.warn('[Printer] Load Bluetooth error:', err.message);
+    return null;
+  }
+}
+
+export async function clearBluetoothPrinter() {
+  try {
+    await SecureStore.deleteItemAsync(BLUETOOTH_PRINTER_KEY);
+  } catch (err) {
+    console.warn('[Printer] Clear Bluetooth error:', err.message);
+  }
+}
 
 export async function saveDefaultPrinter(printer) {
   try {
@@ -89,5 +116,24 @@ export async function loadAutoCut() {
     return val === 'true';
   } catch (err) {
     return false;
+  }
+}
+
+const CONNECTION_TYPE_KEY = 'coffee_demo_connection_type';
+
+export async function saveConnectionType(type) {
+  try {
+    await SecureStore.setItemAsync(CONNECTION_TYPE_KEY, type);
+  } catch (err) {
+    console.warn('[Printer] Save connection type error:', err.message);
+  }
+}
+
+export async function loadConnectionType() {
+  try {
+    const val = await SecureStore.getItemAsync(CONNECTION_TYPE_KEY);
+    return val || 'wifi'; // default to wifi
+  } catch (err) {
+    return 'wifi';
   }
 }
