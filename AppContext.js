@@ -7,6 +7,7 @@ import { loadProfile, saveProfile } from './userProfile';
 import { printOrderReceipt } from './printing';
 import { AppState } from 'react-native';
 import { loadDefaultPrinter, loadAutoPrint, loadBluetoothPrinter } from './printerConfig';
+import { warmupBluetoothConnection } from './brotherPrinter';
 import { setDeviceIdForMoments, onPrismDeviceIdReady, getCanonicalDeviceId } from './tealium';
 import { loadPairingRules } from './recommendations';
 
@@ -324,6 +325,7 @@ function rowToOrder(row) {
     deviceId: row.device_id,
     tealAppUuid: row.teal_app_uuid || row.device_id,
     station: row.station,
+    printed: row.printed ?? false,
   };
 }
 
@@ -415,6 +417,13 @@ export function AppProvider({ children }) {
           const hasPrinter = defaultPrinter?.ip || bluetoothPrinter?.bluetoothAddress;
           if (autoPrintEnabled && hasPrinter) {
             console.log('[AutoPrint] Printing order', order.id, bluetoothPrinter?.bluetoothAddress ? 'via Bluetooth' : 'to ' + defaultPrinter?.ip);
+            // Warm up BT link before printing — ACL drops during sleep cause first print to fail
+            if (bluetoothPrinter?.bluetoothAddress) {
+              try {
+                await warmupBluetoothConnection(bluetoothPrinter.bluetoothAddress);
+                await new Promise((r) => setTimeout(r, 1200));
+              } catch {}
+            }
             const result = await printOrderReceipt(order, '', { silent: true });
             
             // Mark as printed if successful
@@ -457,8 +466,14 @@ export function AppProvider({ children }) {
         if (data) dispatch({ type: 'SET_STORE_BREAKS', payload: data });
       });
 
+    // Periodic flush every 60s — catches any orders that failed to print on arrival
+    const flushInterval = setInterval(() => {
+      flushPrintQueue().catch(() => {});
+    }, 60000);
+
     return () => {
       supabase.removeChannel(channel);
+      clearInterval(flushInterval);
     };
   }, []);
 

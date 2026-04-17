@@ -1,9 +1,10 @@
 import React, { useState } from 'react';
 import {
   View, Text, ScrollView, Switch, TouchableOpacity,
-  StyleSheet, SafeAreaView, Alert, TextInput, Modal,
+  StyleSheet, Alert, TextInput, Modal,
   KeyboardAvoidingView, Platform,
 } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { useNavigation } from '@react-navigation/native';
 import { MENU, CATEGORIES, EXTRAS, SIZES, MILK_OPTIONS } from './menu';
 import { useApp } from './AppContext';

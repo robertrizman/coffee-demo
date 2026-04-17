@@ -1,8 +1,9 @@
 import React, { useState, useRef, useEffect } from 'react';
 import {
   View, Text, ScrollView, TouchableOpacity, RefreshControl,
-  StyleSheet, SafeAreaView, Modal, Alert, TouchableWithoutFeedback,
+  StyleSheet, Modal, Alert, TouchableWithoutFeedback, Linking,
 } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { WebView } from 'react-native-webview';
 import { useNavigation } from '@react-navigation/native';
 import { CameraView, useCameraPermissions } from 'expo-camera';
@@ -136,8 +137,14 @@ export default function OperatorOrdersScreen() {
       .catch(e => console.error('[Push] Edge function error:', e.message));
   };
 
-  const handlePrint = (order) => {
-    printOrderReceipt(order, getVisitorId(), { silent: true });
+  const handlePrint = async (order) => {
+    const result = await printOrderReceipt(order, getVisitorId(), { silent: true });
+    if (result?.ok && order.printed === false) {
+      await supabase.from('orders')
+        .update({ printed: true, printed_at: new Date().toISOString() })
+        .eq('id', order.id);
+      dispatch({ type: 'REALTIME_ORDER_UPDATED', payload: { ...order, printed: true } });
+    }
   };
 
   const handleLogout = () => {
@@ -147,14 +154,30 @@ export default function OperatorOrdersScreen() {
     ]);
   };
 
-  const openScanner = async () => {
-    if (!cameraPermission?.granted) {
-      const result = await requestPermission();
-      if (!result.granted) {
-        Alert.alert('Camera permission needed', 'Please allow camera access to scan order QR codes.');
-        return;
-      }
+  const requestCameraOrOpenSettings = async () => {
+    if (cameraPermission?.granted) return true;
+    // canAskAgain is false when the user permanently denied — must go to Settings
+    if (cameraPermission?.canAskAgain === false) {
+      Alert.alert(
+        'Camera access required',
+        'Camera permission was denied. Open Settings and enable Camera access for this app.',
+        [
+          { text: 'Cancel', style: 'cancel' },
+          { text: 'Open Settings', onPress: () => Linking.openSettings() },
+        ],
+      );
+      return false;
     }
+    const result = await requestPermission();
+    if (!result.granted) {
+      Alert.alert('Camera permission needed', 'Please allow camera access to scan order QR codes.');
+      return false;
+    }
+    return true;
+  };
+
+  const openScanner = async () => {
+    if (!(await requestCameraOrOpenSettings())) return;
     setScanning(true);
     setScanFeedback(null);
     setScanLabel('');
@@ -163,13 +186,7 @@ export default function OperatorOrdersScreen() {
   };
 
   const openInlineScanner = async () => {
-    if (!cameraPermission?.granted) {
-      const result = await requestPermission();
-      if (!result.granted) {
-        Alert.alert('Camera permission needed', 'Please allow camera access to scan order QR codes.');
-        return;
-      }
-    }
+    if (!(await requestCameraOrOpenSettings())) return;
     setScanning(true);
     setScanFeedback(null);
     setScanLabel('');
@@ -380,7 +397,14 @@ export default function OperatorOrdersScreen() {
             ]}>
               <View style={styles.orderHeader}>
                 <View style={styles.orderMeta}>
-                  <Text style={styles.orderId}>{order.id}</Text>
+                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                    <Text style={styles.orderId}>{order.id}</Text>
+                    {order.printed === false && order.status === 'pending' && (
+                      <View style={styles.unprintedBadge}>
+                        <Text style={styles.unprintedBadgeText}>NOT PRINTED</Text>
+                      </View>
+                    )}
+                  </View>
                   <Text style={styles.orderEmail}>
                     {order.name ? `${order.name}` : ''}{order.name && order.email ? ' · ' : ''}{order.email}
                   </Text>
@@ -589,6 +613,18 @@ const styles = StyleSheet.create({
     overflow: 'hidden', ...shadow.card,
   },
   orderCardDone: { opacity: 0.65 },
+  unprintedBadge: {
+    backgroundColor: '#fee2e2',
+    borderRadius: 4,
+    paddingHorizontal: 5,
+    paddingVertical: 2,
+  },
+  unprintedBadgeText: {
+    fontSize: 9,
+    fontWeight: '700',
+    color: '#dc2626',
+    letterSpacing: 0.4,
+  },
   orderHeader: {
     flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start',
     padding: spacing.md, paddingBottom: spacing.sm,

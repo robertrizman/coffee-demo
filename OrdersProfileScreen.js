@@ -1,9 +1,10 @@
 import React, { useEffect, useState, useCallback } from 'react';
 import {
-  View, Text, ScrollView, StyleSheet, SafeAreaView,
+  View, Text, ScrollView, StyleSheet,
   TouchableOpacity, ActivityIndicator, RefreshControl,
   TextInput, Alert, Modal, Clipboard,
 } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { useApp } from './AppContext';
 import { supabase } from './supabase';
 import { trackProfileTab, trackEditProfile, trackProfileUpdated, trackUuidCopy, joinTrace, leaveTrace, getCanonicalDeviceId } from './tealium';

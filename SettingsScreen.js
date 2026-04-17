@@ -2,10 +2,11 @@ import React, { useState, useEffect, useRef } from 'react';
 import Geolocation from '@react-native-community/geolocation';
 import {
   View, Text, ScrollView, TouchableOpacity,
-  StyleSheet, SafeAreaView, Alert, Platform,
+  StyleSheet, Alert, Platform,
   Animated, Easing, Switch, Image, Modal, TextInput,
   ActivityIndicator, FlatList, KeyboardAvoidingView,
 } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { useNavigation } from '@react-navigation/native';
 import * as Print from 'expo-print';
 import { trackSettingsOpen, trackPrinterTest } from './tealium';
@@ -271,20 +272,40 @@ export default function SettingsScreen() {
       const { NativeModules } = require('react-native');
       const BrotherPrinter = NativeModules.BrotherPrinter;
       if (!BrotherPrinter) {
-        Alert.alert('Not available', 'Bluetooth printing requires the Android app build.');
+        Alert.alert(
+          'Not available',
+          Platform.OS === 'ios'
+            ? 'Bluetooth printing requires an Xcode build with the Brother SDK. Make sure you are running the native app, not Expo Go.'
+            : 'Bluetooth printing requires the Android native app build.'
+        );
         return;
       }
-      console.log('[BT] Starting active Bluetooth discovery (~12s)...');
-      // discoverBluetoothPrinters now uses startDiscovery() — actively scans for
-      // nearby devices, not just bonded ones. Resolves when discovery finishes (~12s).
-      const printers = await BrotherPrinter.discoverBluetoothPrinters();
-      console.log('[BT] Discovery complete. Found:', JSON.stringify(printers));
-      setBluetoothPrinters(printers || []);
-      if (!printers || printers.length === 0) {
-        Alert.alert(
-          'No devices found',
-          'Make sure:\n• Bluetooth is enabled on this device\n• Brother printer is powered on and in range (~10m)\n• Printer is in discoverable/pairing mode'
-        );
+
+      if (Platform.OS === 'ios') {
+        // iOS: printer must already be paired in Settings > Bluetooth.
+        // EAAccessoryManager only returns accessories that are already connected.
+        console.log('[BT] iOS: checking connected MFi accessories...');
+        const printers = await BrotherPrinter.discoverBluetoothPrinters();
+        console.log('[BT] iOS discovery complete. Found:', JSON.stringify(printers));
+        setBluetoothPrinters(printers || []);
+        if (!printers || printers.length === 0) {
+          Alert.alert(
+            'No printer found',
+            'On iPhone, the printer must be paired in iOS Settings first:\n\n1. Open Settings > Bluetooth\n2. Power on the Brother printer\n3. Tap the printer name to pair\n4. Return here and tap "Find paired printers"'
+          );
+        }
+      } else {
+        // Android: actively scans for nearby devices (~12s)
+        console.log('[BT] Starting active Bluetooth discovery (~12s)...');
+        const printers = await BrotherPrinter.discoverBluetoothPrinters();
+        console.log('[BT] Discovery complete. Found:', JSON.stringify(printers));
+        setBluetoothPrinters(printers || []);
+        if (!printers || printers.length === 0) {
+          Alert.alert(
+            'No devices found',
+            'Make sure:\n• Bluetooth is enabled on this device\n• Brother printer is powered on and in range (~10m)\n• Printer is in discoverable/pairing mode'
+          );
+        }
       }
     } catch (e) {
       console.warn('[BT] Discovery error:', e.message);
@@ -307,11 +328,10 @@ export default function SettingsScreen() {
         }
       } catch (e) {
         setPairingAddress(null);
-        Alert.alert(
-          'Pairing Failed',
-          (e.message || 'Could not pair with the printer.') +
-          '\n\nTo pair the QL-820NWB:\n1. Press and hold the Bluetooth button for 3 seconds until the LED flashes blue\n2. Tap the printer in the list again'
-        );
+        const pairingHelp = Platform.OS === 'ios'
+          ? '\n\nMake sure the printer is powered on and paired in Settings > Bluetooth, then try again.'
+          : '\n\nTo pair the QL-820NWB:\n1. Press and hold the Bluetooth button for 3 seconds until the LED flashes blue\n2. Tap the printer in the list again';
+        Alert.alert('Pairing Failed', (e.message || 'Could not pair with the printer.') + pairingHelp);
         return;
       }
       setPairingAddress(null);
@@ -936,6 +956,22 @@ export default function SettingsScreen() {
             <Text style={styles.noPrinterText}>No Bluetooth printer paired</Text>
           )}
 
+          {Platform.OS === 'ios' && (
+            <View style={styles.iosBluetoothNote}>
+              <Text style={styles.iosBluetoothNoteText}>
+                On iPhone, pair the printer first:{'\n'}
+                Settings {'>'} Bluetooth {'>'} tap your Brother printer.{'\n'}
+                Then tap Find below to detect it.
+              </Text>
+              <TouchableOpacity
+                onPress={() => { const { Linking } = require('react-native'); Linking.openURL('App-Prefs:Bluetooth'); }}
+                style={styles.iosSettingsLink}
+              >
+                <Text style={styles.iosSettingsLinkText}>Open Bluetooth Settings →</Text>
+              </TouchableOpacity>
+            </View>
+          )}
+
           <TouchableOpacity
             style={[styles.scanBtn, scanningBluetooth && styles.scanBtnDisabled]}
             onPress={startBluetoothScan}
@@ -943,7 +979,10 @@ export default function SettingsScreen() {
             activeOpacity={0.85}
           >
             <Text style={styles.scanBtnText}>
-              {scanningBluetooth ? '🔍 Discovering... (~12s)' : '📶 Discover Bluetooth printers'}
+              {scanningBluetooth
+                ? (Platform.OS === 'ios' ? '🔍 Searching...' : '🔍 Discovering... (~12s)')
+                : (Platform.OS === 'ios' ? '📶 Find paired printers' : '📶 Discover Bluetooth printers')
+              }
             </Text>
           </TouchableOpacity>
 
@@ -1412,6 +1451,14 @@ const styles = StyleSheet.create({
   },
   btClearBtnText: { fontSize: 13, color: colors.textMid, fontWeight: '600' },
   noPrinterText: { fontSize: 14, color: colors.textMuted, marginBottom: spacing.sm },
+  iosBluetoothNote: {
+    backgroundColor: '#f0f7ff', borderRadius: radius.md,
+    padding: spacing.sm, marginBottom: spacing.sm,
+    borderWidth: 1, borderColor: '#c5dff8',
+  },
+  iosBluetoothNoteText: { fontSize: 13, color: '#1a4e7a', lineHeight: 19 },
+  iosSettingsLink: { marginTop: 6 },
+  iosSettingsLinkText: { fontSize: 13, color: colors.primary, fontWeight: '600' },
   connectionTypeRow: { flexDirection: 'row', gap: spacing.sm },
   connectionTypeBtn: {
     flex: 1, paddingVertical: 10, borderRadius: radius.lg,

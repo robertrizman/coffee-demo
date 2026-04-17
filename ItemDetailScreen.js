@@ -110,19 +110,23 @@ export default function ItemDetailScreen() {
         keyboardShouldPersistTaps="handled"
       >
 
-        {/* SIZE */}
-        <Text style={styles.sectionLabel}>SIZE</Text>
-        <View style={styles.sizeRow}>
-          {availableSizes.map((s) => (
-            <TouchableOpacity
-              key={s}
-              style={[styles.sizeBtn, effectiveSize === s && styles.sizeBtnActive]}
-              onPress={() => handleSize(s)}
-            >
-              <Text style={[styles.sizeBtnText, effectiveSize === s && styles.sizeBtnTextActive]}>{s}</Text>
-            </TouchableOpacity>
-          ))}
-        </View>
+        {/* SIZE — hidden when all sizes are disabled */}
+        {availableSizes.length > 0 && (
+          <>
+            <Text style={styles.sectionLabel}>SIZE</Text>
+            <View style={styles.sizeRow}>
+              {availableSizes.map((s) => (
+                <TouchableOpacity
+                  key={s}
+                  style={[styles.sizeBtn, effectiveSize === s && styles.sizeBtnActive]}
+                  onPress={() => handleSize(s)}
+                >
+                  <Text style={[styles.sizeBtnText, effectiveSize === s && styles.sizeBtnTextActive]}>{s}</Text>
+                </TouchableOpacity>
+              ))}
+            </View>
+          </>
+        )}
 
         {/* MILK — tea and iced drinks show No Milk first */}
         <Text style={styles.sectionLabel}>{isTea ? 'MILK (OPTIONAL)' : 'MILK'}</Text>

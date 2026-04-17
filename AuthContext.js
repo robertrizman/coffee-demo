@@ -11,7 +11,7 @@
 import React, { createContext, useContext, useState, useEffect, useRef } from 'react';
 import { AppState } from 'react-native';
 import { supabase } from './supabase';
-import { saveDefaultPrinter, saveBluetoothPrinter, saveAutoCut } from './printerConfig';
+import { saveDefaultPrinter, saveBluetoothPrinter, saveAutoCut, loadBluetoothPrinter } from './printerConfig';
 import { getDeviceId } from './deviceId';
 import { warmupBluetoothConnection } from './brotherPrinter';
 import { flushPrintQueue } from './AppContext';
@@ -33,10 +33,19 @@ export function AuthProvider({ children }) {
   // Keep ref in sync so the AppState listener always sees current barista state
   useEffect(() => { baristaRef.current = barista; }, [barista]);
 
-  // Flush print queue when app comes to foreground — only if a barista is logged in
+  // Flush print queue when app comes to foreground — only if a barista is logged in.
+  // On Android, silently re-warm the Bluetooth connection first so the ACL link
+  // is re-established after the phone sleeps (the OS drops it during inactivity).
   useEffect(() => {
-    const sub = AppState.addEventListener('change', (nextState) => {
+    const sub = AppState.addEventListener('change', async (nextState) => {
       if (nextState === 'active' && baristaRef.current) {
+        try {
+          const btPrinter = await loadBluetoothPrinter();
+          if (btPrinter?.bluetoothAddress) {
+            await warmupBluetoothConnection(btPrinter.bluetoothAddress);
+            await new Promise((r) => setTimeout(r, 1200));
+          }
+        } catch {}
         flushPrintQueue().catch(() => {});
       }
     });

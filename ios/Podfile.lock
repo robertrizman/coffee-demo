@@ -1,4 +1,5 @@
 PODS:
+  - BRLMPrinterKit (4.13.1)
   - EXApplication (7.0.8):
     - ExpoModulesCore
   - EXConstants (18.0.13):
@@ -2141,6 +2142,7 @@ PODS:
     - ZXingObjC/Core
 
 DEPENDENCIES:
+  - BRLMPrinterKit
   - EXApplication (from `../node_modules/expo-application/ios`)
   - EXConstants (from `../node_modules/expo-constants/ios`)
   - EXNotifications (from `../node_modules/expo-notifications/ios`)
@@ -2245,6 +2247,7 @@ DEPENDENCIES:
 
 SPEC REPOS:
   trunk:
+    - BRLMPrinterKit
     - libavif
     - libdav1d
     - libwebp
@@ -2453,6 +2456,7 @@ EXTERNAL SOURCES:
     :path: "../node_modules/react-native/ReactCommon/yoga"
 
 SPEC CHECKSUMS:
+  BRLMPrinterKit: e70a8ebb6f6eade9aa928df13edef470aff560f2
   EXApplication: 1e98d4b1dccdf30627f92917f4b2c5a53c330e5f
   EXConstants: fce59a631a06c4151602843667f7cfe35f81e271
   EXNotifications: 9eec98712cc814ceff916d876cb53859003b0597
@@ -2560,6 +2564,6 @@ SPEC CHECKSUMS:
   Yoga: 5934998fbeaef7845dbf698f698518695ab4cd1a
   ZXingObjC: 8898711ab495761b2dbbdec76d90164a6d7e14c5
 
-PODFILE CHECKSUM: 69354c8828059883e0aeac4ed455904c00feee53
+PODFILE CHECKSUM: d8712ccbd80768647df08e351513d447ae76ce8a
 
 COCOAPODS: 1.16.2

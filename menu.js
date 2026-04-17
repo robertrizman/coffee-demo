@@ -53,7 +53,8 @@ export const SIZES = ['Small', 'Medium', 'Large'];
 export const MILK_OPTIONS = ['Full Cream', 'Skim', 'Oat', 'Almond', 'Soy', 'Coconut', 'Macadamia', 'No Milk'];
 
 export const EXTRAS = [
-  'Extra shot', 'Decaf', 'Sugar', 'Vanilla syrup', 'Caramel syrup',
+  'Extra shot', 'Decaf', 'Sugar', '1/2 sugar', 'Vanilla syrup', 'Caramel syrup',
   'Hazelnut syrup', 'Chocolate syrup', 'Cinnamon', 'Chocolate sprinkles',
   'Whipped cream', 'Ice', 'Less ice', 'Extra hot', 'Weak',
+  '1/2 strength', '1/2 full', '3/4 full', 'Half and half milk',
 ];

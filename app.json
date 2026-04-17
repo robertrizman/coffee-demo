@@ -15,10 +15,14 @@
     "ios": {
       "supportsTablet": false,
       "bundleIdentifier": "com.robrizzy.coffeedemo",
+      "entitlements": {
+        "aps-environment": "production"
+      },
       "infoPlist": {
         "CFBundleDisplayName": "Tealium Arc Cafe",
         "NSCameraUsageDescription": "Allow Tealium Arc Cafe to access your camera to scan order QR codes.",
         "NSLocationWhenInUseUsageDescription": "We need your location to confirm you are at the venue to place an order.",
+        "NSLocationAlwaysAndWhenInUseUsageDescription": "We need your location to confirm you are at the venue to place an order.",
         "NSUserNotificationsUsageDescription": "We'll notify you when your coffee order is ready for pickup"
       }
     },

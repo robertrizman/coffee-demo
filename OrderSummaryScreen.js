@@ -520,9 +520,7 @@ export default function OrderSummaryScreen() {
             {/* Message */}
             <Text style={styles.brewTitle}>Order placed!</Text>
             <Text style={styles.brewSubtitle}>
-              Sit back and relax — your barista is on it.{'\n'}
-              We'll notify you on the app as soon as{'\n'}
-              your order is ready for pickup.
+              Sit back and relax — your barista is on it. We'll notify you when your order is ready for pickup.
             </Text>
 
             {/* Bouncing dots */}

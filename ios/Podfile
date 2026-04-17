@@ -23,6 +23,9 @@ prepare_react_native_project!
 target 'CoffeeDemo' do
   use_expo_modules!
 
+  # Brother printer SDK
+  pod 'BRLMPrinterKit'
+
   # Tealium PRISM SDK
   pod 'tealium-swift/Core', '~> 2.18'
   pod 'tealium-swift/Lifecycle', '~> 2.18'
