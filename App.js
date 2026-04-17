@@ -1,7 +1,7 @@
 import React, { useEffect, useState, useRef } from 'react';
 import { StatusBar, Platform, AppState, PermissionsAndroid } from 'react-native';
 import Geolocation from '@react-native-community/geolocation';
-Geolocation.setRNConfiguration({ skipPermissionRequests: true });
+try { Geolocation.setRNConfiguration({ skipPermissionRequests: true }); } catch (e) { console.warn('[Geolocation] setRNConfiguration failed:', e.message); }
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import * as Notifications from 'expo-notifications';
 import { AppProvider, useApp } from './AppContext';

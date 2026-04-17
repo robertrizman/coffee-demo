@@ -8,10 +8,13 @@
  * - Printer assignment is now DEVICE-SPECIFIC via `barista_device_printers` table
  */
 
-import React, { createContext, useContext, useState } from 'react';
+import React, { createContext, useContext, useState, useEffect, useRef } from 'react';
+import { AppState } from 'react-native';
 import { supabase } from './supabase';
 import { saveDefaultPrinter, saveBluetoothPrinter, saveAutoCut } from './printerConfig';
 import { getDeviceId } from './deviceId';
+import { warmupBluetoothConnection } from './brotherPrinter';
+import { flushPrintQueue } from './AppContext';
 
 const AuthContext = createContext(null);
 
@@ -25,6 +28,20 @@ export function AuthProvider({ children }) {
   const [barista, setBarista] = useState(null);
   const [authError, setAuthError] = useState('');
   const [authLoading, setAuthLoading] = useState(false);
+  const baristaRef = useRef(null);
+
+  // Keep ref in sync so the AppState listener always sees current barista state
+  useEffect(() => { baristaRef.current = barista; }, [barista]);
+
+  // Flush print queue when app comes to foreground — only if a barista is logged in
+  useEffect(() => {
+    const sub = AppState.addEventListener('change', (nextState) => {
+      if (nextState === 'active' && baristaRef.current) {
+        flushPrintQueue().catch(() => {});
+      }
+    });
+    return () => sub.remove();
+  }, []);
 
   const login = async (username, password) => {
     setAuthLoading(true);
@@ -85,6 +102,10 @@ export function AuthProvider({ children }) {
               .eq('id', printer.id);
           }
           console.log('[Auth] Loaded barista Bluetooth printer:', printer.name, printer.bluetooth_address);
+          // Silently warm up the BT connection in the background so the first print is instant
+          warmupBluetoothConnection(printer.bluetooth_address)
+            .then((ok) => console.log('[Auth] BT warmup:', ok ? 'connected' : 'not reachable'))
+            .catch(() => {});
         } else if (printer.ip) {
           await saveDefaultPrinter({
             id: printer.id,
@@ -112,6 +133,10 @@ export function AuthProvider({ children }) {
       setBarista(baristaData);
       setIsAdmin(true);
       setAuthLoading(false);
+
+      // Flush any orders that arrived while no barista was logged in
+      flushPrintQueue().catch(() => {});
+
       return true;
 
     } catch (err) {

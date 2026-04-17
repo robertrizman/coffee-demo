@@ -69,6 +69,35 @@ class BrotherPrinterBridge(reactContext: ReactApplicationContext) :
         }
     }
 
+    // ── Bluetooth Warmup ──────────────────────────────────
+    //
+    // Opens and immediately closes a Bluetooth channel to warm up the
+    // OS-level ACL link so the first real print job connects instantly.
+
+    @ReactMethod
+    fun warmupBluetoothConnection(bluetoothAddress: String, promise: Promise) {
+        CoroutineScope(Dispatchers.IO).launch {
+            try {
+                val bluetoothManager = reactApplicationContext.getSystemService(Context.BLUETOOTH_SERVICE) as? BluetoothManager
+                val bluetoothAdapter = bluetoothManager?.adapter
+                if (bluetoothAdapter == null || !bluetoothAdapter.isEnabled) {
+                    withContext(Dispatchers.Main) { promise.resolve(false) }
+                    return@launch
+                }
+                val channel = Channel.newBluetoothChannel(bluetoothAddress, bluetoothAdapter)
+                val driverResult = PrinterDriverGenerator.openChannel(channel)
+                if (driverResult.error.code == com.brother.sdk.lmprinter.OpenChannelError.ErrorCode.NoError) {
+                    driverResult.driver.closeChannel()
+                    withContext(Dispatchers.Main) { promise.resolve(true) }
+                } else {
+                    withContext(Dispatchers.Main) { promise.resolve(false) }
+                }
+            } catch (e: Exception) {
+                withContext(Dispatchers.Main) { promise.resolve(false) }
+            }
+        }
+    }
+
     // ── Bluetooth Print ───────────────────────────────────
 
     @ReactMethod

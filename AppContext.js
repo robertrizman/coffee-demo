@@ -327,6 +327,49 @@ function rowToOrder(row) {
   };
 }
 
+export async function flushPrintQueue() {
+  try {
+    const [autoPrintEnabled, defaultPrinter, bluetoothPrinter] = await Promise.all([
+      loadAutoPrint(),
+      loadDefaultPrinter(),
+      loadBluetoothPrinter(),
+    ]);
+    const hasPrinter = defaultPrinter?.ip || bluetoothPrinter?.bluetoothAddress;
+    if (!autoPrintEnabled || !hasPrinter) return;
+
+    console.log('[PrintQueue] Checking for unprinted orders...');
+    const { data: unprintedOrders, error } = await supabase
+      .from('orders')
+      .select('*')
+      .eq('printed', false)
+      .eq('status', 'pending')
+      .order('placed_at', { ascending: true })
+      .limit(20);
+
+    if (error) { console.warn('[PrintQueue] Query error:', error.message); return; }
+    if (!unprintedOrders?.length) { console.log('[PrintQueue] No unprinted orders'); return; }
+
+    console.log(`[PrintQueue] 📋 Found ${unprintedOrders.length} unprinted orders`);
+    for (const row of unprintedOrders) {
+      const order = rowToOrder(row);
+      console.log(`[PrintQueue] Printing ${order.id}...`);
+      const result = await printOrderReceipt(order, '', { silent: true });
+      if (result?.ok) {
+        console.log(`[PrintQueue] ✓ ${order.id} printed`);
+        await supabase.from('orders')
+          .update({ printed: true, printed_at: new Date().toISOString() })
+          .eq('id', order.id);
+      } else {
+        console.log(`[PrintQueue] ✗ ${order.id} failed, will retry on next wake`);
+      }
+      await new Promise(resolve => setTimeout(resolve, 500));
+    }
+    console.log('[PrintQueue] ✅ Done');
+  } catch (err) {
+    console.warn('[PrintQueue] Error:', err.message);
+  }
+}
+
 export function AppProvider({ children }) {
   const [state, dispatch] = useReducer(reducer, initialState);
 
@@ -432,63 +475,6 @@ export function AppProvider({ children }) {
           .then(({ data }) => { if (data) dispatch({ type: 'SET_STORE_CONFIG', payload: data }); });
         supabase.from('store_breaks').select('*').order('start_time')
           .then(({ data }) => { if (data) dispatch({ type: 'SET_STORE_BREAKS', payload: data }); });
-        
-        // PRINT QUEUE: Check for unprinted orders
-        try {
-          const [autoPrintEnabled, defaultPrinter, bluetoothPrinter] = await Promise.all([
-            loadAutoPrint(),
-            loadDefaultPrinter(),
-            loadBluetoothPrinter(),
-          ]);
-          const hasPrinter = defaultPrinter?.ip || bluetoothPrinter?.bluetoothAddress;
-
-          if (autoPrintEnabled && hasPrinter) {
-            console.log('[PrintQueue] Checking for unprinted orders...');
-            
-            const { data: unprintedOrders, error } = await supabase
-              .from('orders')
-              .select('*')
-              .eq('printed', false)
-              .eq('status', 'pending')
-              .order('placed_at', { ascending: true })
-              .limit(20);
-            
-            if (error) {
-              console.warn('[PrintQueue] Query error:', error.message);
-              return;
-            }
-            
-            if (unprintedOrders && unprintedOrders.length > 0) {
-              console.log(`[PrintQueue] 📋 Found ${unprintedOrders.length} unprinted orders, printing now...`);
-              
-              for (const row of unprintedOrders) {
-                const order = rowToOrder(row);
-                console.log(`[PrintQueue] Printing ${order.id}...`);
-                
-                const result = await printOrderReceipt(order, '', { silent: true });
-                
-                if (result && result.ok) {
-                  console.log(`[PrintQueue] ✓ ${order.id} printed successfully`);
-                  await supabase
-                    .from('orders')
-                    .update({ printed: true, printed_at: new Date().toISOString() })
-                    .eq('id', order.id);
-                } else {
-                  console.log(`[PrintQueue] ✗ ${order.id} print failed, will retry on next wake`);
-                }
-                
-                // Small delay between prints to avoid overwhelming the printer
-                await new Promise(resolve => setTimeout(resolve, 500));
-              }
-              
-              console.log('[PrintQueue] ✅ Print queue complete');
-            } else {
-              console.log('[PrintQueue] No unprinted orders found');
-            }
-          }
-        } catch (err) {
-          console.warn('[PrintQueue] Error:', err.message);
-        }
       }
     });
     return () => appStateSub.remove();
