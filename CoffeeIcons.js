@@ -9,7 +9,8 @@
  *   <CupIcon size={24} color={colors.primary} />
  */
 
-import React from 'react';
+import React, { useEffect, useRef } from 'react';
+import { Animated, Easing } from 'react-native';
 import { MaterialCommunityIcons as MCI } from '@expo/vector-icons';
 import { Ionicons } from '@expo/vector-icons';
 
@@ -200,3 +201,66 @@ export const StarIcon = ({ size = 24, color = '#006D80' }) => (
 export const CopyIcon = ({ size = 24, color = '#006D80' }) => (
   <MCI name="content-copy" size={size} color={color} />
 );
+
+/** Tag / offers / promotions */
+export const TagIcon = ({ size = 24, color = '#006D80' }) => (
+  <MCI name="tag-outline" size={size} color={color} />
+);
+
+/** Morning tea / pastry */
+export const MorningTeaIcon = ({ size = 24, color = '#006D80' }) => (
+  <MCI name="food-croissant" size={size} color={color} />
+);
+
+/** Lunch / meal */
+export const LunchIcon = ({ size = 24, color = '#006D80' }) => (
+  <MCI name="food" size={size} color={color} />
+);
+
+/** Snacks */
+export const SnacksIcon = ({ size = 24, color = '#006D80' }) => (
+  <MCI name="food-variant" size={size} color={color} />
+);
+
+/** Magnify / search */
+export const MagnifyIcon = ({ size = 24, color = '#006D80' }) => (
+  <MCI name="magnify" size={size} color={color} />
+);
+
+/** Lightning bolt / API / speed */
+export const LightningBoltIcon = ({ size = 24, color = '#006D80' }) => (
+  <MCI name="lightning-bolt" size={size} color={color} />
+);
+
+/** Lightbulb — tips and suggestions */
+export const LightbulbIcon = ({ size = 24, color = '#006D80' }) => (
+  <MCI name="lightbulb-outline" size={size} color={color} />
+);
+
+/** Animated AI spark — pulsing ✦ for AI-powered features */
+export function AiSparkIcon({ size = 22, color = '#fff' }) {
+  const scale   = useRef(new Animated.Value(1)).current;
+  const opacity = useRef(new Animated.Value(1)).current;
+
+  useEffect(() => {
+    Animated.loop(
+      Animated.sequence([
+        Animated.parallel([
+          Animated.timing(scale,   { toValue: 1.3,  duration: 900, useNativeDriver: true, easing: Easing.inOut(Easing.ease) }),
+          Animated.timing(opacity, { toValue: 0.45, duration: 900, useNativeDriver: true, easing: Easing.inOut(Easing.ease) }),
+        ]),
+        Animated.parallel([
+          Animated.timing(scale,   { toValue: 1.0,  duration: 900, useNativeDriver: true, easing: Easing.inOut(Easing.ease) }),
+          Animated.timing(opacity, { toValue: 1.0,  duration: 900, useNativeDriver: true, easing: Easing.inOut(Easing.ease) }),
+        ]),
+        Animated.delay(400),
+      ])
+    ).start();
+  }, []);
+
+  return (
+    <Animated.Text style={{ fontSize: size, lineHeight: size + 4, color, transform: [{ scale }], opacity }}>
+      ✦
+    </Animated.Text>
+  );
+}

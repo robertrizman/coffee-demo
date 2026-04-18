@@ -40,9 +40,9 @@ android {
     buildToolsVersion rootProject.ext.buildToolsVersion
     compileSdk rootProject.ext.compileSdkVersion
 
-    namespace 'com.robrizzy.coffeedemo'
+    namespace 'com.robrizzy.coffeecafe'
     defaultConfig {
-        applicationId 'com.robrizzy.coffeedemo'
+        applicationId 'com.robrizzy.coffeecafe'
         minSdkVersion rootProject.ext.minSdkVersion
         targetSdkVersion rootProject.ext.targetSdkVersion
         versionCode 1

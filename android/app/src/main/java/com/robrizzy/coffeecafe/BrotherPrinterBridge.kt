@@ -1,4 +1,4 @@
-package com.robrizzy.coffeedemo
+package com.robrizzy.coffeecafe
 
 import android.bluetooth.BluetoothAdapter
 import android.bluetooth.BluetoothManager

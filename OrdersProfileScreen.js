@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useCallback } from 'react';
+import React, { useEffect, useState, useCallback, useRef } from 'react';
 import {
   View, Text, ScrollView, StyleSheet,
   TouchableOpacity, ActivityIndicator, RefreshControl,
@@ -6,10 +6,11 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useApp } from './AppContext';
+import { getOrderInsight } from './foodPairingAI';
 import { supabase } from './supabase';
-import { trackProfileTab, trackEditProfile, trackProfileUpdated, trackUuidCopy, joinTrace, leaveTrace, getCanonicalDeviceId } from './tealium';
+import { trackProfileTab, trackEditProfile, trackProfileUpdated, trackUuidCopy, trackDietaryRequirementsUpdated, joinTrace, leaveTrace, getCanonicalDeviceId } from './tealium';
 import { colors, typography, spacing, radius, shadow } from './theme';
-import { UserIcon, EmailIcon, LocationPinIcon, TakeawayCupIcon, CheckIcon, CopyIcon, EditIcon } from './CoffeeIcons';
+import { UserIcon, EmailIcon, LocationPinIcon, TakeawayCupIcon, CheckIcon, CopyIcon, EditIcon, AiSparkIcon, LightbulbIcon, MagnifyIcon, LightningBoltIcon } from './CoffeeIcons';
 
 function timeAgo(ts) {
   const secs = Math.floor((Date.now() - ts) / 1000);
@@ -83,6 +84,9 @@ export default function OrdersProfileScreen() {
   const [debugTapCount, setDebugTapCount] = useState(0);
   const [momentsUnlocked, setMomentsUnlocked] = useState(false);
   const [tealiumUuid, setTealiumUuid] = useState(null);
+  const [editDietary, setEditDietary] = useState(profile?.dietary_requirements || '');
+  const [orderInsight, setOrderInsight] = useState(null);
+  const [insightLoading, setInsightLoading] = useState(false);
 
   // Listen for Tealium UUID to be ready
   useEffect(() => {
@@ -138,10 +142,50 @@ export default function OrdersProfileScreen() {
     loadLocations();
   }, [fetchRemoteOrders]);
 
+  const insightFetched = useRef(false);
+  useEffect(() => {
+    if (!mergedOrders.length || insightFetched.current) return;
+    insightFetched.current = true;
+    setInsightLoading(true);
+    getOrderInsight({ orders: mergedOrders })
+      .then(result => { setOrderInsight(result); setInsightLoading(false); })
+      .catch(() => setInsightLoading(false));
+  }, [mergedOrders.length]);
+
+  useEffect(() => {
+    if (activeTab !== 'profile' || momentsData) return;
+    const deviceIdForMoments = getCanonicalDeviceId() || state.deviceId;
+    if (!deviceIdForMoments) return;
+    const url = `https://personalization-api.ap-southeast-2.prod.tealiumapis.com/personalization/accounts/success-robert-rizman/profiles/coffee-demo/engines/aaa7abe0-9023-49c8-8858-5fe2dbb18c39?attributeId=5120&attributeValue=${encodeURIComponent(deviceIdForMoments.toLowerCase())}`;
+    fetch(url, { headers: { 'Content-Type': 'application/json' } })
+      .then(r => r.json())
+      .then(data => {
+        setMomentsData(data);
+        const momentsDietary = data?.properties?.['Dietary Requirements'];
+        if (momentsDietary && !profile?.dietary_requirements) {
+          dispatch({
+            type: 'UPDATE_PROFILE',
+            payload: { ...profile, dietary_requirements: momentsDietary },
+          });
+        }
+      })
+      .catch(() => {});
+  }, [activeTab]);
+
   const loadLocations = async () => {
     const { data } = await supabase.from('arc_locations').select('*').order('venue_name');
     setLocations(data || []);
   };
+
+  useEffect(() => {
+    const channel = supabase
+      .channel('arc-locations-watch')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'arc_locations' }, () => {
+        loadLocations();
+      })
+      .subscribe();
+    return () => supabase.removeChannel(channel);
+  }, []);
 
   const isLocationActive = (loc) => {
     if (!loc.enabled) return false;
@@ -174,14 +218,19 @@ export default function OrdersProfileScreen() {
   const handleSaveProfile = () => {
     if (!editName.trim()) { Alert.alert('Name required', 'Please enter your name.'); return; }
     if (!editEmail.trim() || !editEmail.includes('@')) { Alert.alert('Email required', 'Please enter a valid email.'); return; }
+    const dietary = editDietary.trim() || null;
     const updatedProfile = {
       name: editName.trim(),
       email: editEmail.trim().toLowerCase(),
       arc_location_id: selectedLocationId,
       arc_location_name: selectedLocationName,
+      dietary_requirements: dietary,
     };
     dispatch({ type: 'UPDATE_PROFILE', payload: updatedProfile });
     trackProfileUpdated(updatedProfile);
+    if (dietary !== (profile?.dietary_requirements || null)) {
+      trackDietaryRequirementsUpdated(dietary);
+    }
     setEditMode(false);
     // Also update push token with new location
     if (deviceId) {
@@ -321,6 +370,56 @@ export default function OrdersProfileScreen() {
             showsVerticalScrollIndicator={false}
             refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => { setRefreshing(true); fetchRemoteOrders(); }} tintColor={colors.primary} />}
           >
+            {/* AI intake insight card */}
+            {(insightLoading || orderInsight) && (
+              <View style={styles.insightCard}>
+                {insightLoading ? (
+                  <View style={styles.insightLoading}>
+                    <ActivityIndicator size="small" color={colors.primary} />
+                    <Text style={styles.insightLoadingText}>Analysing your order history...</Text>
+                  </View>
+                ) : (
+                  <>
+                    {/* Title row with AI badge floated right */}
+                    <View style={styles.insightHeader}>
+                      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                        <AiSparkIcon size={14} color={colors.primary} />
+                        <Text style={styles.insightTitle}>Your Café Intake</Text>
+                      </View>
+                      <View style={styles.insightAiBadge}>
+                        <Text style={styles.insightAiBadgeText}>AI Suggestion</Text>
+                      </View>
+                    </View>
+
+                    {/* LLM name */}
+                    <Text style={styles.insightEngine}>{orderInsight.engine}</Text>
+
+                    {/* kJ chips */}
+                    <View style={styles.insightKjRow}>
+                      <View style={styles.insightKjChip}>
+                        <Text style={styles.insightKjValue}>{orderInsight.kj_total?.toLocaleString()}</Text>
+                        <Text style={styles.insightKjLabel}>total kJ</Text>
+                      </View>
+                      <View style={styles.insightKjChip}>
+                        <Text style={styles.insightKjValue}>{orderInsight.kj_per_visit?.toLocaleString()}</Text>
+                        <Text style={styles.insightKjLabel}>avg per visit</Text>
+                      </View>
+                    </View>
+
+                    {orderInsight.insight ? <Text style={styles.insightText}>{orderInsight.insight}</Text> : null}
+
+                    {/* Tip row with icon */}
+                    {orderInsight.tip ? (
+                      <View style={styles.insightTipRow}>
+                        <LightbulbIcon size={16} color={colors.teal} />
+                        <Text style={styles.insightTip}>{orderInsight.tip}</Text>
+                      </View>
+                    ) : null}
+                  </>
+                )}
+              </View>
+            )}
+
             {mergedOrders.length === 0 ? (
               <View style={styles.emptyState}>
                 <TakeawayCupIcon size={56} color={colors.border} />
@@ -403,6 +502,16 @@ export default function OrdersProfileScreen() {
                 </View>
                 <View style={styles.profileDivider} />
                 <View style={styles.profileRow}>
+                  <Text style={styles.dietaryIcon}>🌿</Text>
+                  <View style={styles.profileInfo}>
+                    <Text style={styles.profileLabel}>DIETARY REQUIREMENTS</Text>
+                    <Text style={[styles.profileValue, !profile?.dietary_requirements && { color: colors.textMuted }]}>
+                      {profile?.dietary_requirements || 'Not set'}
+                    </Text>
+                  </View>
+                </View>
+                <View style={styles.profileDivider} />
+                <View style={styles.profileRow}>
                   <LocationPinIcon size={22} color={colors.textMid} />
                   <View style={styles.profileInfo}>
                     <Text style={styles.profileLabel}>ARC LOCATION</Text>
@@ -440,6 +549,7 @@ export default function OrdersProfileScreen() {
                   onPress={() => {
                     setEditName(profile?.name || '');
                     setEditEmail(profile?.email || '');
+                    setEditDietary(profile?.dietary_requirements || '');
                     setEditMode(true);
                     trackEditProfile();
                   }}
@@ -472,6 +582,19 @@ export default function OrdersProfileScreen() {
                     placeholder="your@email.com"
                     placeholderTextColor={colors.textMuted}
                     keyboardType="email-address"
+                    autoCapitalize="none"
+                    autoCorrect={false}
+                  />
+                </View>
+                <Text style={styles.fieldLabel}>DIETARY REQUIREMENTS</Text>
+                <View style={styles.inputRow}>
+                  <Text style={styles.dietaryIcon}>🌿</Text>
+                  <TextInput
+                    style={styles.input}
+                    value={editDietary}
+                    onChangeText={setEditDietary}
+                    placeholder="e.g. Vegan, Gluten-free, Nut allergy"
+                    placeholderTextColor={colors.textMuted}
                     autoCapitalize="none"
                     autoCorrect={false}
                   />
@@ -594,7 +717,10 @@ export default function OrdersProfileScreen() {
 
           {/* Trace Section */}
           <View style={styles.debugCard}>
-            <Text style={styles.debugCardTitle}>🔍 Tealium Trace</Text>
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+              <MagnifyIcon size={18} color={colors.midnight} />
+              <Text style={styles.debugCardTitle}>Tealium Trace</Text>
+            </View>
             <Text style={styles.debugCardDesc}>
               Enter a Trace ID from Tealium iQ to begin a live trace session. All events will include the trace ID for real-time monitoring.
             </Text>
@@ -642,7 +768,10 @@ export default function OrdersProfileScreen() {
           {/* Moments API Section */}
           {momentsUnlocked && (
             <View style={styles.debugCard}>
-              <Text style={styles.debugCardTitle}>⚡ Moments API</Text>
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                <LightningBoltIcon size={18} color={colors.midnight} />
+                <Text style={styles.debugCardTitle}>Moments API</Text>
+              </View>
               <Text style={styles.debugCardDesc}>Query the Moments API engine for this visitor's current profile data.</Text>
 
               <Text style={styles.debugLabel}>CUSTOMER UUID (TEALIUM)</Text>
@@ -668,9 +797,7 @@ export default function OrdersProfileScreen() {
               {momentsData && (
                 <View style={styles.debugResponseWrap}>
                   <Text style={styles.debugLabel}>RESPONSE</Text>
-                  <ScrollView style={styles.debugResponseScroll} nestedScrollEnabled>
-                    <Text style={styles.debugMono}>{JSON.stringify(momentsData, null, 2)}</Text>
-                  </ScrollView>
+                  <Text style={styles.debugMono}>{JSON.stringify(momentsData, null, 2)}</Text>
                 </View>
               )}
             </View>
@@ -809,6 +936,32 @@ const styles = StyleSheet.create({
   },
   infoTitle: { fontSize: 13, fontWeight: '700', color: colors.primary },
   infoText: { fontSize: 12, color: colors.textMid, lineHeight: 18 },
+  insightCard: {
+    backgroundColor: colors.surface, borderRadius: radius.xl,
+    borderWidth: 1, borderColor: colors.primaryMid,
+    padding: spacing.md, gap: spacing.sm, ...shadow.card,
+  },
+  insightLoading: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm, paddingVertical: spacing.sm },
+  insightLoadingText: { ...typography.caption, color: colors.primary },
+  insightHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
+  insightTitle: { fontSize: 15, fontWeight: '700', color: colors.midnight },
+  insightAiBadge: {
+    backgroundColor: colors.midnight, borderRadius: radius.full,
+    paddingHorizontal: 8, paddingVertical: 3,
+  },
+  insightAiBadgeText: { fontSize: 10, fontWeight: '800', color: '#fff', letterSpacing: 0.5 },
+  insightEngine: { fontSize: 11, fontWeight: '600', color: colors.textMid },
+  insightKjRow: { flexDirection: 'row', gap: spacing.sm },
+  insightKjChip: {
+    flex: 1, backgroundColor: colors.primaryLight, borderRadius: radius.lg,
+    padding: spacing.sm, alignItems: 'center', borderWidth: 1, borderColor: colors.primaryMid,
+  },
+  insightKjValue: { fontSize: 22, fontWeight: '800', color: colors.primary },
+  insightKjLabel: { fontSize: 11, color: colors.textMid, fontWeight: '600', marginTop: 2 },
+  insightText: { fontSize: 13, color: colors.textMid, lineHeight: 20 },
+  insightTipRow: { flexDirection: 'row', alignItems: 'flex-start', gap: 6, backgroundColor: colors.tealLight, borderRadius: radius.md, padding: spacing.sm, borderWidth: 1, borderColor: colors.tealMid },
+  insightTip: { flex: 1, fontSize: 12, color: colors.textMid, fontWeight: '600', lineHeight: 18 },
+  dietaryIcon: { fontSize: 20, width: 22, textAlign: 'center' },
   uuidCard: {
     backgroundColor: colors.surface, borderRadius: radius.lg,
     padding: spacing.md, gap: 6,
@@ -917,5 +1070,4 @@ const styles = StyleSheet.create({
     padding: spacing.sm, lineHeight: 16,
   },
   debugResponseWrap: { marginTop: spacing.sm, gap: spacing.xs },
-  debugResponseScroll: { maxHeight: 200, backgroundColor: colors.surfaceAlt, borderRadius: radius.md, padding: spacing.sm },
 });

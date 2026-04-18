@@ -56,28 +56,56 @@ function pickItemsFromCategory(customItems, category, count = 1) {
   return [...items].sort(() => Math.random() - 0.5).slice(0, count);
 }
 
-export async function getAIPairing({ orders, customItems }) {
+export async function getOrderInsight({ orders }) {
+  if (!FoodPairingModule?.generateInsight || !orders?.length) return null;
+
+  const summary = orders.slice(0, 20).map(o => ({
+    items: (o.items || []).map(i => ({
+      name: i.name,
+      milk: i.milk || null,
+      size: i.size || null,
+    })),
+  }));
+
+  try {
+    const timeout = new Promise((_, reject) => setTimeout(() => reject(new Error('timeout')), 8000));
+    const result = await Promise.race([
+      FoodPairingModule.generateInsight(JSON.stringify(summary)),
+      timeout,
+    ]);
+    return result;
+  } catch (e) {
+    console.warn('[OrderInsight] Failed:', e.message);
+    return null;
+  }
+}
+
+export async function getAIPairing({ orders, customItems, dietaryRequirements = null }) {
   const timeOfDay = getTimeOfDay();
   const dayOfWeek = getDayOfWeek();
   const drinkCategory = getDrinkCategory(orders);
   const milkType = getMilkType(orders);
   const orderCount = orders.length;
 
-  // Build menu items string for LLM prompt
+  // Build context string for LLM prompt — menu items + optional dietary requirements
   const menuItemsJson = customItems
     ? Object.entries(customItems)
         .filter(([cat, items]) => ['Morning Tea', 'Lunch', 'Snacks'].includes(cat) && items?.length > 0)
         .map(([cat, items]) => `${cat}: ${items.join(', ')}`)
         .join(' | ')
     : '';
+  const contextJson = [
+    menuItemsJson,
+    dietaryRequirements ? `Dietary requirements: ${dietaryRequirements}` : '',
+  ].filter(Boolean).join(' | ');
 
-  // Try native module (Gemini Nano on S24+ / Core ML on iOS)
+  // Try native module (Gemini Nano on S24+ / Apple Intelligence on iOS)
   if (FoodPairingModule) {
     try {
-      console.log('[FoodPairingAI] Calling native module with:', { drinkCategory, milkType, timeOfDay, dayOfWeek });
+      console.log('[FoodPairingAI] Calling native module with:', { drinkCategory, milkType, timeOfDay, dayOfWeek, dietaryRequirements });
       const predictionPromise = FoodPairingModule.predict(
         drinkCategory, milkType, timeOfDay, dayOfWeek,
-        Platform.OS === 'android' ? menuItemsJson : ''
+        contextJson
       );
 
       const timeoutPromise = new Promise((_, reject) =>

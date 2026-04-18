@@ -14,7 +14,7 @@
     },
     "ios": {
       "supportsTablet": false,
-      "bundleIdentifier": "com.robrizzy.coffeedemo",
+      "bundleIdentifier": "com.robrizzy.coffeecafe",
       "entitlements": {
         "aps-environment": "production"
       },
@@ -31,7 +31,7 @@
         "foregroundImage": "./assets/images/adaptive-icon.png",
         "backgroundColor": "#FFFFFF"
       },
-      "package": "com.robrizzy.coffeedemo",
+      "package": "com.robrizzy.coffeecafe",
       "googleServicesFile": "./google-services.json",
       "permissions": [
         "CAMERA",

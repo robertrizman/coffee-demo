@@ -40,7 +40,7 @@ serve(async (req) => {
 
   // Customer scanned with phone camera — show waiting page
   if (isBrowserScan && !isBaristaScan) {
-    const deepLink = `com.robrizzy.coffeedemo://order-status?order_id=${encodeURIComponent(orderId)}`;
+    const deepLink = `com.robrizzy.coffeecafe://order-status?order_id=${encodeURIComponent(orderId)}`;
     return new Response(customerWaitPage(customerName, orderId, station, deepLink), {
       headers: { 'Content-Type': 'text/html; charset=utf-8' },
     });

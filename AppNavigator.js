@@ -23,7 +23,7 @@ import LoginScreen from './LoginScreen';
 
 import { useAuth } from './AuthContext';
 import { colors } from './theme';
-import { TakeawayCupIcon, ReceiptIcon, BaristaIcon as BaristaHat } from './CoffeeIcons';
+import { TakeawayCupIcon, ReceiptIcon, BaristaIcon as BaristaHat, TagIcon } from './CoffeeIcons';
 
 const Stack = createNativeStackNavigator();
 const Tab = createBottomTabNavigator();
@@ -62,7 +62,7 @@ function OrdersIcon({ focused }) {
   return <ReceiptIcon size={24} color={focused ? colors.primary : colors.textMuted} />;
 }
 function OffersIcon({ focused }) {
-  return <Text style={{ fontSize: 20, color: focused ? colors.primary : colors.textMuted }}>✦</Text>;
+  return <TagIcon size={24} color={focused ? colors.primary : colors.textMuted} />;
 }
 function BaristaIcon({ focused }) {
   return <BaristaHat size={24} color={focused ? colors.primary : colors.textMuted} />;

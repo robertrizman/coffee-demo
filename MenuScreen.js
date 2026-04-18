@@ -10,7 +10,7 @@ import { MENU, CATEGORIES } from './menu';
 import { useApp } from './AppContext';
 import { trackMenuView, trackItemView, queryMomentsAPI, trackAIPairingOpened, trackAIPairingResult, trackAIPairingCarousel } from './tealium';
 import { colors, typography, spacing, radius, shadow } from './theme';
-import { EspressoIcon, LatteIcon, IcedCupIcon, HotChocIcon, ChaiIcon, TeaIcon, ChevronIcon } from './CoffeeIcons';
+import { EspressoIcon, LatteIcon, IcedCupIcon, HotChocIcon, ChaiIcon, TeaIcon, ChevronIcon, AiSparkIcon, MorningTeaIcon, LunchIcon, SnacksIcon } from './CoffeeIcons';
 import { buildRecommendation } from './recommendations';
 import { getAIPairing } from './foodPairingAI';
 import { formatTime, isCurrentlyInBreak } from './storeUtils';
@@ -21,13 +21,11 @@ const CATEGORY_ICONS = {
   'Iced & Cold': IcedCupIcon,
   'Specialty': HotChocIcon,
   'Tea': TeaIcon,
+  'Morning Tea': MorningTeaIcon,
+  'Lunch': LunchIcon,
+  'Snacks': SnacksIcon,
 };
 
-function AiSparkIcon({ size = 22, color = '#fff' }) {
-  return (
-    <Text style={{ fontSize: size, lineHeight: size + 4 }}>✦</Text>
-  );
-}
 
 function TypingText({ text, onDone, speed = 18 }) {
   const [displayed, setDisplayed] = useState('');
@@ -213,10 +211,15 @@ export default function MenuScreen() {
 
     const minDelay = new Promise((res) => setTimeout(res, 1800));
     const timeout = new Promise((res) => setTimeout(() => res(null), 5000));
-    const aiQuery = getAIPairing({ orders: myOrders, customItems: state.customItems }).catch(() => null);
     const momentsQuery = Promise.race([queryMomentsAPI().catch(() => null), timeout]);
 
-    Promise.all([minDelay, aiQuery, momentsQuery]).then(([, aiResult, momentsData]) => {
+    momentsQuery.then((momentsData) => {
+      const dietaryRequirements = state.profile?.dietary_requirements
+        || momentsData?.properties?.['Dietary Requirements']
+        || null;
+      const aiQuery = getAIPairing({ orders: myOrders, customItems: state.customItems, dietaryRequirements }).catch(() => null);
+
+      Promise.all([minDelay, aiQuery]).then(([, aiResult]) => {
       const rec = buildRecommendation({
         orders: myOrders,
         customItems: state.customItems,
@@ -255,6 +258,7 @@ export default function MenuScreen() {
       setAiPhase('insights');
       Animated.timing(fadeAnim, { toValue: 1, duration: 400, useNativeDriver: true }).start();
       setTimeout(() => setAiPhase('recommendation'), 800);
+      });
     });
   };
 
@@ -283,7 +287,7 @@ export default function MenuScreen() {
             <Text style={styles.subtitle}>Choose your coffee</Text>
           </View>
           <TouchableOpacity style={styles.aiButton} onPress={openAi} activeOpacity={0.85}>
-            <Text style={styles.aiButtonIcon}>✦</Text>
+            <AiSparkIcon size={14} color={colors.teal} />
             <Text style={styles.aiButtonLabel}>AI Pairing</Text>
           </TouchableOpacity>
         </View>
@@ -318,15 +322,20 @@ export default function MenuScreen() {
               <Text style={styles.foodBannerText}>No items added yet. Add items in the Operator menu.</Text>
             </View>
           ) : (
-            foodItems.map((item, i) => (
+            foodItems.map((item, i) => {
+              const FoodIcon = CATEGORY_ICONS[activeCategory];
+              return (
               <View key={item.id || i} style={styles.foodCard}>
-                <Text style={styles.foodEmoji}>🍽️</Text>
+                <View style={styles.foodIconWrap}>
+                  {FoodIcon && <FoodIcon size={22} color={colors.primary} />}
+                </View>
                 <View style={{ flex: 1 }}>
                   <Text style={styles.cardName}>{item.name}</Text>
                   {item.description ? <Text style={styles.cardDesc}>{item.description}</Text> : null}
                 </View>
               </View>
-            ))
+              );
+            })
           )
         ) : (
           visibleItems.map((item) => {
@@ -480,6 +489,7 @@ export default function MenuScreen() {
                                 )}
                               </View>
                             )}
+
                           </>
                         )}
 
@@ -521,13 +531,14 @@ export default function MenuScreen() {
                     ))}
                   </ScrollView>
 
-                <View style={styles.aiBrandNote}>
-                  <Text style={styles.aiBrandNoteText}>
-                    {recommendation?.aiEngine
-                      ? `✦ ${recommendation.aiEngine} · Tealium PRISM${recommendation.aiConfidence ? ` · ${recommendation.aiConfidence}% confidence` : ''}`
-                      : 'Powered by Tealium PRISM'}
-                  </Text>
-                </View>
+                {/* Engine footer — fixed above nav, only on first slide */}
+                {currentSlide === 0 && recommendation?.aiSource === 'on-device-llm' && recommendation?.aiEngine && (
+                  <View style={styles.aiBrandNote}>
+                    <Text style={styles.aiBrandNoteText}>
+                      {`✦ ${recommendation.aiEngine} · Tealium PRISM`}
+                    </Text>
+                  </View>
+                )}
 
                 {/* Navigation arrows if multiple slides */}
                 {slides.length > 1 && (
@@ -623,7 +634,7 @@ const styles = StyleSheet.create({
   foodBanner: { backgroundColor: colors.tealLight, borderRadius: radius.md, padding: spacing.md, borderWidth: 1, borderColor: colors.tealMid },
   foodBannerText: { fontSize: 13, fontWeight: '600', color: colors.primary },
   foodCard: { flexDirection: 'row', alignItems: 'center', backgroundColor: colors.surface, borderRadius: radius.lg, padding: spacing.md, borderWidth: 1, borderColor: colors.borderLight },
-  foodEmoji: { fontSize: 28, marginRight: spacing.md },
+  foodIconWrap: { width: 40, height: 40, borderRadius: radius.md, backgroundColor: colors.tealLight, alignItems: 'center', justifyContent: 'center', marginRight: spacing.md },
 
   // AI Modal
   modalOverlay: { flex: 1, backgroundColor: 'rgba(5,24,56,0.6)', justifyContent: 'center', alignItems: 'center', paddingHorizontal: 16, paddingVertical: spacing.lg },

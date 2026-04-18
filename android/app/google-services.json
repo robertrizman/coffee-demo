@@ -7,6 +7,25 @@
   "client": [
     {
       "client_info": {
+        "mobilesdk_app_id": "1:1038647382820:android:e00cf80420a051536f99b1",
+        "android_client_info": {
+          "package_name": "com.robrizzy.coffeecafe"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyDGn5O3_HUvSojDe2gI8oBWtCSx_WWOZGQ"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    },
+    {
+      "client_info": {
         "mobilesdk_app_id": "1:1038647382820:android:09c66ab257849ed36f99b1",
         "android_client_info": {
           "package_name": "com.robrizzy.coffeedemo"

@@ -1,4 +1,4 @@
-package com.robrizzy.coffeedemo
+package com.robrizzy.coffeecafe
 
 import android.app.Application
 import com.facebook.react.bridge.*

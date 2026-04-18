@@ -1,4 +1,4 @@
-package com.robrizzy.coffeedemo
+package com.robrizzy.coffeecafe
 
 import android.os.Build
 import com.facebook.react.bridge.*
@@ -219,6 +219,51 @@ Reply ONLY with a valid JSON object, no explanation, no markdown:
 
         } catch (e: Exception) {
             promise.reject("PREDICTION_ERROR", e.message, e)
+        }
+    }
+
+    @ReactMethod
+    fun generateInsight(ordersJson: String, promise: Promise) {
+        if (!geminiAvailable || llmInference == null) {
+            promise.reject("UNAVAILABLE", "Gemini Nano not available")
+            return
+        }
+        try {
+            val llm = llmInference!!
+            val prompt = """<start_of_turn>user
+You are a friendly café health assistant. Based on this customer's recent café order history, estimate their total kilojoule (kJ) intake from these orders and provide a short, warm, non-judgmental insight about their café habits.
+
+Orders (JSON): $ordersJson
+
+Guidelines:
+- Estimate kJ for each drink based on typical café values (e.g. flat white ~420kJ, latte ~500kJ, long black ~15kJ, cappuccino ~530kJ, mocha ~700kJ, iced latte ~550kJ, hot chocolate ~800kJ, chai latte ~600kJ, tea ~5kJ)
+- Account for milk type modifiers (oat/almond milk slightly lower, full cream slightly higher)
+- Be encouraging and positive, not preachy
+
+Reply ONLY with a valid JSON object, no markdown:
+{"kj_total":<number>,"kj_per_visit":<number>,"insight":"<2 sentences>","tip":"<one short friendly tip>","engine":"Gemini Nano (Samsung NPU)"}
+<end_of_turn>
+<start_of_turn>model
+""".trimIndent()
+
+            val response = llm.generateResponse(prompt)
+            val jsonStart = response.indexOf('{')
+            val jsonEnd = response.lastIndexOf('}')
+            if (jsonStart == -1 || jsonEnd == -1) {
+                promise.reject("PARSE_ERROR", "No JSON in response")
+                return
+            }
+            val json = JSONObject(response.substring(jsonStart, jsonEnd + 1))
+            val result = Arguments.createMap().apply {
+                putInt("kj_total", json.optInt("kj_total", 0))
+                putInt("kj_per_visit", json.optInt("kj_per_visit", 0))
+                putString("insight", json.optString("insight", ""))
+                putString("tip", json.optString("tip", ""))
+                putString("engine", "Gemini Nano (Samsung NPU)")
+            }
+            promise.resolve(result)
+        } catch (e: Exception) {
+            promise.reject("INSIGHT_ERROR", e.message, e)
         }
     }
 

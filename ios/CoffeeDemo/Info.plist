@@ -28,7 +28,7 @@
 			<key>CFBundleURLSchemes</key>
 			<array>
 				<string>coffeedemo</string>
-				<string>com.robrizzy.coffeedemo</string>
+				<string>com.robrizzy.coffeecafe</string>
 			</array>
 		</dict>
 	</array>

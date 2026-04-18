@@ -135,12 +135,11 @@ function reducer(state, action) {
       };
 
     case 'UPDATE_PROFILE': {
-      // Called when user edits their profile — persists to SecureStore
-      const { name, email, arc_location_id = null, arc_location_name = null } = action.payload;
-      saveProfile({ name, email, arc_location_id, arc_location_name });
+      const { name, email, arc_location_id = null, arc_location_name = null, dietary_requirements = null } = action.payload;
+      saveProfile({ name, email, arc_location_id, arc_location_name, dietary_requirements });
       return {
         ...state,
-        profile: { name, email, arc_location_id, arc_location_name },
+        profile: { name, email, arc_location_id, arc_location_name, dietary_requirements },
         currentOrder: { ...state.currentOrder, name, email },
       };
     }

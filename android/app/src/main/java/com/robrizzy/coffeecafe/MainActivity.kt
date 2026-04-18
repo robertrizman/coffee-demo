@@ -1,4 +1,4 @@
-package com.robrizzy.coffeedemo
+package com.robrizzy.coffeecafe
 import expo.modules.splashscreen.SplashScreenManager
 
 import android.os.Build

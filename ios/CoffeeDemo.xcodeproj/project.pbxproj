@@ -394,11 +394,9 @@
 				CLANG_ENABLE_MODULES = YES;
 				CODE_SIGN_ENTITLEMENTS = CoffeeDemo/CoffeeDemo.entitlements;
 				CODE_SIGN_IDENTITY = "Apple Development";
-				"CODE_SIGN_IDENTITY[sdk=iphoneos*]" = "iPhone Distribution";
-				CODE_SIGN_STYLE = Manual;
+				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
 				DEVELOPMENT_TEAM = YHSBJ2JW4W;
-				"DEVELOPMENT_TEAM[sdk=iphoneos*]" = YHSBJ2JW4W;
 				ENABLE_BITCODE = NO;
 				GCC_PREPROCESSOR_DEFINITIONS = (
 					"$(inherited)",
@@ -417,10 +415,9 @@
 					"-lc++",
 				);
 				OTHER_SWIFT_FLAGS = "$(inherited) -D EXPO_CONFIGURATION_DEBUG";
-				PRODUCT_BUNDLE_IDENTIFIER = com.robrizzy.coffeedemo;
+				PRODUCT_BUNDLE_IDENTIFIER = com.robrizzy.coffeecafe;
 				PRODUCT_NAME = "Architect Arc Cafe";
 				PROVISIONING_PROFILE_SPECIFIER = "";
-				"PROVISIONING_PROFILE_SPECIFIER[sdk=iphoneos*]" = "Tealium Arc Cafe App Store";
 				SWIFT_OBJC_BRIDGING_HEADER = "CoffeeDemo/CoffeeDemo-Bridging-Header.h";
 				SWIFT_OPTIMIZATION_LEVEL = "-Onone";
 				SWIFT_VERSION = 5.0;
@@ -455,7 +452,7 @@
 					"-lc++",
 				);
 				OTHER_SWIFT_FLAGS = "$(inherited) -D EXPO_CONFIGURATION_RELEASE";
-				PRODUCT_BUNDLE_IDENTIFIER = com.robrizzy.coffeedemo;
+				PRODUCT_BUNDLE_IDENTIFIER = com.robrizzy.coffeecafe;
 				PRODUCT_NAME = "Architect Arc Cafe";
 				PROVISIONING_PROFILE_SPECIFIER = "";
 				SWIFT_OBJC_BRIDGING_HEADER = "CoffeeDemo/CoffeeDemo-Bridging-Header.h";

@@ -159,6 +159,53 @@ class FoodPairingModule: NSObject {
     resolve(buildFallbackResult(cat1: cat1, cat2: cat2, engine: engine))
   }
 
+  // ── Order insight (kJ + health commentary) ──────────────────────────────
+  @objc func generateInsight(
+    _ ordersJson: String,
+    resolve: @escaping RCTPromiseResolveBlock,
+    reject: @escaping RCTPromiseRejectBlock
+  ) {
+    guard foundationModelsAvailable else {
+      reject("UNAVAILABLE", "Apple Intelligence not available", nil)
+      return
+    }
+    if #available(iOS 26.0, *) {
+      Task {
+        do {
+          let session = LanguageModelSession()
+          let prompt = """
+          You are a friendly café health assistant. Based on this customer's recent café order history, estimate their total kilojoule (kJ) intake from these orders and provide a short, warm, non-judgmental insight about their café habits.
+
+          Orders (JSON): \(ordersJson)
+
+          Guidelines:
+          - Estimate kJ for each drink based on typical café values (e.g. flat white ~420kJ, latte ~500kJ, long black ~15kJ, cappuccino ~530kJ, mocha ~700kJ, iced latte ~550kJ, hot chocolate ~800kJ, chai latte ~600kJ, tea ~5kJ)
+          - Account for milk type modifiers (oat/almond milk slightly lower, full cream slightly higher)
+          - Be encouraging and positive, not preachy
+
+          Reply ONLY with a valid JSON object, no markdown:
+          {"kj_total":<number>,"kj_per_visit":<number>,"insight":"<2 sentences>","tip":"<one short friendly tip>","engine":"Apple Intelligence (ANE)"}
+          """
+          let response = try await session.respond(to: prompt)
+          let text = response.content
+          guard let start = text.range(of: "{"), let end = text.range(of: "}", options: .backwards) else {
+            throw NSError(domain: "Insight", code: 1, userInfo: [NSLocalizedDescriptionKey: "No JSON in response"])
+          }
+          let jsonStr = String(text[start.lowerBound...end.upperBound])
+          guard let data = jsonStr.data(using: .utf8),
+                let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any] else {
+            throw NSError(domain: "Insight", code: 2, userInfo: [NSLocalizedDescriptionKey: "Invalid JSON"])
+          }
+          resolve(json)
+        } catch {
+          reject("INSIGHT_ERROR", error.localizedDescription, error)
+        }
+      }
+    } else {
+      reject("UNAVAILABLE", "iOS 26+ required", nil)
+    }
+  }
+
   private func buildFallbackResult(cat1: String, cat2: String, engine: String) -> [String: Any] {
     return [
       "category1":     cat1,

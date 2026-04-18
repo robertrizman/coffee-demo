@@ -350,6 +350,13 @@ export function trackProfileUpdated({ name, email, arc_location_id, arc_location
   });
 }
 
+export function trackDietaryRequirementsUpdated(dietaryRequirements) {
+  track('dietary_requirements_updated', {
+    tealium_event: 'dietary_requirements_updated',
+    dietary_requirements: dietaryRequirements || '',
+  });
+}
+
 export function trackUuidCopy({ uuid, email, name }) {
   track('uuid_copy', {
     tealium_event: 'uuid_copy',
