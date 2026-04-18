@@ -49,6 +49,8 @@
 	<string>Allow Architect Arc Cafe to access your camera to scan order QR codes.</string>
 	<key>NSLocationWhenInUseUsageDescription</key>
 	<string>We need your location to confirm you are at the venue to place an order.</string>
+	<key>NSLocationAlwaysAndWhenInUseUsageDescription</key>
+	<string>We need your location to confirm you are at the venue to place an order.</string>
 	<key>NSMicrophoneUsageDescription</key>
 	<string>Allow $(PRODUCT_NAME) to access your microphone</string>
 	<key>NSUserActivityTypes</key>
