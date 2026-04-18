@@ -21,7 +21,7 @@
         "credentialsSource": "remote"
       },
       "android": {
-        "buildType": "apk"
+        "buildType": "app-bundle"
       }
     },
     "production": {
