@@ -15,6 +15,7 @@
       }
     },
     "testflight": {
+      "autoIncrement": true,
       "distribution": "store",
       "ios": {
         "buildConfiguration": "Release",
