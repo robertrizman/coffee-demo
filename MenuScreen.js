@@ -1,12 +1,13 @@
 import React, { useState, useEffect, useRef } from 'react';
 import {
   View, Text, ScrollView, TouchableOpacity,
-  StyleSheet, Modal, Animated, Easing, Image, useWindowDimensions,
+  StyleSheet, Modal, Animated, Easing, Image, useWindowDimensions, Platform,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useNavigation } from '@react-navigation/native';
 import { MENU, CATEGORIES } from './menu';
 import { useApp } from './AppContext';
+import { useAuth } from './AuthContext';
 import { trackMenuView, trackItemView, queryMomentsAPI, trackAIPairingOpened, trackAIPairingResult, trackAIPairingCarousel } from './tealium';
 import { colors, typography, spacing, radius, shadow } from './theme';
 import { EspressoIcon, LatteIcon, IcedCupIcon, HotChocIcon, ChaiIcon, TeaIcon, ChevronIcon, AiSparkIcon, MorningTeaIcon, LunchIcon, SnacksIcon } from './CoffeeIcons';
@@ -104,6 +105,7 @@ function BrewingCup() {
 export default function MenuScreen() {
   const navigation = useNavigation();
   const { state } = useApp();
+  const { isAdmin } = useAuth();
   const { width: screenWidth } = useWindowDimensions();
   const slideWidth = screenWidth - 32 - (spacing.lg * 2);
 
@@ -189,12 +191,13 @@ export default function MenuScreen() {
     navigation.navigate('ItemDetail', { item });
   };
 
-  // Get customer's own orders — match on either deviceId or tealAppUuid since
-  // orders are placed with getCanonicalDeviceId() which can differ from state.deviceId
-  // (e.g. after a bundle ID rename resets SecureStore on Android)
-  const myOrders = state.orders.filter(
-    (o) => o.deviceId === state.deviceId || o.tealAppUuid === state.deviceId
-  );
+  // Match on deviceId, tealAppUuid, or email — email fallback handles SecureStore
+  // reset after package rename (new deviceId won't match old orders)
+  const myOrders = state.orders.filter((o) => {
+    if (state.deviceId && (o.deviceId === state.deviceId || o.tealAppUuid === state.deviceId)) return true;
+    if (state.profile?.email && o.email === state.profile.email) return true;
+    return false;
+  });
   const hasOrders = myOrders.length > 0;
 
   const openAi = () => {
@@ -301,10 +304,12 @@ export default function MenuScreen() {
             <Text style={styles.title}>What'll it be?</Text>
             <Text style={styles.subtitle}>Choose your coffee</Text>
           </View>
-          <TouchableOpacity style={styles.aiButton} onPress={openAi} activeOpacity={0.85}>
-            <AiSparkIcon size={14} color={colors.teal} />
-            <Text style={styles.aiButtonLabel}>AI Pairing</Text>
-          </TouchableOpacity>
+          {!isAdmin && (
+            <TouchableOpacity style={styles.aiButton} onPress={openAi} activeOpacity={0.85}>
+              <AiSparkIcon size={14} color={colors.teal} />
+              <Text style={styles.aiButtonLabel}>AI Pairing</Text>
+            </TouchableOpacity>
+          )}
         </View>
       </View>
 
@@ -370,8 +375,8 @@ export default function MenuScreen() {
         <View style={{ height: 32 }} />
       </ScrollView>
 
-      {/* AI Pairing Modal */}
-      <Modal visible={aiOpen} transparent animationType="fade" onRequestClose={closeAi}>
+      {/* AI Pairing Modal — customers only */}
+      <Modal visible={aiOpen && !isAdmin} transparent animationType="fade" onRequestClose={closeAi}>
         <TouchableOpacity style={styles.modalOverlay} activeOpacity={1} onPress={closeAi}>
           <TouchableOpacity style={styles.aiModal} activeOpacity={1} onPress={() => {}}>
 
@@ -405,7 +410,11 @@ export default function MenuScreen() {
             {aiPhase === 'thinking' && (
               <View style={styles.aiThinking}>
                 <Text style={styles.aiThinkingLabel}>
-                  {getExpectedAIProvider() === 'openai' ? 'Consulting OpenAI…' : 'Analysing your taste profile'}
+                  {getExpectedAIProvider() === 'openai'
+                    ? 'Consulting OpenAI…'
+                    : getExpectedAIProvider() === 'native'
+                      ? Platform.OS === 'ios' ? 'Using Apple Intelligence…' : 'Using Gemini Nano…'
+                      : 'Analysing your taste profile'}
                 </Text>
                 <View style={styles.dotsRow}>{thinkingDots}</View>
                 {getExpectedAIProvider() === 'openai' && (
@@ -512,9 +521,9 @@ export default function MenuScreen() {
                                       </View>
                                     ))}
                                     <TypingText text={recommendation.reason} speed={20} />
-                                    {recommendation.aiSource === 'openai' && (
+                                    {(recommendation.aiSource === 'openai' || recommendation.aiSource === 'on-device-llm') && recommendation.aiEngine && (
                                       <View style={styles.openAIBadge}>
-                                        <Text style={styles.openAIBadgeText}>✦ Generated by OpenAI · GPT-4o mini</Text>
+                                        <Text style={styles.openAIBadgeText}>✦ Generated by {recommendation.aiEngine}</Text>
                                       </View>
                                     )}
                                   </>

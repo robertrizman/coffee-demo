@@ -1,4 +1,4 @@
-package com.robrizzy.coffeecafe
+package com.tealium.coffeecafe
 
 import com.facebook.react.ReactPackage
 import com.facebook.react.bridge.NativeModule

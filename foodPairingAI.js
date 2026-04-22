@@ -138,7 +138,14 @@ export async function getOrderInsight({ orders, dietaryRequirements = null }) {
         FoodPairingModule.generateInsight(JSON.stringify(summary)),
         timeout,
       ]);
-      if (result) { _nativeLLMAvailable = true; return result; }
+      if (result) {
+        _nativeLLMAvailable = true;
+        // Ensure engine label is always set — LLM may omit it from JSON output
+        const engineLabel = Platform.OS === 'ios'
+          ? 'Apple Intelligence (ANE)'
+          : 'Gemini Nano (Samsung NPU)';
+        return { ...result, engine: result.engine || engineLabel };
+      }
       _nativeLLMAvailable = false;
     } catch (e) {
       _nativeLLMAvailable = false;
@@ -223,10 +230,26 @@ export async function getAIPairing({ orders, customItems, dietaryRequirements = 
 
       // Only trust the result if it's a real LLM (Gemini Nano / Apple Intelligence)
       const isLLM = result.source === 'on-device-llm' || result.engine?.toLowerCase().includes('gemini') || result.engine?.toLowerCase().includes('intelligence');
-      if (isLLM && result.item1 && result.item2) {
+      if (isLLM) {
         _nativeLLMAvailable = true;
+
+        // Android (Gemini) returns item1/item2 directly
+        // iOS (Apple Intelligence) returns category1/category2 — pick items from those categories
+        let items;
+        if (result.item1 && result.item2) {
+          items = [result.item1, result.item2];
+        } else {
+          const cat1 = result.category1 || 'Morning Tea';
+          const cat2 = result.category2 || 'Snacks';
+          const picked1 = pickItemsFromCategory(customItems, cat1, 1);
+          const picked2 = cat1 === cat2
+            ? pickItemsFromCategory(customItems, cat2, 2).slice(1)
+            : pickItemsFromCategory(customItems, cat2, 1);
+          items = [...picked1, ...picked2].slice(0, 2);
+        }
+
         return {
-          items: [result.item1, result.item2],
+          items,
           categories: [result.category1, result.category2],
           reason: result.reason || null,
           confidence: result.avgConfidence || 95,

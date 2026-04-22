@@ -1,4 +1,4 @@
-package com.robrizzy.coffeecafe
+package com.tealium.coffeecafe
 
 import android.app.Application
 import android.content.res.Configuration

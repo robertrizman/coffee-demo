@@ -193,9 +193,10 @@ class FoodPairingModule: NSObject {
           }
           let jsonStr = String(text[start.lowerBound...end.upperBound])
           guard let data = jsonStr.data(using: .utf8),
-                let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any] else {
+                var json = try? JSONSerialization.jsonObject(with: data) as? [String: Any] else {
             throw NSError(domain: "Insight", code: 2, userInfo: [NSLocalizedDescriptionKey: "Invalid JSON"])
           }
+          json["engine"] = "Apple Intelligence (ANE)"
           resolve(json)
         } catch {
           reject("INSIGHT_ERROR", error.localizedDescription, error)

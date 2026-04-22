@@ -6,6 +6,7 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useApp } from './AppContext';
+import { useAuth } from './AuthContext';
 import { getOrderInsight } from './foodPairingAI';
 import { supabase } from './supabase';
 import { trackProfileTab, trackEditProfile, trackProfileUpdated, trackUuidCopy, trackDietaryRequirementsUpdated, joinTrace, leaveTrace, getCanonicalDeviceId } from './tealium';
@@ -50,6 +51,7 @@ function StatusBadge({ status, fulfilledAt }) {
 
 export default function OrdersProfileScreen() {
   const { state, dispatch } = useApp();
+  const { isAdmin } = useAuth();
   const { deviceId, profile } = state;
 
   // Profile edit state
@@ -379,8 +381,8 @@ export default function OrdersProfileScreen() {
             showsVerticalScrollIndicator={false}
             refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => { setRefreshing(true); fetchRemoteOrders(); insightFetched.current = false; fetchInsight(mergedOrders); }} tintColor={colors.primary} />}
           >
-            {/* AI intake insight card */}
-            {(insightLoading || orderInsight) && (
+            {/* AI intake insight card — customers only */}
+            {!isAdmin && (insightLoading || orderInsight) && (
               <View style={styles.insightCard}>
                 {/* Always-visible header — tap to expand/collapse */}
                 <TouchableOpacity
@@ -398,7 +400,7 @@ export default function OrdersProfileScreen() {
                     ) : (
                       <View style={styles.insightAiBadge}>
                         <Text style={styles.insightAiBadgeText}>
-                          {orderInsight?.engine === 'GPT-4o mini' ? 'OpenAI' : 'AI Suggestion'}
+                          {orderInsight?.engine || 'AI Suggestion'}
                         </Text>
                       </View>
                     )}

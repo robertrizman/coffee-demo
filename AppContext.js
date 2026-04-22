@@ -10,6 +10,7 @@ import { loadDefaultPrinter, loadAutoPrint, loadBluetoothPrinter } from './print
 import { warmupBluetoothConnection } from './brotherPrinter';
 import { setDeviceIdForMoments, onPrismDeviceIdReady, getCanonicalDeviceId } from './tealium';
 import { loadPairingRules } from './recommendations';
+import { setOpenAIKey } from './foodPairingAI';
 
 const AppContext = createContext(null);
 
@@ -285,9 +286,7 @@ function reducer(state, action) {
 
       rows.forEach((row) => {
         menuEnabled[row.id] = row.enabled;
-        // Treat as custom if flagged OR if it belongs to a food/extras category
-        // (recovers rows where is_custom was previously corrupted to false)
-        if (row.is_custom || CUSTOM_CATS.includes(row.category)) {
+        if (row.is_custom) {
           const cat = row.category || 'Specialty';
           if (!customItems[cat]) customItems[cat] = [];
           customItems[cat].push({ id: row.id, name: row.name, description: row.description || '', category: cat });
@@ -403,6 +402,13 @@ export function AppProvider({ children }) {
       .then(({ data, error }) => {
         if (error) { console.warn('[Supabase] Load menu config error:', error.message); return; }
         dispatch({ type: 'LOAD_MENU_CONFIG', payload: { rows: data || [] } });
+      });
+
+    // Load OpenAI key from public menu_config row (readable by anon, mirrored from barista settings)
+    supabase.from('menu_config').select('description')
+      .eq('category', '_config').eq('name', 'openai_key').single()
+      .then(({ data }) => {
+        if (data?.description) setOpenAIKey(data.description);
       });
 
     // Load orders

@@ -1272,6 +1272,11 @@ export default function SettingsScreen() {
                             android_key: tAndroidKey  || null,
                             openai_key:  tOpenAIKey   || null,
                           }).eq('id', barista.id);
+                          // Mirror key to menu_config so customers (anon) can load it
+                          await supabase.from('menu_config').upsert(
+                            { category: '_config', name: 'openai_key', description: tOpenAIKey || '' },
+                            { onConflict: 'category,name' }
+                          );
                           await reinitTealium({
                             account:    tAccount,
                             profile:    tProfile,

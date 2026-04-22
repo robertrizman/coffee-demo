@@ -1,7 +1,7 @@
 import React, { useState, useRef, useEffect, useCallback } from 'react';
 import {
   View, Text, ScrollView, TouchableOpacity, RefreshControl,
-  StyleSheet, Modal, Alert, TouchableWithoutFeedback, Linking, AppState,
+  StyleSheet, Modal, Alert, TouchableWithoutFeedback, Linking, AppState, Animated,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useKeepAwake } from 'expo-keep-awake';
@@ -60,6 +60,31 @@ export default function OperatorOrdersScreen() {
   const [printerReachable, setPrinterReachable] = useState(null); // null=unknown, true=ok, false=unreachable
   const cameraRef = useRef(null);
   const lastScan = useRef(null);
+  const knownOrderIds = useRef(null); // null = not yet seeded
+  const newOrderAnims = useRef({}); // id -> Animated.Value
+  const [newOrderIds, setNewOrderIds] = useState(new Set());
+
+  useEffect(() => {
+    if (knownOrderIds.current === null) {
+      // Seed with existing orders on mount — don't highlight these
+      knownOrderIds.current = new Set(state.orders.map(o => o.id));
+      return;
+    }
+    const currentIds = new Set(state.orders.map(o => o.id));
+    const added = state.orders.filter(o => !knownOrderIds.current.has(o.id));
+    knownOrderIds.current = currentIds;
+    if (!added.length) return;
+
+    added.forEach(o => {
+      const anim = new Animated.Value(1);
+      newOrderAnims.current[o.id] = anim;
+      Animated.timing(anim, { toValue: 0, duration: 6000, useNativeDriver: false }).start(() => {
+        setNewOrderIds(prev => { const s = new Set(prev); s.delete(o.id); return s; });
+        delete newOrderAnims.current[o.id];
+      });
+    });
+    setNewOrderIds(prev => new Set([...prev, ...added.map(o => o.id)]));
+  }, [state.orders]);
 
   const checkPrinterConnectivity = useCallback(async () => {
     const [autoPrint, btPrinter, wifiPrinter] = await Promise.all([
@@ -450,11 +475,23 @@ export default function OperatorOrdersScreen() {
             <Text style={styles.emptySubtitle}>Customer orders will appear here as they come in</Text>
           </View>
         ) : (
-          filtered.map((order) => (
-            <View key={order.id} style={[
+          filtered.map((order) => {
+            const anim = newOrderAnims.current[order.id];
+            const isNew = newOrderIds.has(order.id);
+            return (
+            <Animated.View key={order.id} style={[
               styles.orderCard,
               order.status === 'complete' && styles.orderCardDone,
               order.status === 'cancelled' && styles.orderCardCancelled,
+              isNew && anim && {
+                borderWidth: 2,
+                borderColor: anim.interpolate({ inputRange: [0, 1], outputRange: ['transparent', '#22c55e'] }),
+                shadowColor: '#22c55e',
+                shadowOpacity: anim,
+                shadowRadius: 8,
+                shadowOffset: { width: 0, height: 0 },
+                elevation: anim.interpolate({ inputRange: [0, 1], outputRange: [0, 6] }),
+              },
             ]}>
               <View style={styles.orderHeader}>
                 <View style={styles.orderMeta}>
@@ -554,8 +591,9 @@ export default function OperatorOrdersScreen() {
                   <Text style={styles.qrSubLabel}>{order.name} · {order.id}</Text>
                 </View>
               )}
-            </View>
-          ))
+            </Animated.View>
+            );
+          })
         )}
         <View style={{ height: 32 }} />
       </ScrollView>

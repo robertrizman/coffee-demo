@@ -1,4 +1,4 @@
-package com.robrizzy.coffeecafe
+package com.tealium.coffeecafe
 
 import android.os.Build
 import com.facebook.react.bridge.*
