@@ -20,9 +20,13 @@ export default function ItemDetailScreen() {
 
   const isTea = item.category === 'Tea';
   const isIcedCold = item.category === 'Iced & Cold';
+  const isNoMilkDefault = isTea || item.id === 'long-black' || item.id === 'iced-long-black';
+  const isIcedMilkDrink = isIcedCold && !isNoMilkDefault;
+
+  const defaultMilk = isNoMilkDefault ? 'No Milk' : 'Full Cream';
 
   const [size, setSize] = useState('Medium');
-  const [milk, setMilk] = useState((isTea || isIcedCold) ? 'No Milk' : 'Full Cream');
+  const [milk, setMilk] = useState(defaultMilk);
   const [extras, setExtras] = useState([]);
   const [specialRequest, setSpecialRequest] = useState('');
 
@@ -38,8 +42,13 @@ export default function ItemDetailScreen() {
     return state.menuEnabled[id] !== false;
   });
 
-  // If current milk selection got disabled, switch to first available
-  const effectiveMilk = availableMilk.includes(milk) ? milk : (availableMilk[0] || milk);
+  // No Milk first for tea, iced drinks, and long black variants
+  const milkOptionsForItem = (isTea || isIcedCold || isNoMilkDefault)
+    ? ['No Milk', ...availableMilk.filter(m => m !== 'No Milk')]
+    : availableMilk;
+
+  // If current milk selection is not in the list, fall back to first available
+  const effectiveMilk = milkOptionsForItem.includes(milk) ? milk : (milkOptionsForItem[0] || milk);
 
   // Filter static extras by menuEnabled, then append enabled custom extras
   const customExtraItems = state.customItems?.Extras || [];
@@ -132,7 +141,7 @@ export default function ItemDetailScreen() {
         {/* MILK — tea and iced drinks show No Milk first */}
         <Text style={styles.sectionLabel}>{isTea ? 'MILK (OPTIONAL)' : 'MILK'}</Text>
         <View style={styles.chipWrap}>
-          {((isTea || isIcedCold) ? ['No Milk', ...availableMilk.filter(m => m !== 'No Milk')] : availableMilk).map((m) => (
+          {milkOptionsForItem.map((m) => (
             <TouchableOpacity
               key={m}
               style={[styles.chip, effectiveMilk === m && styles.chipActive]}

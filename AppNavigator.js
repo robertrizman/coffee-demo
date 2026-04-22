@@ -51,7 +51,8 @@ function OperatorStack() {
 
 // Gate: show login screen if not authenticated
 function BaristaTab() {
-  const { isAdmin } = useAuth();
+  const { isAdmin, authRestoring } = useAuth();
+  if (authRestoring) return null;
   return isAdmin ? <OperatorStack /> : <LoginScreen />;
 }
 

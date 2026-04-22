@@ -9,7 +9,7 @@ import { colors, spacing, radius } from './theme';
 import { track } from './tealium';
 import { HandshakeIcon, PeopleIcon, ClockIcon, StarIcon, CheckIcon } from './CoffeeIcons';
 
-const OFFER_URL = 'https://tealium.com/ai-accelerator/';
+const OFFER_URL = 'https://tealium.com/ai-accelerator/?utm_source=Architect_Arc_Coffee_app';
 
 export default function OffersScreen() {
   const { state } = useApp();

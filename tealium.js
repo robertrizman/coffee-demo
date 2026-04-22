@@ -15,50 +15,90 @@
 
 import { NativeModules, Platform } from 'react-native';
 
-// ── Config ────────────────────────────────────────────────
-const ACCOUNT  = 'success-robert-rizman';
-const PROFILE  = 'coffee-demo';
-const ENV      = 'dev';
-const DATASOURCE = Platform.OS === 'ios' ? 'xbjzdx' : 'd9mo8k';
+// ── Config (mutable so credentials can be updated at runtime) ─
+const DEFAULTS = {
+  account:    'success-robert-rizman',
+  profile:    'coffee-demo',
+  env:        'dev',
+  iosKey:     'xbjzdx',
+  androidKey: 'd9mo8k',
+};
+
+let _account    = DEFAULTS.account;
+let _profile    = DEFAULTS.profile;
+let _env        = DEFAULTS.env;
+let _datasource = Platform.OS === 'ios' ? DEFAULTS.iosKey : DEFAULTS.androidKey;
+
 const COLLECT_URL = `https://collect.tealiumiq.com/event`;
+
+export function getTealiumConfig() {
+  return {
+    account:    _account,
+    profile:    _profile,
+    env:        _env,
+    iosKey:     Platform.OS === 'ios' ? _datasource : DEFAULTS.iosKey,
+    androidKey: Platform.OS === 'android' ? _datasource : DEFAULTS.androidKey,
+    defaults:   DEFAULTS,
+  };
+}
 
 // ── PRISM native module (only available in dev build) ─────
 const PrismModule = NativeModules.TealiumPrismModule || null;
 let prismReady = false;
 
+async function _initPrism(account, profile, env, datasource) {
+  if (!PrismModule) return;
+  try {
+    await PrismModule.initialize(account, profile, env, datasource);
+    prismReady = true;
+    console.log(`[Tealium] PRISM initialized — ${account}/${profile}/${env}`);
+  } catch (err) {
+    console.warn('[Tealium] PRISM init error:', err.message);
+  }
+}
+
 /**
- * Initialise PRISM. Call once at app startup (App.js).
- * Safe to call in Expo Go — will silently skip.
+ * Initialise PRISM at app startup. Safe to call in Expo Go.
  */
 export async function initTealium() {
   if (!PrismModule) {
     console.log('[Tealium] PRISM module not available — using HTTP Collect fallback');
     return;
   }
-  try {
-    await PrismModule.initialize(ACCOUNT, PROFILE, ENV, DATASOURCE);
-    prismReady = true;
-    console.log('[Tealium] PRISM initialized');
+  await _initPrism(_account, _profile, _env, _datasource);
 
-    // Store our device ID for use in all events as customer_uuid
-    const { getDeviceId } = await import('./deviceId');
-    const deviceId = await getDeviceId();
-    const lowerUuid = deviceId.toLowerCase();
-    setDeviceIdForMoments(lowerUuid);
-    setCanonicalDeviceId(lowerUuid);
-    console.log('[Tealium] ✅ customer_uuid set to:', lowerUuid);
-  } catch (err) {
-    console.warn('[Tealium] PRISM init error:', err.message);
-  }
+  // Store our device ID for use in all events as customer_uuid
+  const { getDeviceId } = await import('./deviceId');
+  const deviceId = await getDeviceId();
+  const lowerUuid = deviceId.toLowerCase();
+  setDeviceIdForMoments(lowerUuid);
+  setCanonicalDeviceId(lowerUuid);
+  console.log('[Tealium] ✅ customer_uuid set to:', lowerUuid);
+}
+
+/**
+ * Apply custom Tealium credentials and reinitialise PRISM.
+ * Pass only the fields that differ — omitted fields fall back to defaults.
+ */
+export async function reinitTealium({ account, profile, env, iosKey, androidKey } = {}) {
+  _account    = account    || DEFAULTS.account;
+  _profile    = profile    || DEFAULTS.profile;
+  _env        = env        || DEFAULTS.env;
+  _datasource = Platform.OS === 'ios'
+    ? (iosKey     || DEFAULTS.iosKey)
+    : (androidKey || DEFAULTS.androidKey);
+
+  console.log(`[Tealium] Reinitialising PRISM — ${_account}/${_profile}/${_env}`);
+  await _initPrism(_account, _profile, _env, _datasource);
 }
 
 // ── Core track function ───────────────────────────────────
 
 export async function track(eventName, data = {}) {
   const payload = {
-    tealium_account: ACCOUNT,
-    tealium_profile: PROFILE,
-    tealium_datasource: DATASOURCE,
+    tealium_account: _account,
+    tealium_profile: _profile,
+    tealium_datasource: _datasource,
     tealium_event: eventName,
     platform: Platform.OS,
     customer_uuid: _deviceId || '',
@@ -91,8 +131,8 @@ async function trackView(screenName, data = {}) {
   if (prismReady && PrismModule) {
     try {
       await PrismModule.trackView(screenName, {
-        tealium_account: ACCOUNT,
-        tealium_profile: PROFILE,
+        tealium_account: _account,
+        tealium_profile: _profile,
         screen_name: screenName,
         platform: Platform.OS,
         ...data,
@@ -261,7 +301,7 @@ export function trackOrderComplete(order) {
 
 export function trackOrderReady(order, customerDeviceId) {
   const customerVisitorId = customerDeviceId
-    ? `__${ACCOUNT}_${PROFILE}__5120_${customerDeviceId.toLowerCase()}__`
+    ? `__${_account}_${_profile}__5120_${customerDeviceId.toLowerCase()}__`
     : null;
 
   // Calculate fulfillment time
@@ -275,9 +315,9 @@ export function trackOrderReady(order, customerDeviceId) {
     : `${(totalMins / 60).toFixed(1)}hr`;
 
   const payload = {
-    tealium_account: ACCOUNT,
-    tealium_profile: PROFILE,
-    tealium_datasource: DATASOURCE,
+    tealium_account: _account,
+    tealium_profile: _profile,
+    tealium_datasource: _datasource,
     tealium_event: 'order_ready',
     customer_uuid: customerDeviceId || '',
     tealium_visitor_id: customerVisitorId || '',

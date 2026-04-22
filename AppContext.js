@@ -211,16 +211,18 @@ function reducer(state, action) {
     }
 
     case 'TOGGLE_MENU_ITEM': {
-      const { id, enabled, name, category } = action.payload;
-      // Must include name + category because they're NOT NULL in the schema
-      supabase.from('menu_config')
-        .upsert(
-          { id, enabled, name: name || id, category: category || 'Uncategorised', is_custom: false },
-          { onConflict: 'id' }
-        )
-        .then(({ error }) => {
-          if (error) console.warn('[Supabase] Toggle error:', error.message);
-        });
+      const { id, enabled, name, category, isCustom } = action.payload;
+      const dbOp = isCustom
+        // Custom items: only update enabled — never touch is_custom or other fields
+        ? supabase.from('menu_config').update({ enabled }).eq('id', id)
+        // Standard items: upsert (row may not exist yet for default-enabled items)
+        : supabase.from('menu_config').upsert(
+            { id, enabled, name: name || id, category: category || 'Uncategorised', is_custom: false },
+            { onConflict: 'id' }
+          );
+      dbOp.then(({ error }) => {
+        if (error) console.warn('[Supabase] Toggle error:', error.message);
+      });
       return {
         ...state,
         menuEnabled: { ...state.menuEnabled, [id]: enabled },
@@ -279,10 +281,13 @@ function reducer(state, action) {
       const { rows } = action.payload;
       const menuEnabled = { ...buildDefaultMenuEnabled() };
       const customItems = buildDefaultCustomItems();
+      const CUSTOM_CATS = ['Morning Tea', 'Lunch', 'Snacks', 'Extras'];
 
       rows.forEach((row) => {
         menuEnabled[row.id] = row.enabled;
-        if (row.is_custom) {
+        // Treat as custom if flagged OR if it belongs to a food/extras category
+        // (recovers rows where is_custom was previously corrupted to false)
+        if (row.is_custom || CUSTOM_CATS.includes(row.category)) {
           const cat = row.category || 'Specialty';
           if (!customItems[cat]) customItems[cat] = [];
           customItems[cat].push({ id: row.id, name: row.name, description: row.description || '', category: cat });
@@ -458,6 +463,10 @@ export function AppProvider({ children }) {
         supabase.from('store_breaks').select('*').order('start_time')
           .then(({ data }) => { if (data) dispatch({ type: 'SET_STORE_BREAKS', payload: data }); });
       })
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'menu_config' }, () => {
+        supabase.from('menu_config').select('*')
+          .then(({ data }) => { if (data) dispatch({ type: 'LOAD_MENU_CONFIG', payload: { rows: data } }); });
+      })
       .subscribe((status) => {
         console.log('[Supabase] Channel status:', status);
       });
@@ -496,6 +505,8 @@ export function AppProvider({ children }) {
           .then(({ data }) => { if (data) dispatch({ type: 'SET_STORE_CONFIG', payload: data }); });
         supabase.from('store_breaks').select('*').order('start_time')
           .then(({ data }) => { if (data) dispatch({ type: 'SET_STORE_BREAKS', payload: data }); });
+        supabase.from('menu_config').select('*')
+          .then(({ data }) => { if (data) dispatch({ type: 'LOAD_MENU_CONFIG', payload: { rows: data } }); });
         // Reprint any labels missed while the app was asleep
         flushPrintQueue().catch(() => {});
       }

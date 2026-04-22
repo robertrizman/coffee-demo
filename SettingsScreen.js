@@ -9,7 +9,8 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useNavigation } from '@react-navigation/native';
 import * as Print from 'expo-print';
-import { trackSettingsOpen, trackPrinterTest } from './tealium';
+import { trackSettingsOpen, trackPrinterTest, getTealiumConfig, reinitTealium } from './tealium';
+import { setOpenAIKey } from './foodPairingAI';
 import { buildLabelsHtml, buildQrDebugHtml } from './printing';
 import { useAuth } from './AuthContext';
 import { supabase } from './supabase';
@@ -49,7 +50,7 @@ function TealiumTabIcon({ active }) {
 
 export default function SettingsScreen() {
   const navigation = useNavigation();
-  const { barista, isOwner } = useAuth();
+  const { barista, isOwner, updateBaristaFields } = useAuth();
 
   const [defaultPrinter, setDefaultPrinter] = useState(null);
   const [bluetoothPrinter, setBluetoothPrinter] = useState(null);
@@ -62,6 +63,16 @@ export default function SettingsScreen() {
   const [shorthandEnabled, setShorthandEnabled] = useState(false);
   const [activeTab, setActiveTab] = useState('hours');
   const [autoCutEnabled, setAutoCutEnabled] = useState(false);
+
+  // Tealium credentials state
+  const [tealiumEditMode, setTealiumEditMode] = useState(false);
+  const [tealiumSaving, setTealiumSaving] = useState(false);
+  const [tAccount, setTAccount] = useState('');
+  const [tProfile, setTProfile] = useState('');
+  const [tEnv, setTEnv] = useState('');
+  const [tIosKey, setTIosKey] = useState('');
+  const [tAndroidKey, setTAndroidKey] = useState('');
+  const [tOpenAIKey, setTOpenAIKey] = useState('');
 
   // Location management state
   const [locations, setLocations] = useState([]);
@@ -637,7 +648,12 @@ export default function SettingsScreen() {
         ))}
       </ScrollView>
 
-      <ScrollView contentContainerStyle={styles.body} showsVerticalScrollIndicator={false}>
+      <KeyboardAvoidingView
+        style={{ flex: 1 }}
+        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+        keyboardVerticalOffset={Platform.OS === 'ios' ? 0 : 20}
+      >
+      <ScrollView contentContainerStyle={styles.body} showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
 
         {/* ── Coffee Hours ── */}
         {activeTab === 'hours' && (
@@ -1152,36 +1168,148 @@ export default function SettingsScreen() {
         {/* ── Tealium ── */}
         {activeTab === 'tealium' && (
           <View style={styles.section}>
-            {/* ── Tealium info ── */}
-        <View style={styles.card}>
-          <View style={styles.cardHeader}>
-            <Image
-              source={{ uri: 'https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcTSbhZ0mXjyDpaKqKQZJhCFsXaTfjmxmSHiBw&s' }}
-              style={{ width: 28, height: 28, borderRadius: 6 }}
-              resizeMode="contain"
-            />
-            <Text style={styles.cardTitle}>Tealium Profile</Text>
-          </View>
-          <View style={styles.tealiumRows}>
-            {[
-              ['Account', 'success-robert-rizman'],
-              ['Profile', 'coffee-demo'],
-              ['Environment', 'dev'],
-              ['iOS Key', 'xbjzdx'],
-              ['Android Key', 'd9mo8k'],
-            ].map(([label, value]) => (
-              <View key={label} style={styles.tealiumRow}>
-                <Text style={styles.tealiumLabel}>{label}</Text>
-                <Text style={styles.tealiumValue}>{value}</Text>
+            <View style={styles.card}>
+              <View style={styles.cardHeader}>
+                <Image
+                  source={{ uri: 'https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcTSbhZ0mXjyDpaKqKQZJhCFsXaTfjmxmSHiBw&s' }}
+                  style={{ width: 28, height: 28, borderRadius: 6 }}
+                  resizeMode="contain"
+                />
+                <Text style={styles.cardTitle}>Tealium Profile</Text>
+                {isOwner && !tealiumEditMode && (
+                  <TouchableOpacity
+                    style={styles.tealiumEditBtn}
+                    onPress={() => {
+                      const cfg = getTealiumConfig();
+                      setTAccount(barista?.account || cfg.account);
+                      setTProfile(barista?.profile || cfg.profile);
+                      setTEnv(barista?.environment || cfg.env);
+                      setTIosKey(barista?.ios_key || cfg.iosKey);
+                      setTAndroidKey(barista?.android_key || cfg.androidKey);
+                      setTOpenAIKey(barista?.openai_key || '');
+                      setTealiumEditMode(true);
+                    }}
+                  >
+                    <Text style={styles.tealiumEditBtnText}>Edit</Text>
+                  </TouchableOpacity>
+                )}
               </View>
-            ))}
-          </View>
-        </View>
+
+              {!tealiumEditMode ? (
+                <View style={styles.tealiumRows}>
+                  {(() => {
+                    const cfg = getTealiumConfig();
+                    const oaiKey = barista?.openai_key;
+                    const oaiDisplay = oaiKey ? `${oaiKey.slice(0, 10)}••••••••` : 'Not set';
+                    return [
+                      ['Account',     barista?.account     || cfg.account],
+                      ['Profile',     barista?.profile     || cfg.profile],
+                      ['Environment', barista?.environment || cfg.env],
+                      ['iOS Key',     barista?.ios_key     || cfg.iosKey],
+                      ['Android Key', barista?.android_key || cfg.androidKey],
+                      ['OpenAI Key',  oaiDisplay],
+                    ].map(([label, value]) => (
+                      <View key={label} style={styles.tealiumRow}>
+                        <Text style={styles.tealiumLabel}>{label}</Text>
+                        <Text style={styles.tealiumValue}>{value}</Text>
+                      </View>
+                    ));
+                  })()}
+                </View>
+              ) : (
+                <View style={{ gap: spacing.sm, marginTop: spacing.sm }}>
+                  {[
+                    ['ACCOUNT',     tAccount,     setTAccount,     false],
+                    ['PROFILE',     tProfile,     setTProfile,     false],
+                    ['ENVIRONMENT', tEnv,         setTEnv,         false],
+                    ['IOS KEY',     tIosKey,      setTIosKey,      false],
+                    ['ANDROID KEY', tAndroidKey,  setTAndroidKey,  false],
+                  ].map(([label, val, setter]) => (
+                    <View key={label}>
+                      <Text style={styles.fieldLabel}>{label}</Text>
+                      <TextInput
+                        style={styles.inputField}
+                        value={val}
+                        onChangeText={setter}
+                        autoCapitalize="none"
+                        autoCorrect={false}
+                        placeholderTextColor={colors.textMuted}
+                      />
+                    </View>
+                  ))}
+                  <View>
+                    <Text style={styles.fieldLabel}>OPENAI KEY (AI PAIRING)</Text>
+                    <TextInput
+                      style={styles.inputField}
+                      value={tOpenAIKey}
+                      onChangeText={setTOpenAIKey}
+                      autoCapitalize="none"
+                      autoCorrect={false}
+                      secureTextEntry
+                      placeholder="sk-..."
+                      placeholderTextColor={colors.textMuted}
+                    />
+                  </View>
+                  <View style={{ flexDirection: 'row', gap: spacing.sm, marginTop: spacing.xs }}>
+                    <TouchableOpacity
+                      style={styles.tealiumCancelBtn}
+                      onPress={() => setTealiumEditMode(false)}
+                    >
+                      <Text style={styles.tealiumCancelBtnText}>Cancel</Text>
+                    </TouchableOpacity>
+                    <TouchableOpacity
+                      style={[styles.tealiumSaveBtn, tealiumSaving && { opacity: 0.5 }]}
+                      disabled={tealiumSaving}
+                      onPress={async () => {
+                        if (!barista?.id) return;
+                        setTealiumSaving(true);
+                        try {
+                          await supabase.from('baristas').update({
+                            account:     tAccount     || null,
+                            profile:     tProfile     || null,
+                            environment: tEnv         || null,
+                            ios_key:     tIosKey      || null,
+                            android_key: tAndroidKey  || null,
+                            openai_key:  tOpenAIKey   || null,
+                          }).eq('id', barista.id);
+                          await reinitTealium({
+                            account:    tAccount,
+                            profile:    tProfile,
+                            env:        tEnv,
+                            iosKey:     tIosKey,
+                            androidKey: tAndroidKey,
+                          });
+                          setOpenAIKey(tOpenAIKey || null);
+                          updateBaristaFields({
+                            account:     tAccount     || null,
+                            profile:     tProfile     || null,
+                            environment: tEnv         || null,
+                            ios_key:     tIosKey      || null,
+                            android_key: tAndroidKey  || null,
+                            openai_key:  tOpenAIKey   || null,
+                          });
+                          setTealiumEditMode(false);
+                        } catch (err) {
+                          Alert.alert('Error', err.message);
+                        }
+                        setTealiumSaving(false);
+                      }}
+                    >
+                      <Text style={styles.tealiumSaveBtnText}>{tealiumSaving ? 'Saving…' : 'Save'}</Text>
+                    </TouchableOpacity>
+                  </View>
+                  <Text style={styles.tealiumHint}>
+                    Changes are saved to this account and applied to the PRISM SDK immediately.
+                  </Text>
+                </View>
+              )}
+            </View>
           </View>
         )}
 
         <View style={{ height: 40 }} />
       </ScrollView>
+      </KeyboardAvoidingView>
 
       {/* Broadcast Modal */}
       <Modal visible={broadcastVisible} animationType="slide" presentationStyle="pageSheet">
@@ -1608,6 +1736,23 @@ const styles = StyleSheet.create({
   tealiumRow: { flexDirection: 'row', justifyContent: 'space-between' },
   tealiumLabel: { ...typography.caption, fontWeight: '600' },
   tealiumValue: { ...typography.caption, color: colors.primary, fontWeight: '600' },
+  tealiumEditBtn: {
+    marginLeft: 'auto', paddingHorizontal: spacing.md, paddingVertical: 4,
+    borderRadius: radius.full, borderWidth: 1.5, borderColor: colors.primary,
+  },
+  tealiumEditBtnText: { fontSize: 12, fontWeight: '700', color: colors.primary },
+  tealiumHint: { fontSize: 11, color: colors.textMuted, textAlign: 'center', lineHeight: 16 },
+  tealiumCancelBtn: {
+    flex: 1, paddingVertical: 12, borderRadius: radius.lg,
+    borderWidth: 1.5, borderColor: colors.border,
+    alignItems: 'center', backgroundColor: colors.surface,
+  },
+  tealiumCancelBtnText: { fontSize: 15, fontWeight: '600', color: colors.textMid },
+  tealiumSaveBtn: {
+    flex: 1, paddingVertical: 12, borderRadius: radius.lg,
+    backgroundColor: colors.primary, alignItems: 'center',
+  },
+  tealiumSaveBtnText: { fontSize: 15, fontWeight: '700', color: '#fff' },
   broadcastBtn: {
     backgroundColor: colors.midnight, borderRadius: radius.xl,
     padding: spacing.lg, alignItems: 'center', gap: 4,

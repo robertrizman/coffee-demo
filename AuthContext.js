@@ -4,17 +4,22 @@
  * - Credentials checked against the `baristas` table
  * - Station auto-assigned on first login (Cart 1, Cart 2, etc.)
  * - Session tracked in `barista_sessions` table
- * - Session lives in memory — logout or restart clears it
+ * - Session persisted to SecureStore — survives app close/sleep
  * - Printer assignment is now DEVICE-SPECIFIC via `barista_device_printers` table
  */
 
 import React, { createContext, useContext, useState, useEffect, useRef } from 'react';
 import { AppState } from 'react-native';
+import * as SecureStore from 'expo-secure-store';
 import { supabase } from './supabase';
 import { saveDefaultPrinter, saveBluetoothPrinter, saveAutoCut, saveAutoPrint, loadBluetoothPrinter } from './printerConfig';
 import { getDeviceId } from './deviceId';
 import { ensureBluetoothConnected } from './brotherPrinter';
 import { flushPrintQueue } from './AppContext';
+import { reinitTealium } from './tealium';
+import { setOpenAIKey } from './foodPairingAI';
+
+const SESSION_KEY = 'barista_session_id';
 
 const AuthContext = createContext(null);
 
@@ -28,10 +33,43 @@ export function AuthProvider({ children }) {
   const [barista, setBarista] = useState(null);
   const [authError, setAuthError] = useState('');
   const [authLoading, setAuthLoading] = useState(false);
+  const [authRestoring, setAuthRestoring] = useState(true);
   const baristaRef = useRef(null);
 
   // Keep ref in sync so the AppState listener always sees current barista state
   useEffect(() => { baristaRef.current = barista; }, [barista]);
+
+  // Restore persisted session on mount
+  useEffect(() => {
+    SecureStore.getItemAsync(SESSION_KEY).then(async (savedId) => {
+      if (savedId) {
+        try {
+          const { data } = await supabase.from('baristas').select('*').eq('id', savedId).eq('active', true).single();
+          if (data) {
+            const baristaData = { ...data, station: data.station };
+            setBarista(baristaData);
+            setIsAdmin(true);
+            if (data.account || data.profile || data.environment || data.ios_key || data.android_key) {
+              reinitTealium({
+                account:    data.account,
+                profile:    data.profile,
+                env:        data.environment,
+                iosKey:     data.ios_key,
+                androidKey: data.android_key,
+              }).catch(() => {});
+            }
+            if (data.openai_key) setOpenAIKey(data.openai_key);
+            flushPrintQueue().catch(() => {});
+          } else {
+            await SecureStore.deleteItemAsync(SESSION_KEY);
+          }
+        } catch {
+          await SecureStore.deleteItemAsync(SESSION_KEY);
+        }
+      }
+      setAuthRestoring(false);
+    }).catch(() => setAuthRestoring(false));
+  }, []);
 
   // Flush print queue when app comes to foreground — only if a barista is logged in.
   // On Android, silently re-warm the Bluetooth connection first so the ACL link
@@ -149,6 +187,20 @@ export function AuthProvider({ children }) {
       setBarista(baristaData);
       setIsAdmin(true);
       setAuthLoading(false);
+      await SecureStore.setItemAsync(SESSION_KEY, String(data.id));
+
+      // Apply custom Tealium credentials if set on this barista account
+      if (data.account || data.profile || data.environment || data.ios_key || data.android_key) {
+        reinitTealium({
+          account:    data.account,
+          profile:    data.profile,
+          env:        data.environment,
+          iosKey:     data.ios_key,
+          androidKey: data.android_key,
+        }).catch(() => {});
+      }
+
+      if (data.openai_key) setOpenAIKey(data.openai_key);
 
       // Flush any orders that arrived while no barista was logged in
       flushPrintQueue().catch(() => {});
@@ -177,17 +229,23 @@ export function AuthProvider({ children }) {
         .update({ station: null })
         .eq('id', barista.id);
     }
+    await SecureStore.deleteItemAsync(SESSION_KEY);
+    setOpenAIKey(null);
     setIsAdmin(false);
     setBarista(null);
     setAuthError('');
+  };
+
+  const updateBaristaFields = (fields) => {
+    setBarista((prev) => prev ? { ...prev, ...fields } : prev);
   };
 
   return (
     <AuthContext.Provider value={{
       isAdmin, barista,
       isOwner: barista?.role === 'owner' || barista?.username === 'admin',
-      login, logout,
-      authError, authLoading, setAuthError,
+      login, logout, updateBaristaFields,
+      authError, authLoading, authRestoring, setAuthError,
     }}>
       {children}
     </AuthContext.Provider>

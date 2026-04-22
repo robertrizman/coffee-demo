@@ -26,8 +26,8 @@ export default function OperatorMenuScreen() {
   const [newItemDesc, setNewItemDesc] = useState('');
   const [newItemCategory, setNewItemCategory] = useState('Espresso');
 
-  const handleToggle = (id, name, category, value) => {
-    dispatch({ type: 'TOGGLE_MENU_ITEM', payload: { id, name, category, enabled: value } });
+  const handleToggle = (id, name, category, value, isCustom) => {
+    dispatch({ type: 'TOGGLE_MENU_ITEM', payload: { id, name, category, enabled: value, isCustom: !!isCustom } });
     trackMenuToggle(name, value);
   };
 
@@ -76,7 +76,7 @@ export default function OperatorMenuScreen() {
           )}
           <Switch
             value={enabled}
-            onValueChange={(val) => handleToggle(id, name, category, val)}
+            onValueChange={(val) => handleToggle(id, name, category, val, isCustom)}
             trackColor={{ false: colors.border, true: colors.primary }}
             thumbColor="#fff"
           />

@@ -80,6 +80,7 @@ export default function OrdersProfileScreen() {
   const [traceStatus, setTraceStatus] = useState('');
   const [momentsData, setMomentsData] = useState(null);
   const [momentsLoading, setMomentsLoading] = useState(false);
+  const [momentsRefreshing, setMomentsRefreshing] = useState(false);
   const [momentsUrl, setMomentsUrl] = useState('');
   const [debugTapCount, setDebugTapCount] = useState(0);
   const [momentsUnlocked, setMomentsUnlocked] = useState(false);
@@ -87,6 +88,7 @@ export default function OrdersProfileScreen() {
   const [editDietary, setEditDietary] = useState(profile?.dietary_requirements || '');
   const [orderInsight, setOrderInsight] = useState(null);
   const [insightLoading, setInsightLoading] = useState(false);
+  const [insightExpanded, setInsightExpanded] = useState(false);
 
   // Listen for Tealium UUID to be ready
   useEffect(() => {
@@ -143,13 +145,20 @@ export default function OrdersProfileScreen() {
   }, [fetchRemoteOrders]);
 
   const insightFetched = useRef(false);
+
+  const fetchInsight = useCallback((orders) => {
+    if (!orders.length) return;
+    setInsightLoading(true);
+    setOrderInsight(null);
+    getOrderInsight({ orders, dietaryRequirements: profile?.dietary_requirements || null })
+      .then(result => { setOrderInsight(result); setInsightLoading(false); })
+      .catch(() => setInsightLoading(false));
+  }, [profile?.dietary_requirements]);
+
   useEffect(() => {
     if (!mergedOrders.length || insightFetched.current) return;
     insightFetched.current = true;
-    setInsightLoading(true);
-    getOrderInsight({ orders: mergedOrders })
-      .then(result => { setOrderInsight(result); setInsightLoading(false); })
-      .catch(() => setInsightLoading(false));
+    fetchInsight(mergedOrders);
   }, [mergedOrders.length]);
 
   useEffect(() => {
@@ -288,12 +297,12 @@ export default function OrdersProfileScreen() {
     }
   };
 
-  const handleQueryMoments = async () => {
+  const handleQueryMoments = async ({ isRefresh = false } = {}) => {
     const deviceId = getCanonicalDeviceId() || state.deviceId;
     if (!deviceId) { setTraceStatus('No device ID available'); return; }
     const url = `https://personalization-api.ap-southeast-2.prod.tealiumapis.com/personalization/accounts/success-robert-rizman/profiles/coffee-demo/engines/aaa7abe0-9023-49c8-8858-5fe2dbb18c39?attributeId=5120&attributeValue=${encodeURIComponent(deviceId.toLowerCase())}`;
     setMomentsUrl(url);
-    setMomentsLoading(true);
+    if (isRefresh) setMomentsRefreshing(true); else setMomentsLoading(true);
     try {
       const res = await fetch(url, { headers: { 'Content-Type': 'application/json' } });
       const data = await res.json();
@@ -302,7 +311,7 @@ export default function OrdersProfileScreen() {
     } catch (e) {
       setMomentsData({ error: e.message });
     }
-    setMomentsLoading(false);
+    if (isRefresh) setMomentsRefreshing(false); else setMomentsLoading(false);
   };
 
   return (
@@ -368,33 +377,40 @@ export default function OrdersProfileScreen() {
           <ScrollView
             contentContainerStyle={styles.body}
             showsVerticalScrollIndicator={false}
-            refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => { setRefreshing(true); fetchRemoteOrders(); }} tintColor={colors.primary} />}
+            refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => { setRefreshing(true); fetchRemoteOrders(); insightFetched.current = false; fetchInsight(mergedOrders); }} tintColor={colors.primary} />}
           >
             {/* AI intake insight card */}
             {(insightLoading || orderInsight) && (
               <View style={styles.insightCard}>
-                {insightLoading ? (
-                  <View style={styles.insightLoading}>
-                    <ActivityIndicator size="small" color={colors.primary} />
-                    <Text style={styles.insightLoadingText}>Analysing your order history...</Text>
+                {/* Always-visible header — tap to expand/collapse */}
+                <TouchableOpacity
+                  style={styles.insightHeader}
+                  onPress={() => !insightLoading && setInsightExpanded(e => !e)}
+                  activeOpacity={0.7}
+                >
+                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                    <AiSparkIcon size={14} color={colors.primary} />
+                    <Text style={styles.insightTitle}>Your Café Intake</Text>
                   </View>
-                ) : (
-                  <>
-                    {/* Title row with AI badge floated right */}
-                    <View style={styles.insightHeader}>
-                      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-                        <AiSparkIcon size={14} color={colors.primary} />
-                        <Text style={styles.insightTitle}>Your Café Intake</Text>
-                      </View>
+                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                    {insightLoading ? (
+                      <ActivityIndicator size="small" color={colors.primary} />
+                    ) : (
                       <View style={styles.insightAiBadge}>
-                        <Text style={styles.insightAiBadgeText}>AI Suggestion</Text>
+                        <Text style={styles.insightAiBadgeText}>
+                          {orderInsight?.engine === 'GPT-4o mini' ? 'OpenAI' : 'AI Suggestion'}
+                        </Text>
                       </View>
-                    </View>
+                    )}
+                    <Text style={styles.insightChevron}>{insightExpanded ? '▲' : '▼'}</Text>
+                  </View>
+                </TouchableOpacity>
 
-                    {/* LLM name */}
+                {/* Collapsible body */}
+                {insightExpanded && !insightLoading && orderInsight && (
+                  <>
                     <Text style={styles.insightEngine}>{orderInsight.engine}</Text>
 
-                    {/* kJ chips */}
                     <View style={styles.insightKjRow}>
                       <View style={styles.insightKjChip}>
                         <Text style={styles.insightKjValue}>{orderInsight.kj_total?.toLocaleString()}</Text>
@@ -408,7 +424,6 @@ export default function OrdersProfileScreen() {
 
                     {orderInsight.insight ? <Text style={styles.insightText}>{orderInsight.insight}</Text> : null}
 
-                    {/* Tip row with icon */}
                     {orderInsight.tip ? (
                       <View style={styles.insightTipRow}>
                         <LightbulbIcon size={16} color={colors.teal} />
@@ -713,7 +728,17 @@ export default function OrdersProfileScreen() {
 
       {/* ── Debug Tab ── */}
       {activeTab === 'debug' && (
-        <ScrollView contentContainerStyle={styles.debugContent} showsVerticalScrollIndicator={false}>
+        <ScrollView
+          contentContainerStyle={styles.debugContent}
+          showsVerticalScrollIndicator={false}
+          refreshControl={momentsUnlocked ? (
+            <RefreshControl
+              refreshing={momentsRefreshing}
+              onRefresh={() => handleQueryMoments({ isRefresh: true })}
+              tintColor={colors.primary}
+            />
+          ) : undefined}
+        >
 
           {/* Trace Section */}
           <View style={styles.debugCard}>
@@ -950,6 +975,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 8, paddingVertical: 3,
   },
   insightAiBadgeText: { fontSize: 10, fontWeight: '800', color: '#fff', letterSpacing: 0.5 },
+  insightChevron: { fontSize: 11, color: colors.textMuted, fontWeight: '600' },
   insightEngine: { fontSize: 11, fontWeight: '600', color: colors.textMid },
   insightKjRow: { flexDirection: 'row', gap: spacing.sm },
   insightKjChip: {

@@ -205,8 +205,8 @@ export async function buildBrotherQLLabelsHtml(order, visitorId = '', useShortha
   * { box-sizing: border-box; }
   html, body { margin: 0; padding: 0; background: #fff; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Arial, sans-serif; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
   body { width: 40mm; }
-  .sheet { width: 40mm; height: 48mm; page-break-after: always; break-after: page; padding: 0.5mm; }
-  .sheet:last-child { page-break-after: auto; break-after: auto; }
+  .sheet { width: 40mm; height: 48mm; page-break-after: always; break-after: page; padding: 0.5mm; overflow: hidden; }
+  .sheet:last-child { page-break-after: avoid; break-after: avoid; }
   .label { width: 39mm; height: 47mm; display: flex; flex-direction: column; overflow: hidden; }
   .top { background: #1a7a7a; color: #fff; padding: 0.8mm 1.5mm; display: flex; justify-content: space-between; align-items: center; flex-shrink: 0; }
   .logo { height: 4mm; width: auto; }
@@ -233,7 +233,8 @@ async function printBrotherQL(printer, order, visitorId, useShorthand, autoCutEn
   const html = await buildBrotherQLLabelsHtml(order, visitorId, useShorthand);
 
   if (isBrotherPrinterAvailable()) {
-    const pdf = await Print.printToFileAsync({ html, width: 114, height: 136, base64: false });
+    const labelCount = order?.items?.length || 1;
+    const pdf = await Print.printToFileAsync({ html, width: 114, height: labelCount * 136, base64: false });
 
     const connectionType = printer.connectionType || 'wifi'; // 'wifi' | 'bluetooth'
 

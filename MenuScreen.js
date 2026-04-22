@@ -1,8 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import {
   View, Text, ScrollView, TouchableOpacity,
-  StyleSheet, Modal, Animated, Easing, Image,
-  useWindowDimensions,
+  StyleSheet, Modal, Animated, Easing, Image, useWindowDimensions,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useNavigation } from '@react-navigation/native';
@@ -12,7 +11,7 @@ import { trackMenuView, trackItemView, queryMomentsAPI, trackAIPairingOpened, tr
 import { colors, typography, spacing, radius, shadow } from './theme';
 import { EspressoIcon, LatteIcon, IcedCupIcon, HotChocIcon, ChaiIcon, TeaIcon, ChevronIcon, AiSparkIcon, MorningTeaIcon, LunchIcon, SnacksIcon } from './CoffeeIcons';
 import { buildRecommendation } from './recommendations';
-import { getAIPairing } from './foodPairingAI';
+import { getAIPairing, getExpectedAIProvider } from './foodPairingAI';
 import { formatTime, isCurrentlyInBreak } from './storeUtils';
 
 const CATEGORY_ICONS = {
@@ -106,7 +105,8 @@ export default function MenuScreen() {
   const navigation = useNavigation();
   const { state } = useApp();
   const { width: screenWidth } = useWindowDimensions();
-  const slideWidth = screenWidth - 32 - (spacing.lg * 2); // 16px overlay padding each side + modal padding
+  const slideWidth = screenWidth - 32 - (spacing.lg * 2);
+
   const isClosed = !state.storeOpen || isCurrentlyInBreak(state.storeBreaks);
 
   // All hooks must be declared before any early return (Rules of Hooks)
@@ -130,7 +130,7 @@ export default function MenuScreen() {
 
   const FOOD_CATEGORIES = ['Morning Tea', 'Lunch', 'Snacks'];
   const foodTabsWithItems = FOOD_CATEGORIES.filter(
-    (cat) => (state.customItems?.[cat] || []).length > 0
+    (cat) => (state.customItems?.[cat] || []).some(item => state.menuEnabled[item.id] !== false)
   );
   const allTabs = [...CATEGORIES, ...foodTabsWithItems];
   const isFoodCategory = FOOD_CATEGORIES.includes(activeCategory);
@@ -178,7 +178,9 @@ export default function MenuScreen() {
   const customDrinkItems = !isFoodCategory
     ? (state.customItems?.[activeCategory] || []).filter((item) => state.menuEnabled[item.id] !== false)
     : [];
-  const foodItems = isFoodCategory ? (state.customItems?.[activeCategory] || []) : [];
+  const foodItems = isFoodCategory
+    ? (state.customItems?.[activeCategory] || []).filter(item => state.menuEnabled[item.id] !== false)
+    : [];
   const visibleItems = [...staticItems, ...customDrinkItems];
 
   const handleItemPress = (item) => {
@@ -197,11 +199,16 @@ export default function MenuScreen() {
 
   const openAi = () => {
     setAiOpen(true);
-    setAiPhase('idle');
     setCurrentSlide(0);
     setSlides([]);
     fadeAnim.setValue(0);
     trackAIPairingOpened();
+
+    if (!hasOrders) {
+      setAiPhase('no-orders');
+      return;
+    }
+
     setAiPhase('thinking');
     Animated.loop(
       Animated.sequence([
@@ -221,26 +228,33 @@ export default function MenuScreen() {
       const aiQuery = getAIPairing({ orders: myOrders, customItems: state.customItems, dietaryRequirements }).catch(() => null);
 
       Promise.all([minDelay, aiQuery]).then(([, aiResult]) => {
+        // No connection — OpenAI was attempted but failed
+        if (aiResult?.source === 'offline') {
+          thinkingAnim.stopAnimation();
+          setAiPhase('offline');
+          return;
+        }
+
       const rec = buildRecommendation({
         orders: myOrders,
         customItems: state.customItems,
         momentsData,
         aiResult,
       });
-      
+
       // Build slides array
       const builtSlides = [];
-      
+
       // First slide: standard recommendation
       builtSlides.push({
         type: 'standard',
         data: rec,
       });
-      
+
       // Check if we have Bedrock rank/sentiment from Moments API
-      const hasBedrockData = momentsData?.properties && 
+      const hasBedrockData = momentsData?.properties &&
         (momentsData.properties['Bedrock - Rank'] || momentsData.properties['Bedrock - Sentiment']);
-      
+
       if (hasBedrockData) {
         builtSlides.push({
           type: 'bedrock',
@@ -251,7 +265,7 @@ export default function MenuScreen() {
           },
         });
       }
-      
+
       setSlides(builtSlides);
       setRecommendation(rec);
       trackAIPairingResult(rec);
@@ -373,19 +387,50 @@ export default function MenuScreen() {
               </TouchableOpacity>
             </View>
 
+            {/* No orders state */}
+            {aiPhase === 'no-orders' && (
+              <View style={styles.aiEmptyState}>
+                <Text style={styles.aiEmptyIcon}>☕</Text>
+                <Text style={styles.aiEmptyTitle}>Order a drink first</Text>
+                <Text style={styles.aiEmptySubtitle}>
+                  Place your first order and check back after it's made. AI will analyse your taste profile and suggest perfect food pairings.
+                </Text>
+                <View style={styles.aiBrandNote}>
+                  <Text style={styles.aiBrandNoteText}>Powered by Tealium PRISM</Text>
+                </View>
+              </View>
+            )}
+
             {/* Thinking state */}
             {aiPhase === 'thinking' && (
               <View style={styles.aiThinking}>
-                <Text style={styles.aiThinkingLabel}>Analysing your taste profile</Text>
+                <Text style={styles.aiThinkingLabel}>
+                  {getExpectedAIProvider() === 'openai' ? 'Consulting OpenAI…' : 'Analysing your taste profile'}
+                </Text>
                 <View style={styles.dotsRow}>{thinkingDots}</View>
+                {getExpectedAIProvider() === 'openai' && (
+                  <Text style={styles.aiThinkingEngine}>GPT-4o mini · Cloud</Text>
+                )}
+              </View>
+            )}
+
+            {/* Offline — OpenAI attempted but no connection */}
+            {aiPhase === 'offline' && (
+              <View style={styles.aiEmptyState}>
+                <Text style={styles.aiEmptyIcon}>📡</Text>
+                <Text style={styles.aiEmptyTitle}>Connection required</Text>
+                <Text style={styles.aiEmptySubtitle}>
+                  AI pairing uses OpenAI and needs an internet connection. Connect to WiFi or mobile data and try again.
+                </Text>
+                <View style={styles.aiBrandNote}>
+                  <Text style={styles.aiBrandNoteText}>GPT-4o mini · Cloud</Text>
+                </View>
               </View>
             )}
 
             {/* Insights + Recommendation with Carousel */}
             {(aiPhase === 'insights' || aiPhase === 'recommendation') && recommendation && slides.length > 0 && (
               <Animated.View style={{ opacity: fadeAnim }}>
-
-                {/* Swipeable Carousel — native ScrollView paging */}
                 <ScrollView
                   ref={carouselRef}
                   horizontal
@@ -404,7 +449,6 @@ export default function MenuScreen() {
                   style={{ width: slideWidth }}
                   contentContainerStyle={{ flexDirection: 'row' }}
                 >
-                  {/* Render all slides side by side */}
                   {slides.map((slide, index) => (
                     <View key={index} style={{ width: slideWidth, paddingHorizontal: 4 }}>
                         {slide.type === 'standard' && (
@@ -468,6 +512,11 @@ export default function MenuScreen() {
                                       </View>
                                     ))}
                                     <TypingText text={recommendation.reason} speed={20} />
+                                    {recommendation.aiSource === 'openai' && (
+                                      <View style={styles.openAIBadge}>
+                                        <Text style={styles.openAIBadgeText}>✦ Generated by OpenAI · GPT-4o mini</Text>
+                                      </View>
+                                    )}
                                   </>
                                 ) : (
                                   <View style={styles.aiEmptyState}>
@@ -514,18 +563,10 @@ export default function MenuScreen() {
                             </View>
                           </View>
                         )}
+                        <View style={{ height: 12 }} />
                       </View>
                     ))}
                   </ScrollView>
-
-                {/* Engine footer — fixed above nav, only on first slide */}
-                {currentSlide === 0 && recommendation?.aiSource === 'on-device-llm' && recommendation?.aiEngine && (
-                  <View style={styles.aiBrandNote}>
-                    <Text style={styles.aiBrandNoteText}>
-                      {`✦ ${recommendation.aiEngine} · Tealium PRISM`}
-                    </Text>
-                  </View>
-                )}
 
                 {/* Navigation arrows if multiple slides */}
                 {slides.length > 1 && (
@@ -644,6 +685,7 @@ const styles = StyleSheet.create({
 
   aiThinking: { alignItems: 'center', paddingVertical: spacing.xl, gap: spacing.md },
   aiThinkingLabel: { fontSize: 14, color: colors.textMid, fontWeight: '600' },
+  aiThinkingEngine: { fontSize: 10, color: colors.textMuted, letterSpacing: 0.5, marginTop: 4 },
   dotsRow: { flexDirection: 'row', gap: 8 },
   dot: { fontSize: 10, color: colors.primary },
 
@@ -678,6 +720,14 @@ const styles = StyleSheet.create({
   badgeText: { fontSize: 11, fontWeight: '600', color: '#8a6000' },
   aiBrandNote: { alignItems: 'center', marginTop: spacing.md },
   aiBrandNoteText: { fontSize: 10, color: colors.textMuted, letterSpacing: 0.5 },
+  aiBrandNoteCloud: { backgroundColor: '#f0fdf4', borderRadius: 8, paddingHorizontal: spacing.sm, paddingVertical: 4, borderWidth: 1, borderColor: '#bbf7d0' },
+  openAIBadge: {
+    flexDirection: 'row', alignItems: 'center', alignSelf: 'flex-start',
+    marginTop: spacing.sm, paddingHorizontal: spacing.sm, paddingVertical: 5,
+    backgroundColor: '#f0fdf4', borderRadius: radius.full,
+    borderWidth: 1, borderColor: '#86efac',
+  },
+  openAIBadgeText: { fontSize: 11, fontWeight: '700', color: '#16a34a', letterSpacing: 0.3 },
 
   // Carousel
   carouselNav: {

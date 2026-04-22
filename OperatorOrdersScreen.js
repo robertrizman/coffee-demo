@@ -4,6 +4,7 @@ import {
   StyleSheet, Modal, Alert, TouchableWithoutFeedback, Linking, AppState,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { useKeepAwake } from 'expo-keep-awake';
 import { WebView } from 'react-native-webview';
 import { useNavigation } from '@react-navigation/native';
 import { CameraView, useCameraPermissions } from 'expo-camera';
@@ -39,6 +40,7 @@ async function buildQrHtml(url) {
 }
 
 export default function OperatorOrdersScreen() {
+  useKeepAwake();
   const navigation = useNavigation();
   const { state, dispatch } = useApp();
   const { logout, barista, isOwner } = useAuth();
