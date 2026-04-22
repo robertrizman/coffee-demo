@@ -14,9 +14,11 @@ const FoodPairingModule = NativeModules.FoodPairingModule || null;
 console.log('[FoodPairingAI] Module available:', !!FoodPairingModule, Platform.OS);
 
 let _openAIKey = null;
+let _nativeLLMAvailable = null; // null = untested, true = confirmed LLM, false = unavailable
+
 export function setOpenAIKey(key) { _openAIKey = key || null; }
 export function getExpectedAIProvider() {
-  if (FoodPairingModule) return 'native';
+  if (FoodPairingModule && _nativeLLMAvailable !== false) return 'native';
   if (_openAIKey) return 'openai';
   return 'rules';
 }
@@ -129,16 +131,17 @@ export async function getOrderInsight({ orders, dietaryRequirements = null }) {
   }));
 
   // Try native LLM first (Gemini / Apple Intelligence)
-  if (FoodPairingModule?.generateInsight) {
+  if (FoodPairingModule?.generateInsight && _nativeLLMAvailable !== false) {
     try {
       const timeout = new Promise((_, reject) => setTimeout(() => reject(new Error('timeout')), 8000));
       const result = await Promise.race([
         FoodPairingModule.generateInsight(JSON.stringify(summary)),
         timeout,
       ]);
-      if (result) return result;
+      if (result) { _nativeLLMAvailable = true; return result; }
+      _nativeLLMAvailable = false;
     } catch (e) {
-      console.warn('[OrderInsight] Native failed, trying OpenAI:', e.message);
+      _nativeLLMAvailable = false;
     }
   }
 
@@ -205,7 +208,7 @@ export async function getAIPairing({ orders, customItems, dietaryRequirements = 
   ].filter(Boolean).join(' | ');
 
   // Try native module (Gemini Nano on S24+ / Apple Intelligence on iOS)
-  if (FoodPairingModule) {
+  if (FoodPairingModule && _nativeLLMAvailable !== false) {
     try {
       console.log('[FoodPairingAI] Calling native module with:', { drinkCategory, milkType, timeOfDay, dayOfWeek, dietaryRequirements });
       const predictionPromise = FoodPairingModule.predict(
@@ -219,9 +222,9 @@ export async function getAIPairing({ orders, customItems, dietaryRequirements = 
       const result = await Promise.race([predictionPromise, timeoutPromise]);
 
       // Only trust the result if it's a real LLM (Gemini Nano / Apple Intelligence)
-      // Random Forest results fall through to OpenAI for better quality copy
       const isLLM = result.source === 'on-device-llm' || result.engine?.toLowerCase().includes('gemini') || result.engine?.toLowerCase().includes('intelligence');
       if (isLLM && result.item1 && result.item2) {
+        _nativeLLMAvailable = true;
         return {
           items: [result.item1, result.item2],
           categories: [result.category1, result.category2],
@@ -232,9 +235,9 @@ export async function getAIPairing({ orders, customItems, dietaryRequirements = 
           inputs: { drinkCategory, milkType, timeOfDay, orderCount, dayOfWeek },
         };
       }
-      console.log('[FoodPairingAI] Native module returned non-LLM result, trying OpenAI');
+      _nativeLLMAvailable = false;
     } catch (err) {
-      console.warn('[FoodPairingAI] Native module error, falling back:', err.message);
+      _nativeLLMAvailable = false;
     }
   }
 
