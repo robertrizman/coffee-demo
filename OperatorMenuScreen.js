@@ -86,7 +86,7 @@ export default function OperatorMenuScreen() {
   };
 
   return (
-    <SafeAreaView style={styles.safe}>
+    <SafeAreaView edges={['top', 'left', 'right']} style={styles.safe}>
       <View style={styles.header}>
         <View>
           <Text style={styles.operatorLabel}>OPERATOR · ADMIN</Text>

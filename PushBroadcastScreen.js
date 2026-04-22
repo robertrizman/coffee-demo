@@ -2,8 +2,9 @@ import React, { useState, useEffect } from 'react';
 import {
   View, Text, TextInput, TouchableOpacity, StyleSheet,
   ScrollView, Alert, Switch, ActivityIndicator, Platform,
-  Modal, SafeAreaView,
+  Modal,
 } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { supabase } from './supabase';
 import { colors, spacing, radius, typography } from './theme';
 

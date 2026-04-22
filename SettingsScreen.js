@@ -426,7 +426,7 @@ export default function SettingsScreen() {
     // Unlink printer from barista account in Supabase
     if (barista?.id) {
       try {
-        await supabase.from('baristas').update({ printer_id: null }).eq('id', barista.id);
+        await supabase.from('baristas').update({ printer_id: null, auto_cut: false }).eq('id', barista.id);
         console.log('[Settings] Unlinked printer from barista account');
       } catch (err) {
         console.warn('[Settings] Could not unlink printer from DB:', err.message);
@@ -533,7 +533,7 @@ export default function SettingsScreen() {
           // Unlink printer from barista account in Supabase
           if (barista?.id) {
             try {
-              await supabase.from('baristas').update({ printer_id: null }).eq('id', barista.id);
+              await supabase.from('baristas').update({ printer_id: null, auto_cut: false }).eq('id', barista.id);
               console.log('[Settings] Unlinked printer from barista account');
             } catch (err) {
               console.warn('[Settings] Could not unlink printer from DB:', err.message);
@@ -559,6 +559,10 @@ export default function SettingsScreen() {
     }
     setAutoPrintEnabled(value);
     await saveAutoPrint(value);
+    if (barista?.id) {
+      supabase.from('baristas').update({ auto_print: value }).eq('id', barista.id)
+        .then(({ error }) => { if (error) console.warn('[Settings] auto_print sync error:', error.message); });
+    }
   };
 
   const handleTestPrint = async () => {
@@ -602,7 +606,7 @@ export default function SettingsScreen() {
   ];
 
   return (
-    <SafeAreaView style={styles.safe}>
+    <SafeAreaView edges={['top', 'left', 'right']} style={styles.safe}>
       <View style={styles.header}>
         <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backBtn}>
           <Text style={styles.backIcon}>‹</Text>
@@ -1075,6 +1079,10 @@ export default function SettingsScreen() {
                     onValueChange={async (v) => {
                       setAutoCutEnabled(v);
                       await saveAutoCut(v);
+                      if (barista?.id) {
+                        supabase.from('baristas').update({ auto_cut: v }).eq('id', barista.id)
+                          .then(({ error }) => { if (error) console.warn('[Settings] auto_cut sync error:', error.message); });
+                      }
                     }}
                     trackColor={{ false: '#e0e0e0', true: colors.primary }}
                     thumbColor="#fff"

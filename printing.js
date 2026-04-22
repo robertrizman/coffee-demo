@@ -8,10 +8,23 @@
 
 import QRCode from 'qrcode';
 import * as Print from 'expo-print';
+import { Platform, PermissionsAndroid } from 'react-native';
 import { loadShorthand, loadAutoCut } from './printerConfig';
 import { resolvePrinterForCurrentNetwork } from './printerResolver';
 import { toShorthandLines } from './shorthand';
 import { BrotherPrinter, isBrotherPrinterAvailable } from './brotherPrinter';
+
+async function ensureBluetoothConnectPermission() {
+  if (Platform.OS !== 'android' || Platform.Version < 31) return true;
+  try {
+    const already = await PermissionsAndroid.check('android.permission.BLUETOOTH_CONNECT');
+    if (already) return true;
+    const result = await PermissionsAndroid.request('android.permission.BLUETOOTH_CONNECT');
+    return result === PermissionsAndroid.RESULTS.GRANTED;
+  } catch {
+    return false;
+  }
+}
 
 async function buildQrSvg(url, width = 120) {
   try {
@@ -225,6 +238,10 @@ async function printBrotherQL(printer, order, visitorId, useShorthand, autoCutEn
     const connectionType = printer.connectionType || 'wifi'; // 'wifi' | 'bluetooth'
 
     if (connectionType === 'bluetooth' && printer.bluetoothAddress) {
+      const hasPermission = await ensureBluetoothConnectPermission();
+      if (!hasPermission) {
+        throw new Error('Bluetooth permission denied. Please grant Bluetooth permission in Settings.');
+      }
       console.log('[Printer] Using Bluetooth:', printer.bluetoothAddress);
       await BrotherPrinter.printQLPdfBluetooth(printer.bluetoothAddress, pdf.uri, !!autoCutEnabled);
       return true;

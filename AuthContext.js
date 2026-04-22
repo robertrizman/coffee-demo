@@ -11,9 +11,9 @@
 import React, { createContext, useContext, useState, useEffect, useRef } from 'react';
 import { AppState } from 'react-native';
 import { supabase } from './supabase';
-import { saveDefaultPrinter, saveBluetoothPrinter, saveAutoCut, loadBluetoothPrinter } from './printerConfig';
+import { saveDefaultPrinter, saveBluetoothPrinter, saveAutoCut, saveAutoPrint, loadBluetoothPrinter } from './printerConfig';
 import { getDeviceId } from './deviceId';
-import { warmupBluetoothConnection } from './brotherPrinter';
+import { ensureBluetoothConnected } from './brotherPrinter';
 import { flushPrintQueue } from './AppContext';
 
 const AuthContext = createContext(null);
@@ -42,8 +42,11 @@ export function AuthProvider({ children }) {
         try {
           const btPrinter = await loadBluetoothPrinter();
           if (btPrinter?.bluetoothAddress) {
-            await warmupBluetoothConnection(btPrinter.bluetoothAddress);
-            await new Promise((r) => setTimeout(r, 1200));
+            const result = await ensureBluetoothConnected(btPrinter.bluetoothAddress, btPrinter.name);
+            if (result.connected && result.address !== btPrinter.bluetoothAddress) {
+              await saveBluetoothPrinter({ ...btPrinter, bluetoothAddress: result.address, address: result.address, name: result.name });
+            }
+            if (result.connected) await new Promise((r) => setTimeout(r, 1200));
           }
         } catch {}
         flushPrintQueue().catch(() => {});
@@ -76,6 +79,10 @@ export function AuthProvider({ children }) {
       if (!station) {
         station = await assignStation(data.id);
       }
+
+      // Restore auto-print and auto-cut preferences from DB so they survive reinstalls / new devices
+      await saveAutoPrint(data.auto_print === true);
+      await saveAutoCut(data.auto_cut === true);
 
       // Load printer assigned to this barista account (shared across all devices)
       const { data: baristaWithPrinter } = await supabase
@@ -111,9 +118,9 @@ export function AuthProvider({ children }) {
               .eq('id', printer.id);
           }
           console.log('[Auth] Loaded barista Bluetooth printer:', printer.name, printer.bluetooth_address);
-          // Silently warm up the BT connection in the background so the first print is instant
-          warmupBluetoothConnection(printer.bluetooth_address)
-            .then((ok) => console.log('[Auth] BT warmup:', ok ? 'connected' : 'not reachable'))
+          // Silently connect in the background — scan and auto-reconnect if direct fails
+          ensureBluetoothConnected(printer.bluetooth_address, printer.name)
+            .then((r) => console.log('[Auth] BT connect:', r.connected ? `connected (${r.address})` : 'not reachable'))
             .catch(() => {});
         } else if (printer.ip) {
           await saveDefaultPrinter({

@@ -1,7 +1,7 @@
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useRef, useEffect, useCallback } from 'react';
 import {
   View, Text, ScrollView, TouchableOpacity, RefreshControl,
-  StyleSheet, Modal, Alert, TouchableWithoutFeedback, Linking,
+  StyleSheet, Modal, Alert, TouchableWithoutFeedback, Linking, AppState,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { WebView } from 'react-native-webview';
@@ -12,6 +12,8 @@ import { supabase } from './supabase';
 import { useAuth } from './AuthContext';
 import { trackOrderComplete, trackOrderReady, getVisitorId } from './tealium';
 import { printOrderReceipt, buildQrDeepLink } from './printing';
+import { loadAutoPrint, loadDefaultPrinter, loadBluetoothPrinter, saveBluetoothPrinter } from './printerConfig';
+import { ensureBluetoothConnected } from './brotherPrinter';
 import { colors, typography, spacing, radius, shadow } from './theme';
 import { QrScanIcon, SettingsIcon, LogoutIcon, PrinterIcon, UserIcon } from './CoffeeIcons';
 
@@ -53,8 +55,58 @@ export default function OperatorOrdersScreen() {
   const [qrVisible, setQrVisible] = useState({});
   const [refreshing, setRefreshing] = useState(false);
   const [qrDataUrls, setQrDataUrls] = useState({});
+  const [printerReachable, setPrinterReachable] = useState(null); // null=unknown, true=ok, false=unreachable
   const cameraRef = useRef(null);
   const lastScan = useRef(null);
+
+  const checkPrinterConnectivity = useCallback(async () => {
+    const [autoPrint, btPrinter, wifiPrinter] = await Promise.all([
+      loadAutoPrint(), loadBluetoothPrinter(), loadDefaultPrinter(),
+    ]);
+
+    // Always attempt BT reconnect when a default Bluetooth printer is configured.
+    // If the direct connection fails, scan for a QL printer and reconnect automatically.
+    if (btPrinter?.bluetoothAddress) {
+      const result = await ensureBluetoothConnected(btPrinter.bluetoothAddress, btPrinter.name);
+      if (result.connected && result.address !== btPrinter.bluetoothAddress) {
+        // Printer was found at a new address — update saved config silently
+        await saveBluetoothPrinter({ ...btPrinter, bluetoothAddress: result.address, address: result.address, name: result.name });
+      }
+      setPrinterReachable(autoPrint ? result.connected : null);
+      return;
+    }
+
+    if (!autoPrint) { setPrinterReachable(null); return; }
+
+    if (wifiPrinter?.ip) {
+      try {
+        const controller = new AbortController();
+        const timer = setTimeout(() => controller.abort(), 3000);
+        const res = await fetch(`http://${wifiPrinter.ip}:${wifiPrinter.port || 631}/`, {
+          method: 'HEAD', signal: controller.signal,
+        });
+        clearTimeout(timer);
+        setPrinterReachable(res.status < 500);
+      } catch {
+        setPrinterReachable(false);
+      }
+      return;
+    }
+
+    setPrinterReachable(null);
+  }, []);
+
+  useEffect(() => {
+    checkPrinterConnectivity();
+    const appStateSub = AppState.addEventListener('change', (state) => {
+      if (state === 'active') checkPrinterConnectivity();
+    });
+    const focusSub = navigation.addListener('focus', checkPrinterConnectivity);
+    return () => {
+      appStateSub.remove();
+      focusSub();
+    };
+  }, [checkPrinterConnectivity, navigation]);
 
   const filtered = state.orders.filter((o) => {
     if (tab === 'Pending') return o.status === 'pending';
@@ -281,7 +333,7 @@ export default function OperatorOrdersScreen() {
   };
 
   return (
-    <SafeAreaView style={styles.safe}>
+    <SafeAreaView edges={['top', 'left', 'right']} style={styles.safe}>
 
       <View style={styles.header}>
         <View>
@@ -322,6 +374,13 @@ export default function OperatorOrdersScreen() {
       </View>
 
       <View style={styles.divider} />
+
+      {printerReachable === false && (
+        <TouchableOpacity style={styles.printerBanner} onPress={() => navigation.navigate('Settings')} activeOpacity={0.8}>
+          <PrinterIcon size={14} color="#92400e" />
+          <Text style={styles.printerBannerText}>Printer unreachable — tap to go to Settings</Text>
+        </TouchableOpacity>
+      )}
 
       {/* Inline Scanner */}
       {inlineScannerVisible && cameraPermission?.granted && (
@@ -600,6 +659,13 @@ const styles = StyleSheet.create({
   tabTextActive: { fontWeight: '700', color: colors.primary },
   tabUnderline: { height: 2, backgroundColor: colors.primary, borderRadius: 2, marginTop: 4 },
   divider: { height: 1, backgroundColor: colors.border },
+
+  printerBanner: {
+    flexDirection: 'row', alignItems: 'center', gap: spacing.xs,
+    backgroundColor: '#fef3c7', borderBottomWidth: 1, borderBottomColor: '#fde68a',
+    paddingHorizontal: spacing.lg, paddingVertical: 8,
+  },
+  printerBannerText: { fontSize: 12, fontWeight: '600', color: '#92400e', flex: 1 },
 
   list: { padding: spacing.md, gap: spacing.md },
 

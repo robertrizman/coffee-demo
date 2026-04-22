@@ -1,9 +1,10 @@
 import React, { useState } from 'react';
 import {
   View, Text, ScrollView, TouchableOpacity,
-  StyleSheet, SafeAreaView, TextInput, Alert, StatusBar, Platform,
+  StyleSheet, TextInput, Alert, StatusBar, Platform,
   KeyboardAvoidingView,
 } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { useNavigation, useRoute } from '@react-navigation/native';
 import { SIZES, MILK_OPTIONS, EXTRAS } from './menu';
 import { useApp } from './AppContext';
@@ -85,7 +86,7 @@ export default function ItemDetailScreen() {
   };
 
   return (
-    <SafeAreaView style={styles.safe}>
+    <SafeAreaView edges={['top', 'left', 'right']} style={styles.safe}>
       <KeyboardAvoidingView
         style={{ flex: 1 }}
         behavior={Platform.OS === 'ios' ? 'padding' : 'height'}

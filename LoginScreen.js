@@ -1,10 +1,12 @@
 import React, { useState } from 'react';
 import {
   View, Text, TextInput, TouchableOpacity,
-  StyleSheet, SafeAreaView, KeyboardAvoidingView,
+  StyleSheet, KeyboardAvoidingView,
   Platform, ActivityIndicator, ScrollView,
 } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import Svg, { Path, Circle } from 'react-native-svg';
+import Constants from 'expo-constants';
 import { useAuth } from './AuthContext';
 import { colors, typography, spacing, radius, shadow } from './theme';
 import { UserIcon, LockIcon } from './CoffeeIcons';
@@ -44,7 +46,7 @@ export default function LoginScreen() {
       style={{ flex: 1, backgroundColor: colors.background }}
       behavior={Platform.OS === 'ios' ? 'padding' : undefined}
     >
-      <SafeAreaView style={styles.safe}>
+      <SafeAreaView edges={['top', 'left', 'right']} style={styles.safe}>
         <ScrollView
           contentContainerStyle={styles.inner}
           keyboardShouldPersistTaps="handled"
@@ -155,6 +157,9 @@ export default function LoginScreen() {
               This is a demonstration app built for Tealium event tracking and analytics purposes. It is not intended for commercial use, resale, or production deployment. All data collected is used solely for Tealium platform demonstration and testing.
             </Text>
             <Text style={styles.aboutVersion}>Coffee Demo · Powered by Tealium PRISM SDK</Text>
+            <Text style={styles.buildVersion}>
+              v{Constants.expoConfig?.version ?? '—'}
+            </Text>
           </View>
         </ScrollView>
       </SafeAreaView>
@@ -207,4 +212,5 @@ const styles = StyleSheet.create({
   aboutTitle: { fontSize: 10, fontWeight: '700', color: colors.textMuted, letterSpacing: 1, textTransform: 'uppercase' },
   aboutText: { fontSize: 11, color: colors.textMuted, textAlign: 'center', lineHeight: 16, opacity: 0.8 },
   aboutVersion: { fontSize: 10, color: colors.teal, fontWeight: '600', letterSpacing: 0.5 },
+  buildVersion: { fontSize: 10, color: colors.textMuted, opacity: 0.5, marginTop: 2 },
 });

@@ -1,9 +1,10 @@
 import React, { useState, useEffect, useRef } from 'react';
 import {
   View, Text, ScrollView, TouchableOpacity,
-  StyleSheet, SafeAreaView, TextInput, Alert,
+  StyleSheet, TextInput, Alert,
   KeyboardAvoidingView, Platform, Modal, Animated, Easing, Linking,
 } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { useNavigation } from '@react-navigation/native';
 import { useApp, generateOrderId, generateSequentialOrderId } from './AppContext';
 import { trackRemoveFromOrder, trackEmailEntered, trackOrderPlaced, track } from './tealium';
@@ -276,7 +277,7 @@ export default function OrderSummaryScreen() {
 
   return (
     <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : 'height'}>
-      <SafeAreaView style={styles.safe}>
+      <SafeAreaView edges={['top', 'left', 'right']} style={styles.safe}>
 
         <View style={styles.header}>
           <View>

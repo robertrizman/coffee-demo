@@ -109,7 +109,7 @@ export default function OrdersProfileScreen() {
 
   // Filter global orders down to only this user's orders
   const myOrders = state.orders.filter((o) => {
-    if (deviceId && o.deviceId === deviceId) return true;
+    if (deviceId && (o.deviceId === deviceId || o.tealAppUuid === deviceId)) return true;
     if (profile?.email && o.email === profile.email) return true;
     return false;
   });
@@ -306,7 +306,7 @@ export default function OrdersProfileScreen() {
   };
 
   return (
-    <SafeAreaView style={styles.safe}>
+    <SafeAreaView edges={['top', 'left', 'right']} style={styles.safe}>
       {/* Toast notification */}
       {toast && (
         <View style={styles.toast} pointerEvents="none">

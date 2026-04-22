@@ -147,7 +147,7 @@ export default function MenuScreen() {
 
   if (isClosed) {
     return (
-      <SafeAreaView style={[styles.safe, { backgroundColor: colors.midnight }]}>
+      <SafeAreaView edges={['top', 'left', 'right']} style={[styles.safe, { backgroundColor: colors.midnight }]}>
         <View style={styles.closedScreen}>
           <BrewingCup />
           <Text style={styles.closedTitle}>Back Soon!</Text>
@@ -187,8 +187,12 @@ export default function MenuScreen() {
     navigation.navigate('ItemDetail', { item });
   };
 
-  // Get customer's own orders
-  const myOrders = state.orders.filter((o) => o.deviceId === state.deviceId);
+  // Get customer's own orders — match on either deviceId or tealAppUuid since
+  // orders are placed with getCanonicalDeviceId() which can differ from state.deviceId
+  // (e.g. after a bundle ID rename resets SecureStore on Android)
+  const myOrders = state.orders.filter(
+    (o) => o.deviceId === state.deviceId || o.tealAppUuid === state.deviceId
+  );
   const hasOrders = myOrders.length > 0;
 
   const openAi = () => {
@@ -198,9 +202,6 @@ export default function MenuScreen() {
     setSlides([]);
     fadeAnim.setValue(0);
     trackAIPairingOpened();
-
-    if (!hasOrders) return;
-
     setAiPhase('thinking');
     Animated.loop(
       Animated.sequence([
@@ -277,7 +278,7 @@ export default function MenuScreen() {
   });
 
   return (
-    <SafeAreaView style={styles.safe}>
+    <SafeAreaView edges={['top', 'left', 'right']} style={styles.safe}>
 
       {/* Header */}
       <View style={styles.header}>
@@ -372,22 +373,8 @@ export default function MenuScreen() {
               </TouchableOpacity>
             </View>
 
-            {/* No orders state */}
-            {!hasOrders && (
-              <View style={styles.aiEmptyState}>
-                <Text style={styles.aiEmptyIcon}>☕</Text>
-                <Text style={styles.aiEmptyTitle}>Order a drink first</Text>
-                <Text style={styles.aiEmptySubtitle}>
-                  Place your first order and check back after it's made. AI will analyze your taste profile and suggest perfect food pairings.
-                </Text>
-                <View style={styles.aiBrandNote}>
-                  <Text style={styles.aiBrandNoteText}>Powered by Tealium PRISM · On-device AI</Text>
-                </View>
-              </View>
-            )}
-
             {/* Thinking state */}
-            {hasOrders && aiPhase === 'thinking' && (
+            {aiPhase === 'thinking' && (
               <View style={styles.aiThinking}>
                 <Text style={styles.aiThinkingLabel}>Analysing your taste profile</Text>
                 <View style={styles.dotsRow}>{thinkingDots}</View>
@@ -395,7 +382,7 @@ export default function MenuScreen() {
             )}
 
             {/* Insights + Recommendation with Carousel */}
-            {hasOrders && (aiPhase === 'insights' || aiPhase === 'recommendation') && recommendation && slides.length > 0 && (
+            {(aiPhase === 'insights' || aiPhase === 'recommendation') && recommendation && slides.length > 0 && (
               <Animated.View style={{ opacity: fadeAnim }}>
 
                 {/* Swipeable Carousel — native ScrollView paging */}

@@ -338,6 +338,13 @@ export async function flushPrintQueue() {
     const hasPrinter = defaultPrinter?.ip || bluetoothPrinter?.bluetoothAddress;
     if (!autoPrintEnabled || !hasPrinter) return;
 
+    if (bluetoothPrinter?.bluetoothAddress) {
+      try {
+        await warmupBluetoothConnection(bluetoothPrinter.bluetoothAddress);
+        await new Promise((r) => setTimeout(r, 1200));
+      } catch {}
+    }
+
     console.log('[PrintQueue] Checking for unprinted orders...');
     const { data: unprintedOrders, error } = await supabase
       .from('orders')
@@ -489,6 +496,8 @@ export function AppProvider({ children }) {
           .then(({ data }) => { if (data) dispatch({ type: 'SET_STORE_CONFIG', payload: data }); });
         supabase.from('store_breaks').select('*').order('start_time')
           .then(({ data }) => { if (data) dispatch({ type: 'SET_STORE_BREAKS', payload: data }); });
+        // Reprint any labels missed while the app was asleep
+        flushPrintQueue().catch(() => {});
       }
     });
     return () => appStateSub.remove();

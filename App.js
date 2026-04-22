@@ -45,7 +45,9 @@ async function registerPushToken(arcLocationId = null) {
     }
     
     console.log('🎫 [Push] Getting Expo push token...');
-    const tokenData = await Notifications.getExpoPushTokenAsync();
+    const tokenData = await Notifications.getExpoPushTokenAsync({
+      projectId: 'e0b60245-0625-41bc-a4b5-248e50f54c91',
+    });
     const token = tokenData.data;
     console.log('✅ [Push] Token received:', token);
     
