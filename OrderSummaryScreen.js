@@ -9,7 +9,7 @@ import { useNavigation } from '@react-navigation/native';
 import { useApp, generateOrderId, generateSequentialOrderId } from './AppContext';
 import { trackRemoveFromOrder, trackEmailEntered, trackOrderPlaced, track } from './tealium';
 import { colors, typography, spacing, radius, shadow } from './theme';
-import { LocationPinIcon } from './CoffeeIcons';
+import { LocationPinIcon, UserIcon, EmailIcon, TrashIcon, TakeawayCupIcon } from './CoffeeIcons';
 import { supabase } from './supabase';
 import Geolocation from '@react-native-community/geolocation';
 
@@ -297,7 +297,7 @@ export default function OrderSummaryScreen() {
 
           <Text style={styles.sectionLabel}>YOUR NAME</Text>
           <View style={styles.inputRow}>
-            <Text style={styles.inputIcon}>👤</Text>
+            <UserIcon size={18} color={colors.textMuted} />
             <TextInput
               style={styles.input}
               placeholder="Enter your name"
@@ -309,7 +309,7 @@ export default function OrderSummaryScreen() {
 
           <Text style={styles.sectionLabel}>YOUR EMAIL</Text>
           <View style={styles.inputRow}>
-            <Text style={styles.inputIcon}>✉</Text>
+            <EmailIcon size={18} color={colors.textMuted} />
             <TextInput
               style={styles.input}
               placeholder="Enter your email"
@@ -344,7 +344,7 @@ export default function OrderSummaryScreen() {
                     ) : null}
                   </View>
                   <TouchableOpacity onPress={() => handleRemove(index)} style={styles.deleteBtn}>
-                    <Text style={styles.deleteIcon}>🗑</Text>
+                    <TrashIcon size={20} color={colors.textMid} />
                   </TouchableOpacity>
                 </View>
               );
@@ -360,7 +360,8 @@ export default function OrderSummaryScreen() {
             onPress={handlePlaceOrderPress}
             activeOpacity={0.85}
           >
-            <Text style={styles.placeBtnText}>☕  Review & Place Order</Text>
+            <TakeawayCupIcon size={18} color="#fff" />
+            <Text style={styles.placeBtnText}>Review & Place Order</Text>
           </TouchableOpacity>
 
           <View style={{ height: 40 }} />
@@ -390,11 +391,11 @@ export default function OrderSummaryScreen() {
               <View style={styles.confirmSection}>
                 <Text style={styles.confirmSectionLabel}>ORDERING FOR</Text>
                 <View style={styles.confirmDetailRow}>
-                  <Text style={styles.confirmDetailIcon}>👤</Text>
+                  <UserIcon size={15} color={colors.textMuted} />
                   <Text style={styles.confirmDetailText}>{name}</Text>
                 </View>
                 <View style={styles.confirmDetailRow}>
-                  <Text style={styles.confirmDetailIcon}>✉</Text>
+                  <EmailIcon size={15} color={colors.textMuted} />
                   <Text style={styles.confirmDetailText}>{email}</Text>
                 </View>
               </View>
@@ -424,14 +425,14 @@ export default function OrderSummaryScreen() {
               </View>
 
               <View style={styles.confirmDivider} />
-
-              {/* Note */}
-              <View style={styles.confirmNoteWrap}>
-                <Text style={styles.confirmNoteText}>
-                  Once confirmed, your order is sent straight to the barista and you'll be notified when it's ready for pickup.
-                </Text>
-              </View>
             </ScrollView>
+
+            {/* Note — outside scroll so it's always visible */}
+            <View style={styles.confirmNoteWrap}>
+              <Text style={styles.confirmNoteText}>
+                Once confirmed, your order is sent straight to the barista and you'll be notified when it's ready for pickup.
+              </Text>
+            </View>
 
             {/* Geo Warning */}
             {(geoWarning === 'outside' || geoWarning === 'denied') && (
@@ -472,7 +473,8 @@ export default function OrderSummaryScreen() {
                 activeOpacity={0.85}
                 disabled={geoWarning === 'outside' || geoWarning === 'denied'}
               >
-                <Text style={styles.confirmBtnText}>Confirm ☕</Text>
+                <Text style={styles.confirmBtnText}>Confirm</Text>
+                <TakeawayCupIcon size={16} color="#fff" />
               </TouchableOpacity>
             </View>
 
@@ -539,7 +541,7 @@ export default function OrderSummaryScreen() {
 
             {/* Notification pill */}
             <View style={styles.notifyPill}>
-              <Text style={styles.notifyPillText}>🔔  You'll be notified when ready</Text>
+              <Text style={styles.notifyPillText}>🔔  You'll be notified when your order is ready for pickup</Text>
             </View>
 
           </Animated.View>
@@ -574,7 +576,6 @@ const styles = StyleSheet.create({
     backgroundColor: colors.surface, borderRadius: radius.lg,
     borderWidth: 1.5, borderColor: colors.border, paddingHorizontal: spacing.md,
   },
-  inputIcon: { fontSize: 18, marginRight: spacing.sm, color: colors.textMuted },
   input: { flex: 1, height: 52, fontSize: 16, color: colors.textDark },
 
   itemCard: {
@@ -593,7 +594,6 @@ const styles = StyleSheet.create({
   itemDetail: { ...typography.caption, marginTop: 2 },
   itemSpecial: { ...typography.caption, fontStyle: 'italic', color: colors.textLight, marginTop: 2 },
   deleteBtn: { padding: spacing.sm },
-  deleteIcon: { fontSize: 18 },
 
   addMoreBtn: {
     borderWidth: 1.5, borderColor: colors.border, borderStyle: 'dashed',
@@ -604,7 +604,7 @@ const styles = StyleSheet.create({
 
   placeBtn: {
     backgroundColor: colors.primary, borderRadius: radius.lg,
-    paddingVertical: 12, alignItems: 'center',
+    paddingVertical: 12, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8,
   },
   placeBtnDisabled: { opacity: 0.4 },
   placeBtnText: { color: '#fff', fontSize: 17, fontWeight: '700', letterSpacing: 0.3 },
@@ -654,7 +654,6 @@ const styles = StyleSheet.create({
   confirmDivider: { height: 1, backgroundColor: colors.borderLight },
 
   confirmDetailRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
-  confirmDetailIcon: { fontSize: 15, width: 24, color: colors.textMuted },
   confirmDetailText: { fontSize: 15, color: colors.textDark, fontWeight: '500' },
 
   confirmItem: { flexDirection: 'row', alignItems: 'flex-start', gap: spacing.sm },
@@ -690,7 +689,7 @@ const styles = StyleSheet.create({
   editBtnText: { fontSize: 15, fontWeight: '600', color: colors.textMid },
   confirmBtn: {
     flex: 2, paddingVertical: 11, borderRadius: radius.lg,
-    backgroundColor: colors.primary, alignItems: 'center',
+    backgroundColor: colors.primary, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6,
   },
   confirmBtnDisabled: { backgroundColor: colors.textMuted, opacity: 0.6 },
   confirmBtnText: { color: '#fff', fontSize: 16, fontWeight: '700', letterSpacing: 0.3 },
@@ -771,12 +770,14 @@ const styles = StyleSheet.create({
 
   notifyPill: {
     backgroundColor: colors.primaryLight,
-    borderRadius: radius.full,
+    borderRadius: radius.lg,
     paddingHorizontal: spacing.lg,
-    paddingVertical: spacing.sm,
+    paddingVertical: spacing.sm + 2,
     borderWidth: 1,
     borderColor: colors.primaryMid,
     marginTop: spacing.sm,
+    alignSelf: 'center',
+    maxWidth: 300,
   },
-  notifyPillText: { fontSize: 13, fontWeight: '700', color: colors.primary },
+  notifyPillText: { fontSize: 13, fontWeight: '700', color: colors.primary, textAlign: 'center' },
 });

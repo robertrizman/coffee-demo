@@ -1,9 +1,10 @@
 import React, { useEffect, useState, useCallback } from 'react';
 import {
   View, Text, ScrollView, StyleSheet,
-  TouchableOpacity, ActivityIndicator, RefreshControl,
+  TouchableOpacity, ActivityIndicator, RefreshControl, Linking,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import * as Notifications from 'expo-notifications';
 import { useApp } from './AppContext';
 import { supabase } from './supabase';
 import { colors, typography, spacing, radius, shadow } from './theme';
@@ -37,6 +38,13 @@ export default function MyOrdersScreen() {
   const [orders, setOrders] = useState([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
+  const [notifDenied, setNotifDenied] = useState(false);
+
+  useEffect(() => {
+    Notifications.getPermissionsAsync().then(({ status }) => {
+      setNotifDenied(status !== 'granted');
+    });
+  }, []);
 
   const fetchOrders = useCallback(async () => {
     if (!deviceId) return;
@@ -91,6 +99,14 @@ export default function MyOrdersScreen() {
       </View>
 
       <View style={styles.divider} />
+
+      {notifDenied && (
+        <TouchableOpacity style={styles.notifBanner} onPress={() => Linking.openSettings()} activeOpacity={0.75}>
+          <Text style={styles.notifBannerIcon}>🔔</Text>
+          <Text style={styles.notifBannerText}>Enable notifications to know when your order is ready</Text>
+          <Text style={styles.notifBannerArrow}>›</Text>
+        </TouchableOpacity>
+      )}
 
       {loading ? (
         <View style={styles.centred}>
@@ -175,6 +191,23 @@ const styles = StyleSheet.create({
   loadingText: { ...typography.caption, color: colors.primary },
 
   body: { padding: spacing.md, gap: spacing.md },
+
+  notifBanner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.sm,
+    marginHorizontal: spacing.md,
+    marginTop: spacing.md,
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.sm + 2,
+    backgroundColor: colors.primaryLight,
+    borderRadius: radius.md,
+    borderWidth: 1,
+    borderColor: colors.primaryMid,
+  },
+  notifBannerIcon: { fontSize: 15 },
+  notifBannerText: { flex: 1, fontSize: 13, color: colors.primary, fontWeight: '500', lineHeight: 18 },
+  notifBannerArrow: { fontSize: 18, color: colors.primary, fontWeight: '600' },
 
   emptyState: { alignItems: 'center', paddingTop: 80, gap: spacing.md },
   emptyIcon: { fontSize: 56 },

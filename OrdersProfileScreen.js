@@ -11,7 +11,7 @@ import { getOrderInsight } from './foodPairingAI';
 import { supabase } from './supabase';
 import { trackProfileTab, trackEditProfile, trackProfileUpdated, trackUuidCopy, trackDietaryRequirementsUpdated, joinTrace, leaveTrace, getCanonicalDeviceId } from './tealium';
 import { colors, typography, spacing, radius, shadow } from './theme';
-import { UserIcon, EmailIcon, LocationPinIcon, TakeawayCupIcon, CheckIcon, CopyIcon, EditIcon, AiSparkIcon, LightbulbIcon, MagnifyIcon, LightningBoltIcon } from './CoffeeIcons';
+import { UserIcon, EmailIcon, LocationPinIcon, TakeawayCupIcon, CheckIcon, CopyIcon, EditIcon, AiSparkIcon, LightbulbIcon, MagnifyIcon, LightningBoltIcon, LeafIcon, ShieldIcon } from './CoffeeIcons';
 
 function timeAgo(ts) {
   const secs = Math.floor((Date.now() - ts) / 1000);
@@ -519,7 +519,7 @@ export default function OrdersProfileScreen() {
                 </View>
                 <View style={styles.profileDivider} />
                 <View style={styles.profileRow}>
-                  <Text style={styles.dietaryIcon}>🌿</Text>
+                  <LeafIcon size={22} color={colors.textMid} />
                   <View style={styles.profileInfo}>
                     <Text style={styles.profileLabel}>DIETARY REQUIREMENTS</Text>
                     <Text style={[styles.profileValue, !profile?.dietary_requirements && { color: colors.textMuted }]}>
@@ -605,7 +605,7 @@ export default function OrdersProfileScreen() {
                 </View>
                 <Text style={styles.fieldLabel}>DIETARY REQUIREMENTS</Text>
                 <View style={styles.inputRow}>
-                  <Text style={styles.dietaryIcon}>🌿</Text>
+                  <LeafIcon size={16} color={colors.textMuted} />
                   <TextInput
                     style={styles.input}
                     value={editDietary}
@@ -641,7 +641,10 @@ export default function OrdersProfileScreen() {
           </View>
 
           <View style={styles.infoCard}>
-            <Text style={styles.infoTitle}>🔒 Privacy</Text>
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+              <ShieldIcon size={15} color={colors.primary} />
+              <Text style={styles.infoTitle}>Privacy</Text>
+            </View>
             <Text style={styles.infoText}>
               Your name and email are stored securely on this device and used only to link your orders. We don't share your details with anyone.
             </Text>
@@ -989,7 +992,6 @@ const styles = StyleSheet.create({
   insightText: { fontSize: 13, color: colors.textMid, lineHeight: 20 },
   insightTipRow: { flexDirection: 'row', alignItems: 'flex-start', gap: 6, backgroundColor: colors.tealLight, borderRadius: radius.md, padding: spacing.sm, borderWidth: 1, borderColor: colors.tealMid },
   insightTip: { flex: 1, fontSize: 12, color: colors.textMid, fontWeight: '600', lineHeight: 18 },
-  dietaryIcon: { fontSize: 20, width: 22, textAlign: 'center' },
   uuidCard: {
     backgroundColor: colors.surface, borderRadius: radius.lg,
     padding: spacing.md, gap: 6,

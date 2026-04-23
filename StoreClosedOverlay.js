@@ -3,7 +3,7 @@ import { View, Text, StyleSheet, Animated, Modal } from 'react-native';
 import { colors, spacing, radius } from './theme';
 import { formatTime } from './storeUtils';
 
-export default function StoreClosedOverlay({ message, breaks = [], visible }) {
+export default function StoreClosedOverlay({ title = 'Back Soon!', message, breaks = [], visible }) {
   const fadeAnim = useRef(new Animated.Value(0)).current;
 
   useEffect(() => {
@@ -26,7 +26,7 @@ export default function StoreClosedOverlay({ message, breaks = [], visible }) {
       <View style={styles.overlay}>
         <View style={styles.card}>
           <Text style={styles.icon}>☕</Text>
-          <Text style={styles.title}>Back Soon!</Text>
+          <Text style={styles.title}>{title}</Text>
           <Text style={styles.message}>{message}</Text>
 
           {activeBreaks.length > 0 && (

@@ -6,7 +6,6 @@ import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useNavigationState, useIsFocused } from '@react-navigation/native';
 import { useApp } from './AppContext';
-import StoreClosedOverlay from './StoreClosedOverlay';
 import { isCurrentlyInBreak } from './storeUtils';
 import { trackTabNavigation } from './tealium';
 

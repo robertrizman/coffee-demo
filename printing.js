@@ -15,12 +15,34 @@ import { toShorthandLines } from './shorthand';
 import { BrotherPrinter, isBrotherPrinterAvailable } from './brotherPrinter';
 
 async function ensureBluetoothConnectPermission() {
-  if (Platform.OS !== 'android' || Platform.Version < 31) return true;
+  if (Platform.OS !== 'android') return true;
   try {
-    const already = await PermissionsAndroid.check('android.permission.BLUETOOTH_CONNECT');
-    if (already) return true;
-    const result = await PermissionsAndroid.request('android.permission.BLUETOOTH_CONNECT');
-    return result === PermissionsAndroid.RESULTS.GRANTED;
+    if (Platform.Version >= 31) {
+      // Android 12+: BLUETOOTH_SCAN + BLUETOOTH_CONNECT are dangerous permissions
+      const results = await PermissionsAndroid.requestMultiple([
+        'android.permission.BLUETOOTH_SCAN',
+        'android.permission.BLUETOOTH_CONNECT',
+      ]);
+      return (
+        results['android.permission.BLUETOOTH_SCAN'] === PermissionsAndroid.RESULTS.GRANTED &&
+        results['android.permission.BLUETOOTH_CONNECT'] === PermissionsAndroid.RESULTS.GRANTED
+      );
+    } else {
+      // Android 6–11: BLUETOOTH/BLUETOOTH_ADMIN are normal (auto-granted), but BLE
+      // scanning requires ACCESS_FINE_LOCATION as a runtime permission
+      const already = await PermissionsAndroid.check('android.permission.ACCESS_FINE_LOCATION');
+      if (already) return true;
+      const result = await PermissionsAndroid.request(
+        'android.permission.ACCESS_FINE_LOCATION',
+        {
+          title: 'Location Permission Required',
+          message: 'Bluetooth printer discovery requires location permission on this device.',
+          buttonPositive: 'Allow',
+          buttonNegative: 'Deny',
+        }
+      );
+      return result === PermissionsAndroid.RESULTS.GRANTED;
+    }
   } catch {
     return false;
   }

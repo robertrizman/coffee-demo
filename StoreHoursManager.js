@@ -1,39 +1,81 @@
-import React, { useState } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import {
   View, Text, StyleSheet, TouchableOpacity, Switch,
-  TextInput, ScrollView, Alert,
+  TextInput, Alert,
 } from 'react-native';
 import { colors, spacing, radius } from './theme';
 import { supabase } from './supabase';
 import { useApp } from './AppContext';
 import { formatTime } from './storeUtils';
+import { EditIcon } from './CoffeeIcons';
 
 export default function StoreHoursManager() {
   const { state, dispatch } = useApp();
-  const { storeOpen, closedMessage, storeBreaks, offersEnabled } = state;
+  const { storeOpen, closedTitle, closedMessage, storeBreaks, offersEnabled } = state;
+
   const [adding, setAdding] = useState(false);
   const [newBreak, setNewBreak] = useState({ label: '', start_time: '10:00', end_time: '11:00' });
   const [saving, setSaving] = useState(false);
 
+  const [editingMessage, setEditingMessage] = useState(false);
+  const [editTitle, setEditTitle] = useState(closedTitle || 'Back Soon!');
+  const [editMessage, setEditMessage] = useState(closedMessage || '');
+  const [saveStatus, setSaveStatus] = useState(null); // null | 'saving' | 'saved'
+  const debounceRef = useRef(null);
+  const saveStatusTimer = useRef(null);
+
+  // Keep local edit state in sync if state changes from another device via real-time
+  useEffect(() => {
+    if (!editingMessage) {
+      setEditTitle(closedTitle || 'Back Soon!');
+      setEditMessage(closedMessage || '');
+    }
+  }, [closedTitle, closedMessage]);
+
+  const persistMessage = (title, message) => {
+    const t = title.trim() || 'Back Soon!';
+    const m = message.trim();
+    dispatch({ type: 'SET_STORE_CONFIG', payload: { closed_title: t, closed_message: m } });
+    setSaveStatus('saving');
+    supabase.from('store_config').update({
+      closed_title: t,
+      closed_message: m,
+      updated_at: new Date().toISOString(),
+    }).eq('id', 'default').then(() => {
+      setSaveStatus('saved');
+      if (saveStatusTimer.current) clearTimeout(saveStatusTimer.current);
+      saveStatusTimer.current = setTimeout(() => setSaveStatus(null), 2000);
+    });
+  };
+
+  const onTitleChange = (v) => {
+    setEditTitle(v);
+    if (debounceRef.current) clearTimeout(debounceRef.current);
+    debounceRef.current = setTimeout(() => persistMessage(v, editMessage), 800);
+  };
+
+  const onMessageChange = (v) => {
+    setEditMessage(v);
+    if (debounceRef.current) clearTimeout(debounceRef.current);
+    debounceRef.current = setTimeout(() => persistMessage(editTitle, v), 800);
+  };
+
   const toggleOffers = async (value) => {
-    dispatch({ type: 'SET_STORE_CONFIG', payload: { is_open: storeOpen, closed_message: closedMessage, offers_enabled: value } });
+    dispatch({ type: 'SET_STORE_CONFIG', payload: { offers_enabled: value } });
     await supabase.from('store_config').update({ offers_enabled: value }).eq('id', 'default');
   };
 
   const toggleStore = async (value) => {
-    dispatch({ type: 'SET_STORE_CONFIG', payload: { is_open: value, closed_message: closedMessage, offers_enabled: offersEnabled } });
+    dispatch({ type: 'SET_STORE_CONFIG', payload: { is_open: value } });
     const { error } = await supabase.from('store_config').update({
       is_open: value,
-      closed_message: closedMessage,
       updated_at: new Date().toISOString(),
     }).eq('id', 'default');
     if (error) console.warn('[StoreHours] toggleStore error:', error.message);
-    else console.log('[StoreHours] Store toggled:', value);
   };
 
   const toggleBreak = async (b) => {
-    const updated = { ...b, active: !b.active };
-    dispatch({ type: 'SET_STORE_BREAKS', payload: storeBreaks.map(x => x.id === b.id ? updated : x) });
+    dispatch({ type: 'SET_STORE_BREAKS', payload: storeBreaks.map(x => x.id === b.id ? { ...b, active: !b.active } : x) });
     await supabase.from('store_breaks').update({ active: !b.active }).eq('id', b.id);
   };
 
@@ -66,9 +108,22 @@ export default function StoreHoursManager() {
 
   return (
     <View style={styles.container}>
-      {/* Manual open/close toggle */}
+
+      {/* Coffee Bar Status + Closed Message */}
       <View style={styles.section}>
-        <Text style={styles.sectionTitle}>Coffee Bar Status</Text>
+        <View style={styles.sectionHeader}>
+          <Text style={styles.sectionTitle}>Coffee Bar Status</Text>
+          <TouchableOpacity
+            style={[styles.editBtn, editingMessage && styles.editBtnActive]}
+            onPress={() => setEditingMessage(v => !v)}
+          >
+            <EditIcon size={13} color={editingMessage ? '#fff' : colors.primary} />
+            <Text style={[styles.editBtnText, editingMessage && styles.editBtnTextActive]}>
+              {editingMessage ? 'Done' : 'Edit Message'}
+            </Text>
+          </TouchableOpacity>
+        </View>
+
         <View style={styles.toggleRow}>
           <View>
             <Text style={styles.toggleLabel}>{storeOpen ? '🟢 Open' : '🔴 Closed'}</Text>
@@ -81,6 +136,35 @@ export default function StoreHoursManager() {
             thumbColor="#fff"
           />
         </View>
+
+        {editingMessage && (
+          <View style={styles.messageEditor}>
+            <View style={styles.divider} />
+            <View style={styles.messageFieldRow}>
+              <Text style={styles.formLabel}>Title</Text>
+              {saveStatus === 'saving' && <Text style={styles.saveIndicator}>Saving…</Text>}
+              {saveStatus === 'saved' && <Text style={[styles.saveIndicator, styles.saveIndicatorDone]}>✓ Saved</Text>}
+            </View>
+            <TextInput
+              style={styles.input}
+              value={editTitle}
+              onChangeText={onTitleChange}
+              placeholder="Back Soon!"
+              placeholderTextColor={colors.textMuted}
+              autoCorrect={false}
+            />
+            <Text style={styles.formLabel}>Message</Text>
+            <TextInput
+              style={[styles.input, styles.inputMultiline]}
+              value={editMessage}
+              onChangeText={onMessageChange}
+              placeholder="We're taking a short break — check back soon!"
+              placeholderTextColor={colors.textMuted}
+              multiline
+              autoCorrect={false}
+            />
+          </View>
+        )}
       </View>
 
       {/* Offers tab toggle */}
@@ -193,6 +277,26 @@ const styles = StyleSheet.create({
   toggleRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingVertical: 4 },
   toggleLabel: { fontSize: 16, fontWeight: '700', color: colors.midnight },
   toggleSub: { fontSize: 12, color: colors.textMuted, marginTop: 2 },
+
+  editBtn: {
+    flexDirection: 'row', alignItems: 'center', gap: 5,
+    paddingHorizontal: 10, paddingVertical: 6,
+    borderRadius: radius.full, borderWidth: 1, borderColor: colors.primary,
+  },
+  editBtnActive: { backgroundColor: colors.primary },
+  editBtnText: { fontSize: 12, fontWeight: '700', color: colors.primary },
+  editBtnTextActive: { color: '#fff' },
+
+  divider: { height: 1, backgroundColor: colors.borderLight },
+  messageEditor: { gap: spacing.sm },
+  messageFieldRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
+  saveIndicator: { fontSize: 11, color: colors.textMuted },
+  saveIndicatorDone: { color: colors.primary, fontWeight: '600' },
+
+  formLabel: { fontSize: 12, fontWeight: '600', color: colors.textMuted },
+  input: { borderWidth: 1, borderColor: colors.border, borderRadius: radius.md, padding: 10, fontSize: 14, color: colors.midnight, backgroundColor: colors.surface },
+  inputMultiline: { minHeight: 72, textAlignVertical: 'top' },
+
   addBtn: { backgroundColor: colors.primary, paddingHorizontal: 12, paddingVertical: 6, borderRadius: radius.full },
   addBtnText: { color: '#fff', fontWeight: '700', fontSize: 13 },
   empty: { fontSize: 14, color: colors.textMuted, textAlign: 'center', paddingVertical: 8 },
@@ -204,8 +308,6 @@ const styles = StyleSheet.create({
   deleteBtn: { width: 28, height: 28, borderRadius: 14, backgroundColor: '#fee', alignItems: 'center', justifyContent: 'center' },
   deleteBtnText: { fontSize: 12, color: '#e74c3c', fontWeight: '700' },
   addForm: { gap: spacing.sm, paddingTop: spacing.sm },
-  formLabel: { fontSize: 12, fontWeight: '600', color: colors.textMuted },
-  input: { borderWidth: 1, borderColor: colors.border, borderRadius: radius.md, padding: 10, fontSize: 14, color: colors.midnight, backgroundColor: colors.surface },
   timeRow: { flexDirection: 'row', alignItems: 'flex-end', gap: 8 },
   timeField: { flex: 1, gap: 4 },
   timeSep: { fontSize: 18, color: colors.textMuted, marginBottom: 10 },

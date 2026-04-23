@@ -152,11 +152,8 @@ export default function MenuScreen() {
       <SafeAreaView edges={['top', 'left', 'right']} style={[styles.safe, { backgroundColor: colors.midnight }]}>
         <View style={styles.closedScreen}>
           <BrewingCup />
-          <Text style={styles.closedTitle}>Back Soon!</Text>
-          <Text style={styles.closedMsg}>
-            {(state.closedMessage || '').replace(/☕/g, '').replace(/—|-/g, '').trim()}
-            {'\n'}Check back soon.
-          </Text>
+          <Text style={styles.closedTitle}>{state.closedTitle || 'Back Soon!'}</Text>
+          <Text style={styles.closedMsg}>{state.closedMessage || "We're taking a short break — check back soon!"}</Text>
           {state.storeBreaks.filter(b => b.active).length > 0 && (
             <View style={styles.closedBreaks}>
               <Text style={styles.closedBreaksTitle}>Today's Break Times</Text>

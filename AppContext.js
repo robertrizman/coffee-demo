@@ -50,6 +50,7 @@ const initialState = {
   profileLoaded: false,
   storeOpen: true,
   offersEnabled: true,
+  closedTitle: 'Back Soon!',
   closedMessage: "We're taking a short break — check back soon! ☕",
   storeBreaks: [],
 };
@@ -117,6 +118,7 @@ function reducer(state, action) {
       return {
         ...state,
         storeOpen: action.payload.is_open ?? state.storeOpen,
+        closedTitle: action.payload.closed_title ?? state.closedTitle,
         closedMessage: action.payload.closed_message ?? state.closedMessage,
         offersEnabled: action.payload.offers_enabled ?? state.offersEnabled,
       };

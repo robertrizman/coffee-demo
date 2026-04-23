@@ -23,6 +23,12 @@ class FoodPairingModule(reactContext: ReactApplicationContext) :
     private var llmInference: LlmInference? = null
     private var geminiAvailable = false
 
+    private val geminiEngineLabel: String get() = when {
+        Build.MANUFACTURER.equals("Google", ignoreCase = true) -> "Gemini Nano (Tensor NPU)"
+        Build.MANUFACTURER.equals("samsung", ignoreCase = true) -> "Gemini Nano (Samsung NPU)"
+        else -> "Gemini Nano (On-device AI)"
+    }
+
     init {
         loadRandomForestModel()
         initGeminiNano()
@@ -54,7 +60,7 @@ class FoodPairingModule(reactContext: ReactApplicationContext) :
 
     private fun initGeminiNano() {
         try {
-            // Gemini Nano requires Android 10+ and is available on S24+ via MediaPipe
+            // Gemini Nano requires Android 10+ and is available on Pixel 8+, Samsung S24+/S25+/Z Fold6+/Z Flip6, Motorola Razr 50 Ultra/Edge 50 Ultra, Xiaomi 14T/MIX Flip, Realme GT 6
             if (Build.VERSION.SDK_INT < Build.VERSION_CODES.Q) {
                 println("[FoodPairing] Android version too old for Gemini Nano")
                 return
@@ -186,7 +192,7 @@ Reply ONLY with a valid JSON object, no explanation, no markdown:
             putDouble("confidence2", 0.95)
             putInt("avgConfidence", 96)
             putString("source", "on-device-llm")
-            putString("engine", "Gemini Nano (Samsung NPU)")
+            putString("engine", geminiEngineLabel)
         }
     }
 
@@ -241,7 +247,7 @@ Guidelines:
 - Be encouraging and positive, not preachy
 
 Reply ONLY with a valid JSON object, no markdown:
-{"kj_total":<number>,"kj_per_visit":<number>,"insight":"<2 sentences>","tip":"<one short friendly tip>","engine":"Gemini Nano (Samsung NPU)"}
+{"kj_total":<number>,"kj_per_visit":<number>,"insight":"<2 sentences>","tip":"<one short friendly tip>"}
 <end_of_turn>
 <start_of_turn>model
 """.trimIndent()
@@ -259,7 +265,7 @@ Reply ONLY with a valid JSON object, no markdown:
                 putInt("kj_per_visit", json.optInt("kj_per_visit", 0))
                 putString("insight", json.optString("insight", ""))
                 putString("tip", json.optString("tip", ""))
-                putString("engine", "Gemini Nano (Samsung NPU)")
+                putString("engine", geminiEngineLabel)
             }
             promise.resolve(result)
         } catch (e: Exception) {

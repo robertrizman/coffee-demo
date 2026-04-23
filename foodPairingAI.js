@@ -5,7 +5,7 @@
  * with fallback to rules-based recommendations.
  *
  * iOS:  Core ML → Apple Neural Engine (A-series chip)
- * Android: TFLite → Samsung NPU / Google ML Kit (coming soon)
+ * Android: MediaPipe LLM → Gemini Nano (Pixel 8+, Samsung S24+/S25+, Motorola Razr 50 Ultra/Edge 50 Ultra, Xiaomi 14T/MIX Flip, Realme GT 6)
  */
 
 import { NativeModules, Platform } from 'react-native';
@@ -143,7 +143,7 @@ export async function getOrderInsight({ orders, dietaryRequirements = null }) {
         // Ensure engine label is always set — LLM may omit it from JSON output
         const engineLabel = Platform.OS === 'ios'
           ? 'Apple Intelligence (ANE)'
-          : 'Gemini Nano (Samsung NPU)';
+          : 'Gemini Nano (On-device AI)';
         return { ...result, engine: result.engine || engineLabel };
       }
       _nativeLLMAvailable = false;
@@ -214,7 +214,7 @@ export async function getAIPairing({ orders, customItems, dietaryRequirements = 
     dietaryRequirements ? `Dietary requirements: ${dietaryRequirements}` : '',
   ].filter(Boolean).join(' | ');
 
-  // Try native module (Gemini Nano on S24+ / Apple Intelligence on iOS)
+  // Try native module (Gemini Nano on supported Android devices / Apple Intelligence on iOS)
   if (FoodPairingModule && _nativeLLMAvailable !== false) {
     try {
       console.log('[FoodPairingAI] Calling native module with:', { drinkCategory, milkType, timeOfDay, dayOfWeek, dietaryRequirements });

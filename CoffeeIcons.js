@@ -167,6 +167,16 @@ export const AnalyticsIcon = ({ size = 24, color = '#006D80' }) => (
   <MCI name="chart-bar" size={size} color={color} />
 );
 
+/** Leaf — dietary requirements */
+export const LeafIcon = ({ size = 24, color = '#006D80' }) => (
+  <MCI name="leaf" size={size} color={color} />
+);
+
+/** Shield lock — privacy */
+export const ShieldIcon = ({ size = 24, color = '#006D80' }) => (
+  <MCI name="shield-lock-outline" size={size} color={color} />
+);
+
 /** Back arrow */
 export const BackIcon = ({ size = 24, color = '#006D80' }) => (
   <Ionicons name="chevron-back" size={size} color={color} />

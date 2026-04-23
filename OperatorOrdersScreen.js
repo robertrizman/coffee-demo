@@ -78,7 +78,7 @@ export default function OperatorOrdersScreen() {
     added.forEach(o => {
       const anim = new Animated.Value(1);
       newOrderAnims.current[o.id] = anim;
-      Animated.timing(anim, { toValue: 0, duration: 6000, useNativeDriver: false }).start(() => {
+      Animated.timing(anim, { toValue: 0, duration: 20000, useNativeDriver: false }).start(() => {
         setNewOrderIds(prev => { const s = new Set(prev); s.delete(o.id); return s; });
         delete newOrderAnims.current[o.id];
       });
@@ -484,13 +484,14 @@ export default function OperatorOrdersScreen() {
               order.status === 'complete' && styles.orderCardDone,
               order.status === 'cancelled' && styles.orderCardCancelled,
               isNew && anim && {
-                borderWidth: 2,
-                borderColor: anim.interpolate({ inputRange: [0, 1], outputRange: ['transparent', '#22c55e'] }),
-                shadowColor: '#22c55e',
-                shadowOpacity: anim,
-                shadowRadius: 8,
+                borderWidth: 3,
+                borderColor: anim.interpolate({ inputRange: [0, 1], outputRange: ['#e5e7eb', '#16a34a'] }),
+                backgroundColor: anim.interpolate({ inputRange: [0, 1], outputRange: [colors.surface, '#dcfce7'] }),
+                shadowColor: '#16a34a',
+                shadowOpacity: anim.interpolate({ inputRange: [0, 1], outputRange: [0, 0.35] }),
+                shadowRadius: 12,
                 shadowOffset: { width: 0, height: 0 },
-                elevation: anim.interpolate({ inputRange: [0, 1], outputRange: [0, 6] }),
+                elevation: anim.interpolate({ inputRange: [0, 1], outputRange: [2, 10] }),
               },
             ]}>
               <View style={styles.orderHeader}>
