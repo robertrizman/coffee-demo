@@ -38,8 +38,6 @@ export default function OrderSummaryScreen() {
   const [etaMinutes, setEtaMinutes] = useState(null);
   const [etaLoading, setEtaLoading] = useState(false);
   const [etaPendingCount, setEtaPendingCount] = useState(0);
-  const geoChannelRef = useRef(null);
-
   const runGeoCheck = async (locationId, customerLoc) => {
     if (!locationId) return;
     try {
@@ -101,40 +99,6 @@ export default function OrderSummaryScreen() {
     runGeoCheck(locationId, customerLoc);
   }, [state.customerLocation, state.profile?.arc_location_id]);
 
-  // Realtime subscription — only recreated when locationId changes, not on every location update
-  useEffect(() => {
-    const locationId = state.profile?.arc_location_id;
-    if (!locationId) return;
-
-    if (geoChannelRef.current) {
-      supabase.removeChannel(geoChannelRef.current);
-      geoChannelRef.current = null;
-    }
-
-    const channel = supabase
-      .channel(`geo-loc-${locationId}`)
-      .on('postgres_changes', {
-        event: 'UPDATE',
-        schema: 'public',
-        table: 'arc_locations',
-        filter: `id=eq.${locationId}`,
-      }, () => {
-        console.log('[Geo] Location settings updated by admin');
-        runGeoCheck(locationId, state.customerLocation);
-      })
-      .subscribe((status, err) => {
-        if (err) console.warn('[Geo] Realtime subscription error:', err.message);
-      });
-
-    geoChannelRef.current = channel;
-
-    return () => {
-      if (geoChannelRef.current) {
-        supabase.removeChannel(geoChannelRef.current);
-        geoChannelRef.current = null;
-      }
-    };
-  }, [state.profile?.arc_location_id]);
 
   // Animation values
   const fillAnim = useRef(new Animated.Value(0)).current;   // coffee fill 0→1
