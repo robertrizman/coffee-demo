@@ -48,12 +48,17 @@ export default function OperatorOrdersScreen() {
   useEffect(() => {
     if (!Audio) return;
     try {
-      Audio.setAudioModeAsync({ playsInSilentModeIOS: true });
-      Audio.Sound.createAsync(require('./assets/sounds/scan_success.wav'))
-        .then(({ sound }) => { soundSuccess.current = sound; })
+      Audio.setAudioModeAsync({
+        playsInSilentModeIOS: true,
+        staysActiveInBackground: false,
+        shouldDuckAndroid: false,
+        playThroughEarpieceAndroid: false,
+      });
+      Audio.Sound.createAsync(require('./assets/sounds/scan_success.wav'), { volume: 1.0 })
+        .then(({ sound }) => { soundSuccess.current = sound; console.log('[Sound] success loaded'); })
         .catch(e => console.warn('[Sound] Failed to load success:', e.message));
-      Audio.Sound.createAsync(require('./assets/sounds/scan_error.wav'))
-        .then(({ sound }) => { soundError.current = sound; })
+      Audio.Sound.createAsync(require('./assets/sounds/scan_error.wav'), { volume: 1.0 })
+        .then(({ sound }) => { soundError.current = sound; console.log('[Sound] error loaded'); })
         .catch(e => console.warn('[Sound] Failed to load error:', e.message));
     } catch (e) {
       console.warn('[Sound] expo-av not available — rebuild required:', e.message);
@@ -306,12 +311,17 @@ export default function OperatorOrdersScreen() {
   };
 
   const playFeedback = async (type) => {
-    if (type === 'success') {
-      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-      try { await soundSuccess.current?.replayAsync(); } catch {}
-    } else {
-      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
-      try { await soundError.current?.replayAsync(); } catch {}
+    const isSuccess = type === 'success';
+    Haptics.notificationAsync(
+      isSuccess ? Haptics.NotificationFeedbackType.Success : Haptics.NotificationFeedbackType.Error
+    );
+    const sound = isSuccess ? soundSuccess.current : soundError.current;
+    if (!sound) { console.warn('[Sound] not loaded yet for', type); return; }
+    try {
+      await sound.setPositionAsync(0);
+      await sound.playAsync();
+    } catch (e) {
+      console.warn('[Sound] playback error:', e.message);
     }
   };
 
