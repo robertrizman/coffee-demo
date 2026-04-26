@@ -40,6 +40,42 @@ export default function OrderSummaryScreen() {
   const [etaPendingCount, setEtaPendingCount] = useState(0);
   const geoChannelRef = useRef(null);
 
+  const runGeoCheck = async (locationId, customerLoc) => {
+    if (!locationId) return;
+    try {
+      const { data: loc } = await supabase
+        .from('arc_locations')
+        .select('venue_name, latitude, longitude, geo_check_enabled, geo_radius_meters')
+        .eq('id', locationId)
+        .single();
+
+      if (!loc || !loc.geo_check_enabled || !loc.latitude || !loc.longitude) {
+        setGeoWarning(null);
+        return;
+      }
+
+      setLocationName(loc.venue_name);
+
+      if (!customerLoc || customerLoc.denied) {
+        setGeoWarning('denied');
+        return;
+      }
+
+      if (!customerLoc.granted) return;
+
+      const dist = getDistanceMeters(
+        customerLoc.latitude, customerLoc.longitude,
+        loc.latitude, loc.longitude
+      );
+      const radius = loc.geo_radius_meters || 1000;
+      console.log(`[Geo] Distance to ${loc.venue_name}: ${Math.round(dist)}m (limit: ${radius}m)`);
+      setGeoWarning(dist > radius ? 'outside' : 'ok');
+    } catch (e) {
+      console.warn('[Geo] Check failed:', e.message);
+    }
+  };
+
+  // Re-run geo check whenever customer location or locationId changes
   useEffect(() => {
     const locationId = state.profile?.arc_location_id;
     const customerLoc = state.customerLocation;
@@ -62,54 +98,21 @@ export default function OrderSummaryScreen() {
       );
     }
 
-    const runGeoCheck = async () => {
-      if (!locationId) return;
-      try {
-        const { data: loc } = await supabase
-          .from('arc_locations')
-          .select('venue_name, latitude, longitude, geo_check_enabled, geo_radius_meters')
-          .eq('id', locationId)
-          .single();
+    runGeoCheck(locationId, customerLoc);
+  }, [state.customerLocation, state.profile?.arc_location_id]);
 
-        if (!loc || !loc.geo_check_enabled || !loc.latitude || !loc.longitude) {
-          setGeoWarning(null);
-          return;
-        }
-
-        setLocationName(loc.venue_name);
-
-        if (!customerLoc || customerLoc.denied) {
-          setGeoWarning('denied');
-          return;
-        }
-
-        if (!customerLoc.granted) return;
-
-        const dist = getDistanceMeters(
-          customerLoc.latitude, customerLoc.longitude,
-          loc.latitude, loc.longitude
-        );
-        const radius = loc.geo_radius_meters || 1000;
-        console.log(`[Geo] Distance to ${loc.venue_name}: ${Math.round(dist)}m (limit: ${radius}m)`);
-        setGeoWarning(dist > radius ? 'outside' : 'ok');
-      } catch (e) {
-        console.warn('[Geo] Check failed:', e.message);
-      }
-    };
-
-    runGeoCheck();
-
+  // Realtime subscription — only recreated when locationId changes, not on every location update
+  useEffect(() => {
+    const locationId = state.profile?.arc_location_id;
     if (!locationId) return;
 
-    // Remove existing channel before creating new one
     if (geoChannelRef.current) {
       supabase.removeChannel(geoChannelRef.current);
       geoChannelRef.current = null;
     }
 
-    // Real-time — re-check when admin updates arc_locations
     const channel = supabase
-      .channel(`geo-loc-${locationId}-${Date.now()}`)
+      .channel(`geo-loc-${locationId}`)
       .on('postgres_changes', {
         event: 'UPDATE',
         schema: 'public',
@@ -117,9 +120,11 @@ export default function OrderSummaryScreen() {
         filter: `id=eq.${locationId}`,
       }, () => {
         console.log('[Geo] Location settings updated by admin');
-        runGeoCheck();
+        runGeoCheck(locationId, state.customerLocation);
       })
-      .subscribe();
+      .subscribe((status, err) => {
+        if (err) console.warn('[Geo] Realtime subscription error:', err.message);
+      });
 
     geoChannelRef.current = channel;
 
@@ -129,7 +134,7 @@ export default function OrderSummaryScreen() {
         geoChannelRef.current = null;
       }
     };
-  }, [state.customerLocation, state.profile?.arc_location_id]);
+  }, [state.profile?.arc_location_id]);
 
   // Animation values
   const fillAnim = useRef(new Animated.Value(0)).current;   // coffee fill 0→1
