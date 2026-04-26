@@ -15,7 +15,8 @@ import { trackOrderComplete, trackOrderReady, getVisitorId } from './tealium';
 import { printOrderReceipt, buildQrDeepLink } from './printing';
 import { loadAutoPrint, loadDefaultPrinter, loadBluetoothPrinter, saveBluetoothPrinter } from './printerConfig';
 import { ensureBluetoothConnected } from './brotherPrinter';
-import { Audio } from 'expo-av';
+let Audio = null;
+try { Audio = require('expo-av').Audio; } catch {}
 import * as Haptics from 'expo-haptics';
 import { colors, typography, spacing, radius, shadow } from './theme';
 import { QrScanIcon, SettingsIcon, LogoutIcon, PrinterIcon, UserIcon } from './CoffeeIcons';
@@ -45,13 +46,18 @@ export default function OperatorOrdersScreen() {
   useKeepAwake();
 
   useEffect(() => {
-    Audio.setAudioModeAsync({ playsInSilentModeIOS: true });
-    Audio.Sound.createAsync(require('./assets/sounds/scan_success.wav'))
-      .then(({ sound }) => { soundSuccess.current = sound; })
-      .catch(e => console.warn('[Sound] Failed to load success:', e.message));
-    Audio.Sound.createAsync(require('./assets/sounds/scan_error.wav'))
-      .then(({ sound }) => { soundError.current = sound; })
-      .catch(e => console.warn('[Sound] Failed to load error:', e.message));
+    if (!Audio) return;
+    try {
+      Audio.setAudioModeAsync({ playsInSilentModeIOS: true });
+      Audio.Sound.createAsync(require('./assets/sounds/scan_success.wav'))
+        .then(({ sound }) => { soundSuccess.current = sound; })
+        .catch(e => console.warn('[Sound] Failed to load success:', e.message));
+      Audio.Sound.createAsync(require('./assets/sounds/scan_error.wav'))
+        .then(({ sound }) => { soundError.current = sound; })
+        .catch(e => console.warn('[Sound] Failed to load error:', e.message));
+    } catch (e) {
+      console.warn('[Sound] expo-av not available — rebuild required:', e.message);
+    }
     return () => {
       soundSuccess.current?.unloadAsync();
       soundError.current?.unloadAsync();
