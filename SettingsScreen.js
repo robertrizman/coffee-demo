@@ -57,6 +57,7 @@ export default function SettingsScreen() {
   const [bluetoothPrinters, setBluetoothPrinters] = useState([]);
   const [scanningBluetooth, setScanningBluetooth] = useState(false);
   const [pairingAddress, setPairingAddress] = useState(null);
+  const [manualMac, setManualMac] = useState('');
   const [connectionType, setConnectionType] = useState('wifi'); // 'wifi' | 'bluetooth'
   const [deviceIP, setDeviceIP] = useState(null);
   const [autoPrintEnabled, setAutoPrintEnabled] = useState(false);
@@ -243,16 +244,15 @@ export default function SettingsScreen() {
     if (Platform.OS === 'android') {
       const { PermissionsAndroid } = require('react-native');
       try {
-        // Android 12+ needs BLUETOOTH_SCAN + BLUETOOTH_CONNECT
-        // Android < 12 needs ACCESS_FINE_LOCATION for startDiscovery()
+        // Android 12+ (API 31+) needs BLUETOOTH_SCAN + BLUETOOTH_CONNECT as runtime permissions.
+        // Android < 12 only needs ACCESS_FINE_LOCATION — BLUETOOTH/BLUETOOTH_ADMIN are
+        // manifest-only permissions on those versions and must NOT be requested at runtime.
         const permissionsToRequest = Platform.Version >= 31
           ? [
               'android.permission.BLUETOOTH_SCAN',
               'android.permission.BLUETOOTH_CONNECT',
             ]
           : [
-              'android.permission.BLUETOOTH_SCAN',
-              'android.permission.BLUETOOTH_CONNECT',
               'android.permission.ACCESS_FINE_LOCATION',
             ];
 
@@ -424,6 +424,17 @@ export default function SettingsScreen() {
     }
 
     Alert.alert('Bluetooth printer set', `${printer.name} is now the active printer.`);
+  };
+
+  const handleManualMacSave = () => {
+    const mac = manualMac.trim().toUpperCase();
+    const valid = /^([0-9A-F]{2}:){5}[0-9A-F]{2}$/.test(mac);
+    if (!valid) {
+      Alert.alert('Invalid address', 'Enter a MAC address in the format XX:XX:XX:XX:XX:XX');
+      return;
+    }
+    handleSetBluetoothPrinter({ name: 'QL-820NWB', address: mac });
+    setManualMac('');
   };
 
   const handleClearBluetoothPrinter = async () => {
@@ -1005,6 +1016,27 @@ export default function SettingsScreen() {
               }
             </Text>
           </TouchableOpacity>
+
+          {/* Manual MAC entry — fallback for already-paired devices */}
+          <View style={styles.manualMacRow}>
+            <TextInput
+              style={styles.manualMacInput}
+              placeholder="Enter MAC address  e.g. AC:4D:16:EE:92:23"
+              placeholderTextColor={colors.textMuted}
+              value={manualMac}
+              onChangeText={setManualMac}
+              autoCapitalize="characters"
+              autoCorrect={false}
+            />
+            <TouchableOpacity
+              style={[styles.manualMacBtn, !manualMac.trim() && { opacity: 0.4 }]}
+              onPress={handleManualMacSave}
+              disabled={!manualMac.trim()}
+              activeOpacity={0.85}
+            >
+              <Text style={styles.manualMacBtnText}>Save</Text>
+            </TouchableOpacity>
+          </View>
 
           {bluetoothPrinters.length > 0 && (
             <View style={{ marginTop: spacing.sm, gap: spacing.sm }}>
@@ -1592,6 +1624,21 @@ const styles = StyleSheet.create({
   },
   btClearBtnText: { fontSize: 13, color: colors.textMid, fontWeight: '600' },
   noPrinterText: { fontSize: 14, color: colors.textMuted, marginBottom: spacing.sm },
+  manualMacRow: {
+    flexDirection: 'row', alignItems: 'center', gap: spacing.sm,
+    marginTop: spacing.sm,
+  },
+  manualMacInput: {
+    flex: 1, height: 42, fontSize: 13, color: colors.textDark,
+    backgroundColor: colors.surfaceAlt, borderRadius: radius.md,
+    borderWidth: 1, borderColor: colors.border,
+    paddingHorizontal: spacing.md,
+  },
+  manualMacBtn: {
+    paddingHorizontal: spacing.md, paddingVertical: 10,
+    backgroundColor: colors.primary, borderRadius: radius.md,
+  },
+  manualMacBtnText: { fontSize: 13, fontWeight: '700', color: '#fff' },
   iosBluetoothNote: {
     backgroundColor: '#f0f7ff', borderRadius: radius.md,
     padding: spacing.sm, marginBottom: spacing.sm,

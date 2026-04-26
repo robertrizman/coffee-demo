@@ -193,25 +193,40 @@ function Root() {
     }
 
     console.log('[Location] Calling getCurrentPosition...');
+    const onPosition = (position) => {
+      const { latitude, longitude } = position.coords;
+      const last = lastLocationRef.current;
+      if (!last || last.latitude !== latitude || last.longitude !== longitude || !last.granted) {
+        const payload = { latitude, longitude, granted: true, denied: false };
+        lastLocationRef.current = payload;
+        dispatch({ type: 'SET_CUSTOMER_LOCATION', payload });
+        console.log(`[Location] ✅ Got position: ${latitude}, ${longitude}`);
+      }
+    };
+
+    // Try GPS first; on timeout (code 3) fall back to network/cell location
     Geolocation.getCurrentPosition(
-      (position) => {
-        const { latitude, longitude } = position.coords;
-        const last = lastLocationRef.current;
-        if (!last || last.latitude !== latitude || last.longitude !== longitude || !last.granted) {
-          const payload = { latitude, longitude, granted: true, denied: false };
-          lastLocationRef.current = payload;
-          dispatch({ type: 'SET_CUSTOMER_LOCATION', payload });
-          console.log(`[Location] ✅ Got position: ${latitude}, ${longitude}`);
+      onPosition,
+      (error) => {
+        console.log('[Location] ❌ GPS error code:', error.code, 'message:', error.message);
+        if (error.code === 3) {
+          console.log('[Location] GPS timed out — retrying with network location...');
+          Geolocation.getCurrentPosition(
+            onPosition,
+            (err2) => {
+              console.log('[Location] ❌ Network location also failed:', err2.message);
+              dispatch({ type: 'SET_CUSTOMER_LOCATION', payload: { granted: false, denied: true } });
+            },
+            { enableHighAccuracy: false, timeout: 10000, maximumAge: 60000 }
+          );
+        } else {
+          dispatch({ type: 'SET_CUSTOMER_LOCATION', payload: { granted: false, denied: true } });
         }
       },
-      (error) => {
-        console.log('[Location] ❌ getCurrentPosition error code:', error.code, 'message:', error.message);
-        dispatch({ type: 'SET_CUSTOMER_LOCATION', payload: { granted: false, denied: true } });
-      },
-      { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 }
+      { enableHighAccuracy: true, timeout: 20000, maximumAge: 0 }
     );
 
-    // Also watch for ongoing updates — clear previous watcher first
+    // Watch — use network accuracy on Android to avoid GPS timeouts
     if (locationWatchRef.current !== null) {
       Geolocation.clearWatch(locationWatchRef.current);
     }
@@ -229,7 +244,7 @@ function Root() {
       (error) => {
         console.log('[Location] Watch error code:', error.code, 'message:', error.message);
       },
-      { enableHighAccuracy: true, timeout: 10000, maximumAge: 30000, distanceFilter: 50 }
+      { enableHighAccuracy: false, timeout: 20000, maximumAge: 30000, distanceFilter: 50 }
     );
   };
 
