@@ -26,8 +26,14 @@
       }
     },
     "production": {
-      "autoIncrement": true,
-      "distribution": "store"
+      "distribution": "store",
+      "ios": {
+        "autoIncrement": false
+      },
+      "android": {
+        "buildType": "app-bundle",
+        "autoIncrement": true
+      }
     }
   },
   "submit": {
@@ -36,6 +42,10 @@
         "appleId": "robert.rizman@gmail.com",
         "ascAppId": "6762507451",
         "bundleIdentifier": "com.robrizzy.coffeecafe"
+      },
+      "android": {
+        "serviceAccountKeyPath": "./google-play-service-account.json",
+        "track": "internal"
       }
     }
   }

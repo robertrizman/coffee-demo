@@ -43,3 +43,4 @@ node_modules/
 *.log
 .DS_Store
 ios/Pods/
+google-play-service-account.json

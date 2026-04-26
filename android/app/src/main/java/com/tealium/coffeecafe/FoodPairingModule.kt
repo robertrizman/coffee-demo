@@ -206,26 +206,28 @@ Reply ONLY with a valid JSON object, no explanation, no markdown:
         menuItemsJson: String,
         promise: Promise
     ) {
-        try {
-            if (geminiAvailable && llmInference != null && menuItemsJson.isNotEmpty()) {
-                println("[FoodPairing] Using Gemini Nano")
-                try {
-                    val result = predictGeminiNano(drinkCategory, milkType, timeOfDay, dayOfWeek, menuItemsJson)
-                    promise.resolve(result)
-                    return
-                } catch (e: Exception) {
-                    println("[FoodPairing] Gemini Nano failed: ${e.message} — falling back to Random Forest")
+        Thread {
+            try {
+                if (geminiAvailable && llmInference != null && menuItemsJson.isNotEmpty()) {
+                    println("[FoodPairing] Using Gemini Nano")
+                    try {
+                        val result = predictGeminiNano(drinkCategory, milkType, timeOfDay, dayOfWeek, menuItemsJson)
+                        promise.resolve(result)
+                        return@Thread
+                    } catch (e: Throwable) {
+                        println("[FoodPairing] Gemini Nano failed: ${e.message} — falling back to Random Forest")
+                    }
                 }
+
+                // Fallback to Random Forest
+                println("[FoodPairing] Using Random Forest")
+                val result = predictRandomForest(drinkCategory, milkType, timeOfDay, dayOfWeek)
+                promise.resolve(result)
+
+            } catch (e: Throwable) {
+                promise.reject("PREDICTION_ERROR", e.message ?: "Unknown error")
             }
-
-            // Fallback to Random Forest
-            println("[FoodPairing] Using Random Forest")
-            val result = predictRandomForest(drinkCategory, milkType, timeOfDay, dayOfWeek)
-            promise.resolve(result)
-
-        } catch (e: Exception) {
-            promise.reject("PREDICTION_ERROR", e.message, e)
-        }
+        }.start()
     }
 
     @ReactMethod
@@ -234,9 +236,10 @@ Reply ONLY with a valid JSON object, no explanation, no markdown:
             promise.reject("UNAVAILABLE", "Gemini Nano not available")
             return
         }
-        try {
-            val llm = llmInference!!
-            val prompt = """<start_of_turn>user
+        Thread {
+            try {
+                val llm = llmInference!!
+                val prompt = """<start_of_turn>user
 You are a friendly café health assistant. Based on this customer's recent café order history, estimate their total kilojoule (kJ) intake from these orders and provide a short, warm, non-judgmental insight about their café habits.
 
 Orders (JSON): $ordersJson
@@ -252,25 +255,26 @@ Reply ONLY with a valid JSON object, no markdown:
 <start_of_turn>model
 """.trimIndent()
 
-            val response = llm.generateResponse(prompt)
-            val jsonStart = response.indexOf('{')
-            val jsonEnd = response.lastIndexOf('}')
-            if (jsonStart == -1 || jsonEnd == -1) {
-                promise.reject("PARSE_ERROR", "No JSON in response")
-                return
+                val response = llm.generateResponse(prompt)
+                val jsonStart = response.indexOf('{')
+                val jsonEnd = response.lastIndexOf('}')
+                if (jsonStart == -1 || jsonEnd == -1) {
+                    promise.reject("PARSE_ERROR", "No JSON in response")
+                    return@Thread
+                }
+                val json = JSONObject(response.substring(jsonStart, jsonEnd + 1))
+                val result = Arguments.createMap().apply {
+                    putInt("kj_total", json.optInt("kj_total", 0))
+                    putInt("kj_per_visit", json.optInt("kj_per_visit", 0))
+                    putString("insight", json.optString("insight", ""))
+                    putString("tip", json.optString("tip", ""))
+                    putString("engine", geminiEngineLabel)
+                }
+                promise.resolve(result)
+            } catch (e: Throwable) {
+                promise.reject("INSIGHT_ERROR", e.message ?: "Unknown error")
             }
-            val json = JSONObject(response.substring(jsonStart, jsonEnd + 1))
-            val result = Arguments.createMap().apply {
-                putInt("kj_total", json.optInt("kj_total", 0))
-                putInt("kj_per_visit", json.optInt("kj_per_visit", 0))
-                putString("insight", json.optString("insight", ""))
-                putString("tip", json.optString("tip", ""))
-                putString("engine", geminiEngineLabel)
-            }
-            promise.resolve(result)
-        } catch (e: Exception) {
-            promise.reject("INSIGHT_ERROR", e.message, e)
-        }
+        }.start()
     }
 
     @ReactMethod

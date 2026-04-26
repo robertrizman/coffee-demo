@@ -1,3 +1,10 @@
+import * as Sentry from '@sentry/react-native';
+
+Sentry.init({
+  dsn: 'https://4e6117809a12ae2fb88d7c5c2f1860bd@o4511272638873600.ingest.us.sentry.io/4511272642543616',
+  tracesSampleRate: 0.2,
+});
+
 import React, { useEffect, useState, useRef } from 'react';
 import { StatusBar, Platform, AppState, PermissionsAndroid } from 'react-native';
 import Geolocation from '@react-native-community/geolocation';
@@ -247,7 +254,7 @@ function Root() {
   return <AppNavigator />;
 }
 
-export default function App() {
+function App() {
   console.log('🎬 [App] Component START');
   
   useEffect(() => {
@@ -271,9 +278,9 @@ export default function App() {
   
   return (
     <SafeAreaProvider>
-      <StatusBar 
-        translucent={false} 
-        backgroundColor="#f0fafb" 
+      <StatusBar
+        translucent={false}
+        backgroundColor="#f0fafb"
         barStyle="dark-content"
       />
       <AuthProvider>
@@ -284,3 +291,5 @@ export default function App() {
     </SafeAreaProvider>
   );
 }
+
+export default Sentry.wrap(App);

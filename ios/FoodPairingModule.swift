@@ -172,7 +172,13 @@ class FoodPairingModule: NSObject {
     if #available(iOS 26.0, *) {
       Task {
         do {
-          let session = LanguageModelSession()
+          let session: LanguageModelSession
+          do {
+            session = LanguageModelSession()
+          } catch {
+            reject("UNAVAILABLE", "Failed to create session: \(error.localizedDescription)", error)
+            return
+          }
           let prompt = """
           You are a friendly café health assistant. Based on this customer's recent café order history, estimate their total kilojoule (kJ) intake from these orders and provide a short, warm, non-judgmental insight about their café habits.
 

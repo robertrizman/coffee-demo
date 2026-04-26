@@ -230,6 +230,7 @@ export function AuthProvider({ children }) {
         .eq('id', barista.id);
     }
     await SecureStore.deleteItemAsync(SESSION_KEY);
+    await saveAutoPrint(false);
     setOpenAIKey(null);
     setIsAdmin(false);
     setBarista(null);
