@@ -601,7 +601,7 @@ export default function OperatorOrdersScreen() {
 
       {/* QR Scanner Modal — stays open, continuous scanning */}
       <Modal visible={scannerOpen} animationType="slide" onRequestClose={closeScanner}>
-        <SafeAreaView style={styles.scannerSafe}>
+        <SafeAreaView edges={['top', 'left', 'right']} style={styles.scannerSafe}>
 
           {/* Header */}
           <View style={styles.scannerHeader}>

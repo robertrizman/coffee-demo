@@ -35,6 +35,9 @@ export default function OrderSummaryScreen() {
   const [geoWarning, setGeoWarning] = useState(null); // null | 'outside' | 'denied' | 'ok'
   const [locationName, setLocationName] = useState('');
   const [brewingVisible, setBrewingVisible] = useState(false);
+  const [etaMinutes, setEtaMinutes] = useState(null);
+  const [etaLoading, setEtaLoading] = useState(false);
+  const [etaPendingCount, setEtaPendingCount] = useState(0);
   const geoChannelRef = useRef(null);
 
   useEffect(() => {
@@ -138,6 +141,73 @@ export default function OrderSummaryScreen() {
   const dot1 = useRef(new Animated.Value(0)).current;
   const dot2 = useRef(new Animated.Value(0)).current;
   const dot3 = useRef(new Animated.Value(0)).current;
+  const etaPulse = useRef(new Animated.Value(1)).current;
+
+  const fetchETA = async () => {
+    try {
+      setEtaLoading(true);
+      setEtaMinutes(null);
+
+      const [pendingResult, completedResult] = await Promise.all([
+        supabase
+          .from('orders')
+          .select('items')
+          .eq('status', 'pending'),
+        supabase
+          .from('orders')
+          .select('placed_at, fulfilled_at, items')
+          .eq('status', 'complete')
+          .not('fulfilled_at', 'is', null)
+          .gt('fulfilled_at', Date.now() - 4 * 60 * 60 * 1000)
+          .order('fulfilled_at', { ascending: false })
+          .limit(15),
+      ]);
+
+      // Total drinks ahead in the queue
+      const pendingOrders = pendingResult.data || [];
+      const pendingDrinks = pendingOrders.reduce(
+        (sum, o) => sum + (Array.isArray(o.items) ? o.items.length : 1), 0
+      );
+
+      // Avg minutes per drink from recent completed orders
+      let avgMinPerDrink = 2; // fallback: 2 min per drink
+      const completed = completedResult.data || [];
+      if (completed.length > 0) {
+        const perDrinkTimes = completed
+          .filter(o => Array.isArray(o.items) && o.items.length > 0)
+          .map(o => (o.fulfilled_at - o.placed_at) / 60000 / o.items.length)
+          .filter(t => t > 0.3 && t < 15);
+        if (perDrinkTimes.length > 0) {
+          avgMinPerDrink = perDrinkTimes.reduce((a, b) => a + b, 0) / perDrinkTimes.length;
+        }
+      }
+
+      const myDrinks = currentOrder.items.length || 1;
+      const eta = Math.max(2, Math.round(avgMinPerDrink * (pendingDrinks + myDrinks)));
+      setEtaPendingCount(pendingDrinks);
+      setEtaMinutes(eta);
+    } catch (e) {
+      console.warn('[ETA]', e.message);
+    } finally {
+      setEtaLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    if (confirmVisible) {
+      fetchETA();
+      const loop = Animated.loop(
+        Animated.sequence([
+          Animated.timing(etaPulse, { toValue: 1.5, duration: 700, useNativeDriver: true }),
+          Animated.timing(etaPulse, { toValue: 1, duration: 700, useNativeDriver: true }),
+        ])
+      );
+      loop.start();
+      return () => loop.stop();
+    } else {
+      etaPulse.setValue(1);
+    }
+  }, [confirmVisible]);
 
   const startBrewingAnimation = () => {
     // Reset
@@ -427,6 +497,23 @@ export default function OrderSummaryScreen() {
               <View style={styles.confirmDivider} />
             </ScrollView>
 
+            {/* ETA — live wait estimate */}
+            <View style={[styles.etaWrap, etaMinutes > 10 && styles.etaWrapAmber]}>
+              <View style={styles.etaRow}>
+                <Animated.View style={[styles.etaDot, etaMinutes > 10 && styles.etaDotAmber, { transform: [{ scale: etaPulse }] }]} />
+                {etaLoading ? (
+                  <Text style={styles.etaText}>Calculating wait time…</Text>
+                ) : etaMinutes != null ? (
+                  <Text style={[styles.etaText, etaMinutes > 10 && styles.etaTextAmber]}>
+                    {'Estimated wait: '}
+                    <Text style={[styles.etaHighlight, etaMinutes > 10 && styles.etaHighlightAmber]}>
+                      {etaMinutes < 60 ? `~${etaMinutes} min` : `~${Math.round(etaMinutes / 60)} hr`}
+                    </Text>
+                  </Text>
+                ) : null}
+              </View>
+            </View>
+
             {/* Note — outside scroll so it's always visible */}
             <View style={styles.confirmNoteWrap}>
               <Text style={styles.confirmNoteText}>
@@ -664,6 +751,35 @@ const styles = StyleSheet.create({
   confirmItemName: { fontSize: 15, fontWeight: '600', color: colors.textDark },
   confirmItemDetail: { ...typography.caption, marginTop: 2 },
   confirmItemSpecial: { ...typography.caption, fontStyle: 'italic', color: colors.textLight, marginTop: 2 },
+
+  etaWrap: {
+    marginHorizontal: spacing.lg,
+    marginTop: spacing.sm,
+    marginBottom: 2,
+    backgroundColor: '#f0fdf4',
+    borderRadius: radius.md,
+    padding: spacing.md,
+    borderWidth: 1,
+    borderColor: '#bbf7d0',
+  },
+  etaRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.sm,
+    flexWrap: 'wrap',
+  },
+  etaDot: {
+    width: 10,
+    height: 10,
+    borderRadius: 5,
+    backgroundColor: '#22c55e',
+  },
+  etaText: { fontSize: 13, color: '#166534', fontWeight: '500', flex: 1, flexWrap: 'wrap' },
+  etaHighlight: { fontWeight: '800', color: '#15803d' },
+  etaWrapAmber: { backgroundColor: '#fffbeb', borderColor: '#fcd34d' },
+  etaDotAmber: { backgroundColor: '#f59e0b' },
+  etaTextAmber: { color: '#92400e' },
+  etaHighlightAmber: { color: '#b45309' },
 
   confirmNoteWrap: {
     marginHorizontal: spacing.lg,

@@ -339,20 +339,28 @@ export default function MenuScreen() {
               <Text style={styles.foodBannerText}>No items added yet. Add items in the Operator menu.</Text>
             </View>
           ) : (
-            foodItems.map((item, i) => {
-              const FoodIcon = CATEGORY_ICONS[activeCategory];
-              return (
-              <View key={item.id || i} style={styles.foodCard}>
-                <View style={styles.foodIconWrap}>
-                  {FoodIcon && <FoodIcon size={22} color={colors.primary} />}
+            <>
+              {foodItems.map((item, i) => {
+                const FoodIcon = CATEGORY_ICONS[activeCategory];
+                return (
+                <View key={item.id || i} style={styles.foodCard}>
+                  <View style={styles.foodIconWrap}>
+                    {FoodIcon && <FoodIcon size={22} color={colors.primary} />}
+                  </View>
+                  <View style={{ flex: 1 }}>
+                    <Text style={styles.cardName}>{item.name}</Text>
+                    {item.description ? <Text style={styles.cardDesc}>{item.description}</Text> : null}
+                  </View>
                 </View>
-                <View style={{ flex: 1 }}>
-                  <Text style={styles.cardName}>{item.name}</Text>
-                  {item.description ? <Text style={styles.cardDesc}>{item.description}</Text> : null}
-                </View>
+                );
+              })}
+              <View style={styles.foodDisclaimer}>
+                <Text style={styles.foodDisclaimerTitle}>Please note</Text>
+                <Text style={styles.foodDisclaimerText}>
+                  Food items are provided directly by the venue and cannot be ordered through this app. For any dietary requirements or allergen information, please speak with a member of our staff.
+                </Text>
               </View>
-              );
-            })
+            </>
           )
         ) : (
           visibleItems.map((item) => {
@@ -669,6 +677,16 @@ const styles = StyleSheet.create({
   foodBannerText: { fontSize: 13, fontWeight: '600', color: colors.primary },
   foodCard: { flexDirection: 'row', alignItems: 'center', backgroundColor: colors.surface, borderRadius: radius.lg, padding: spacing.md, borderWidth: 1, borderColor: colors.borderLight },
   foodIconWrap: { width: 40, height: 40, borderRadius: radius.md, backgroundColor: colors.tealLight, alignItems: 'center', justifyContent: 'center', marginRight: spacing.md },
+  foodDisclaimer: {
+    backgroundColor: colors.surfaceAlt,
+    borderRadius: radius.md,
+    padding: spacing.md,
+    borderWidth: 1,
+    borderColor: colors.borderLight,
+    gap: 4,
+  },
+  foodDisclaimerTitle: { fontSize: 11, fontWeight: '700', color: colors.textMuted, letterSpacing: 0.5, textTransform: 'uppercase' },
+  foodDisclaimerText: { fontSize: 12, color: colors.textMuted, lineHeight: 18 },
 
   // AI Modal
   modalOverlay: { flex: 1, backgroundColor: 'rgba(5,24,56,0.6)', justifyContent: 'center', alignItems: 'center', paddingHorizontal: 16, paddingVertical: spacing.lg },
