@@ -1,7 +1,7 @@
 {
   "name": "coffee-demo",
   "main": "index.js",
-  "version": "1.0.3",
+  "version": "1.0.4",
   "scripts": {
     "start": "expo start",
     "reset-project": "node ./scripts/reset-project.js",
@@ -18,8 +18,10 @@
     "@react-navigation/elements": "^2.6.3",
     "@react-navigation/native": "^7.1.8",
     "@react-navigation/native-stack": "^7.3.16",
+    "@sentry/react-native": "~7.2.0",
     "@supabase/supabase-js": "^2.101.1",
     "expo": "~54.0.33",
+    "expo-av": "~16.0.8",
     "expo-camera": "~17.0.10",
     "expo-constants": "~18.0.13",
     "expo-file-system": "~19.0.21",

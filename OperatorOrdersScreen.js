@@ -15,6 +15,8 @@ import { trackOrderComplete, trackOrderReady, getVisitorId } from './tealium';
 import { printOrderReceipt, buildQrDeepLink } from './printing';
 import { loadAutoPrint, loadDefaultPrinter, loadBluetoothPrinter, saveBluetoothPrinter } from './printerConfig';
 import { ensureBluetoothConnected } from './brotherPrinter';
+import { Audio } from 'expo-av';
+import * as Haptics from 'expo-haptics';
 import { colors, typography, spacing, radius, shadow } from './theme';
 import { QrScanIcon, SettingsIcon, LogoutIcon, PrinterIcon, UserIcon } from './CoffeeIcons';
 
@@ -41,6 +43,20 @@ async function buildQrHtml(url) {
 
 export default function OperatorOrdersScreen() {
   useKeepAwake();
+
+  useEffect(() => {
+    Audio.setAudioModeAsync({ playsInSilentModeIOS: true });
+    Audio.Sound.createAsync(require('./assets/sounds/scan_success.wav'))
+      .then(({ sound }) => { soundSuccess.current = sound; })
+      .catch(e => console.warn('[Sound] Failed to load success:', e.message));
+    Audio.Sound.createAsync(require('./assets/sounds/scan_error.wav'))
+      .then(({ sound }) => { soundError.current = sound; })
+      .catch(e => console.warn('[Sound] Failed to load error:', e.message));
+    return () => {
+      soundSuccess.current?.unloadAsync();
+      soundError.current?.unloadAsync();
+    };
+  }, []);
   const navigation = useNavigation();
   const { state, dispatch } = useApp();
   const { logout, barista, isOwner } = useAuth();
@@ -60,6 +76,8 @@ export default function OperatorOrdersScreen() {
   const [printerReachable, setPrinterReachable] = useState(null); // null=unknown, true=ok, false=unreachable
   const cameraRef = useRef(null);
   const lastScan = useRef(null);
+  const soundSuccess = useRef(null);
+  const soundError = useRef(null);
   const knownOrderIds = useRef(null); // null = not yet seeded
   const newOrderAnims = useRef({}); // id -> Animated.Value
   const [newOrderIds, setNewOrderIds] = useState(new Set());
@@ -281,6 +299,16 @@ export default function OperatorOrdersScreen() {
     lastScan.current = null;
   };
 
+  const playFeedback = async (type) => {
+    if (type === 'success') {
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+      try { await soundSuccess.current?.replayAsync(); } catch {}
+    } else {
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
+      try { await soundError.current?.replayAsync(); } catch {}
+    }
+  };
+
   const handleBarCodeScanned = ({ data }) => {
     if (!scanning) return;
     if (lastScan.current === data) return;
@@ -297,6 +325,7 @@ export default function OperatorOrdersScreen() {
       const deviceId = params.device_id;
 
       if (!orderId) {
+        playFeedback('error');
         setScanFeedback('invalid');
         setScanLabel('Not a valid order QR');
         setTimeout(() => { setScanning(true); lastScan.current = null; setScanFeedback(null); }, 2000);
@@ -306,6 +335,7 @@ export default function OperatorOrdersScreen() {
       const order = state.orders.find((o) => o.id === orderId);
 
       if (!order) {
+        playFeedback('error');
         setScanFeedback('not_found');
         setScanLabel(`Order ${orderId} not found`);
         setTimeout(() => { setScanning(true); lastScan.current = null; setScanFeedback(null); }, 2000);
@@ -313,6 +343,7 @@ export default function OperatorOrdersScreen() {
       }
 
       if (order.status === 'complete') {
+        playFeedback('error');
         setScanFeedback('already_done');
         setScanLabel(`${order.name || orderId} — already complete`);
         setTimeout(() => { setScanning(true); lastScan.current = null; setScanFeedback(null); }, 2500);
@@ -328,7 +359,7 @@ export default function OperatorOrdersScreen() {
         { ...order, drink_summary: drinkSummary },
         order.tealAppUuid || order.deviceId
       );
-      
+
       // Trigger Edge Function to send push notification
       console.log('[QR] Calling Edge Function:', data);
       fetch(data, { method: 'GET' })
@@ -338,12 +369,14 @@ export default function OperatorOrdersScreen() {
         .catch((err) => {
           console.warn('[QR] Edge Function error:', err.message);
         });
-      
+
+      playFeedback('success');
       setScanFeedback('success');
       setScanLabel(`✓ ${order.name || orderId} — order complete!`);
       setTimeout(() => { setScanning(true); lastScan.current = null; setScanFeedback(null); setScanLabel(''); }, 2500);
 
     } catch {
+      playFeedback('error');
       setScanFeedback('invalid');
       setScanLabel('Could not read QR code');
       setTimeout(() => { setScanning(true); lastScan.current = null; setScanFeedback(null); }, 1500);
