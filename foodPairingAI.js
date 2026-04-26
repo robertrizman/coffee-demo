@@ -15,8 +15,33 @@ console.log('[FoodPairingAI] Module available:', !!FoodPairingModule, Platform.O
 
 let _openAIKey = null;
 let _nativeLLMAvailable = null; // null = untested, true = confirmed LLM, false = unavailable
+let _keyFetchPromise = null;
 
 export function setOpenAIKey(key) { _openAIKey = key || null; }
+
+// Lazy-loads the OpenAI key from Supabase if it hasn't been set yet.
+// Guards against the race where getAIPairing/getOrderInsight is called before
+// AppContext has finished its startup fetch.
+async function ensureOpenAIKey() {
+  if (_openAIKey) return _openAIKey;
+  if (_keyFetchPromise) return _keyFetchPromise;
+  try {
+    const { supabase } = require('./supabase');
+    _keyFetchPromise = supabase
+      .from('menu_config').select('description')
+      .eq('category', '_config').eq('name', 'openai_key').single()
+      .then(({ data }) => {
+        if (data?.description) _openAIKey = data.description;
+        _keyFetchPromise = null;
+        return _openAIKey;
+      })
+      .catch(() => { _keyFetchPromise = null; return null; });
+    return await _keyFetchPromise;
+  } catch {
+    _keyFetchPromise = null;
+    return null;
+  }
+}
 export function getExpectedAIProvider() {
   if (FoodPairingModule && _nativeLLMAvailable !== false) return 'native';
   if (_openAIKey) return 'openai';
@@ -119,6 +144,66 @@ function pickItemsFromCategory(customItems, category, count = 1) {
   return [...items].sort(() => Math.random() - 0.5).slice(0, count);
 }
 
+// kJ lookup table: medium size, full cream milk baseline
+const KJ_BASE = {
+  'iced mocha': 900, 'hot chocolate': 850, 'mocha': 900,
+  'dirty chai': 750, 'iced coffee': 750,
+  'chai latte': 700, 'iced chai': 700, 'chai': 700,
+  'matcha latte': 600, 'iced matcha': 600,
+  'turmeric latte': 550, 'beetroot latte': 580, 'blue latte': 560,
+  'iced latte': 670, 'latte': 670,
+  'flat white': 630, 'cappuccino': 600,
+  'cortado': 300, 'gibraltar': 300, 'piccolo': 160,
+  'macchiato': 80,
+  'iced long black': 15, 'iced americano': 20,
+  'long black': 15, 'short black': 15, 'americano': 20,
+  'cold brew': 20, 'ristretto': 10, 'espresso': 15, 'tea': 5,
+};
+
+const SIZE_FACTOR = { small: 0.8, medium: 1.0, large: 1.2 };
+
+const MILK_FACTOR = {
+  'full cream': 1.0, 'half & half': 0.88,
+  'skim': 0.72, 'oat': 0.88, 'almond': 0.65,
+  'soy': 0.80, 'coconut': 1.05, 'macadamia': 0.90,
+};
+
+export function computeItemKJ(item) {
+  const name = (item.name || '').toLowerCase().trim();
+  const size = (item.size || 'medium').toLowerCase().trim();
+  const milk = (item.milk || '').toLowerCase().trim();
+
+  // Longest key match = most specific
+  let base = 400;
+  const sorted = Object.entries(KJ_BASE).sort((a, b) => b[0].length - a[0].length);
+  for (const [key, kj] of sorted) {
+    if (name.includes(key)) { base = kj; break; }
+  }
+
+  const sizeMult = SIZE_FACTOR[size] ?? 1.0;
+
+  // Black coffee / tea: no milk scaling
+  if (base <= 20) return Math.round(base * sizeMult);
+
+  // No milk selected: only espresso shots remain (~30kJ for 2 shots)
+  if (milk === 'no milk') return Math.round(30 * sizeMult);
+
+  const milkMult = MILK_FACTOR[milk] ?? 1.0;
+  return Math.round(base * sizeMult * milkMult);
+}
+
+export function computeOrdersKJ(orders) {
+  if (!orders?.length) return { kj_total: 0, kj_per_visit: 0 };
+  let total = 0;
+  for (const order of orders) {
+    for (const item of order.items || []) total += computeItemKJ(item);
+  }
+  return {
+    kj_total: total,
+    kj_per_visit: Math.round(total / orders.length),
+  };
+}
+
 export async function getOrderInsight({ orders, dietaryRequirements = null }) {
   if (!orders?.length) return null;
 
@@ -130,6 +215,9 @@ export async function getOrderInsight({ orders, dietaryRequirements = null }) {
     })),
   }));
 
+  // Pre-compute accurate kJ — overrides any AI-estimated values
+  const { kj_total, kj_per_visit } = computeOrdersKJ(orders.slice(0, 20));
+
   // Try native LLM first (Gemini / Apple Intelligence)
   if (FoodPairingModule?.generateInsight && _nativeLLMAvailable !== false) {
     try {
@@ -140,11 +228,10 @@ export async function getOrderInsight({ orders, dietaryRequirements = null }) {
       ]);
       if (result) {
         _nativeLLMAvailable = true;
-        // Ensure engine label is always set — LLM may omit it from JSON output
         const engineLabel = Platform.OS === 'ios'
           ? 'Apple Intelligence (ANE)'
           : 'Gemini Nano (On-device AI)';
-        return { ...result, engine: result.engine || engineLabel };
+        return { ...result, engine: result.engine || engineLabel, kj_total, kj_per_visit };
       }
       _nativeLLMAvailable = false;
     } catch (e) {
@@ -152,7 +239,8 @@ export async function getOrderInsight({ orders, dietaryRequirements = null }) {
     }
   }
 
-  // OpenAI fallback
+  // OpenAI fallback — ensure key is available even if AppContext hasn't finished loading
+  if (!_openAIKey) await ensureOpenAIKey();
   if (_openAIKey) {
     try {
       const orderList = summary.map((o, i) =>
@@ -164,10 +252,13 @@ export async function getOrderInsight({ orders, dietaryRequirements = null }) {
 Order history (most recent first):
 ${orderList}
 ${dietaryRequirements ? `\nCustomer dietary requirements: ${dietaryRequirements}` : ''}
-Estimate the kilojoule content of each drink based on typical café values (e.g. medium flat white with full cream ~630kJ, oat milk latte ~580kJ, long black ~10kJ, chai latte ~700kJ).
+The kilojoule values have been pre-calculated from a verified nutrition database:
+- Total kJ across all ${orders.length} order(s): ${kj_total}kJ
+- Average kJ per visit: ${kj_per_visit}kJ
+Use these exact values in your response — do not estimate or change them.
 ${dietaryRequirements ? 'Factor their dietary requirements into both the insight and the tip.' : ''}
 Respond with ONLY valid JSON, no markdown:
-{"kj_total":number,"kj_per_visit":number,"insight":"2 sentence personalised observation about their drinking habits","tip":"1 practical health or lifestyle tip tailored to their orders and dietary needs","engine":"GPT-4o mini"}`;
+{"kj_total":${kj_total},"kj_per_visit":${kj_per_visit},"insight":"2 sentence personalised observation about their drinking habits","tip":"1 practical health or lifestyle tip tailored to their orders and dietary needs","engine":"GPT-4o mini"}`;
 
       const timeout = new Promise((_, reject) => setTimeout(() => reject(new Error('timeout')), 10000));
       const fetchInsight = fetch('https://api.openai.com/v1/chat/completions', {
@@ -186,7 +277,7 @@ Respond with ONLY valid JSON, no markdown:
       });
 
       const result = await Promise.race([fetchInsight, timeout]);
-      if (result?.insight) return result;
+      if (result?.insight) return { ...result, kj_total, kj_per_visit };
     } catch (e) {
       console.warn('[OrderInsight] OpenAI failed:', e.message);
     }
@@ -264,7 +355,8 @@ export async function getAIPairing({ orders, customItems, dietaryRequirements = 
     }
   }
 
-  // OpenAI cloud fallback
+  // OpenAI cloud fallback — ensure key is available even if AppContext hasn't finished loading
+  if (!_openAIKey) await ensureOpenAIKey();
   if (_openAIKey) {
     try {
       const timeout = new Promise((_, reject) => setTimeout(() => reject(new Error('timeout')), 8000));

@@ -126,7 +126,7 @@ export default function OrdersProfileScreen() {
   ].sort((a, b) => (b.placedAt || b.placed_at) - (a.placedAt || a.placed_at));
 
   const fetchRemoteOrders = useCallback(async () => {
-    if (!deviceId && !profile?.email) { setLoading(false); return; }
+    if (!deviceId && !profile?.email) { setLoading(false); return []; }
     let query = supabase.from('orders').select('*').order('placed_at', { ascending: false }).limit(30);
     if (deviceId && profile?.email) {
       query = query.or(`device_id.eq.${deviceId},email.eq.${profile.email}`);
@@ -138,7 +138,9 @@ export default function OrdersProfileScreen() {
     const { data, error } = await query;
     setLoading(false);
     setRefreshing(false);
-    if (!error) setRemoteOrders(data || []);
+    const fetched = error ? [] : (data || []);
+    if (!error) setRemoteOrders(fetched);
+    return fetched;
   }, [deviceId, profile?.email]);
 
   useEffect(() => {
@@ -156,6 +158,19 @@ export default function OrdersProfileScreen() {
       .then(result => { setOrderInsight(result); setInsightLoading(false); })
       .catch(() => setInsightLoading(false));
   }, [profile?.dietary_requirements]);
+
+  const onRefresh = useCallback(async () => {
+    setRefreshing(true);
+    const freshRemote = await fetchRemoteOrders();
+    // Build the merged list with fresh data immediately — don't wait for state to settle
+    const localIds = new Set(myOrders.map(o => o.id));
+    const fresh = [
+      ...myOrders,
+      ...freshRemote.filter(o => !localIds.has(o.id)),
+    ].sort((a, b) => (b.placedAt || b.placed_at) - (a.placedAt || a.placed_at));
+    insightFetched.current = false;
+    if (fresh.length) fetchInsight(fresh);
+  }, [fetchRemoteOrders, myOrders, fetchInsight]);
 
   useEffect(() => {
     if (!mergedOrders.length || insightFetched.current) return;
@@ -379,7 +394,7 @@ export default function OrdersProfileScreen() {
           <ScrollView
             contentContainerStyle={styles.body}
             showsVerticalScrollIndicator={false}
-            refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => { setRefreshing(true); fetchRemoteOrders(); insightFetched.current = false; fetchInsight(mergedOrders); }} tintColor={colors.primary} />}
+            refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={colors.primary} />}
           >
             {/* AI intake insight card — customers only */}
             {!isAdmin && (insightLoading || orderInsight) && (

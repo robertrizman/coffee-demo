@@ -21,6 +21,11 @@ import PushBroadcastScreen from './PushBroadcastScreen';
 import { colors, typography, spacing, radius, shadow } from './theme';
 import Svg, { Path } from 'react-native-svg';
 
+let Audio = null;
+let Haptics = null;
+try { Audio = require('expo-av').Audio; } catch {}
+try { Haptics = require('expo-haptics'); } catch {}
+
 function TealiumTabIcon({ active }) {
   const fill = active ? '#fff' : colors.textMuted;
   return (
@@ -104,6 +109,11 @@ export default function SettingsScreen() {
   const [scanError, setScanError] = useState(null);
   const scanSignal = useRef({ cancelled: false });
 
+  // Scanner sounds
+  const soundSuccess = useRef(null);
+  const soundError = useRef(null);
+  const [soundLooping, setSoundLooping] = useState(null); // null | 'success' | 'error'
+
   // Progress bar animation
   const progressAnim = useRef(new Animated.Value(0)).current;
 
@@ -117,6 +127,28 @@ export default function SettingsScreen() {
     loadAutoCut().then(setAutoCutEnabled);
     getDeviceIP().then(setDeviceIP);
     loadLocations();
+
+    if (Audio) {
+      Audio.setAudioModeAsync({
+        playsInSilentModeIOS: true,
+        staysActiveInBackground: false,
+        shouldDuckAndroid: false,
+        playThroughEarpieceAndroid: false,
+      });
+      Audio.Sound.createAsync(require('./assets/sounds/scan_success.wav'), { volume: 1.0 })
+        .then(({ sound }) => { soundSuccess.current = sound; })
+        .catch(() => {});
+      Audio.Sound.createAsync(require('./assets/sounds/scan_error.wav'), { volume: 1.0 })
+        .then(({ sound }) => { soundError.current = sound; })
+        .catch(() => {});
+    }
+
+    return () => {
+      soundSuccess.current?.stopAsync().catch(() => {});
+      soundSuccess.current?.unloadAsync().catch(() => {});
+      soundError.current?.stopAsync().catch(() => {});
+      soundError.current?.unloadAsync().catch(() => {});
+    };
   }, []);
 
   const loadLocations = async () => {
@@ -584,6 +616,42 @@ export default function SettingsScreen() {
     if (barista?.id) {
       supabase.from('baristas').update({ auto_print: value }).eq('id', barista.id)
         .then(({ error }) => { if (error) console.warn('[Settings] auto_print sync error:', error.message); });
+    }
+  };
+
+  const playTestSound = async (type) => {
+    // Tapping the active sound stops it
+    if (soundLooping === type) {
+      const sound = type === 'success' ? soundSuccess.current : soundError.current;
+      try { await sound?.stopAsync(); } catch {}
+      setSoundLooping(null);
+      return;
+    }
+
+    // Stop whatever was playing before
+    if (soundLooping) {
+      const prev = soundLooping === 'success' ? soundSuccess.current : soundError.current;
+      try { await prev?.stopAsync(); } catch {}
+    }
+
+    const isSuccess = type === 'success';
+    if (Haptics) {
+      Haptics.notificationAsync(
+        isSuccess ? Haptics.NotificationFeedbackType.Success : Haptics.NotificationFeedbackType.Error
+      ).catch(() => {});
+    }
+    const sound = isSuccess ? soundSuccess.current : soundError.current;
+    if (!sound) {
+      Alert.alert('Sound not ready', 'Audio files are still loading. Try again in a moment.');
+      return;
+    }
+    try {
+      await sound.setIsLoopingAsync(true);
+      await sound.setPositionAsync(0);
+      await sound.playAsync();
+      setSoundLooping(type);
+    } catch (e) {
+      Alert.alert('Playback error', e.message);
     }
   };
 
@@ -1153,6 +1221,35 @@ export default function SettingsScreen() {
           <TouchableOpacity style={styles.secondaryBtn} onPress={handleQrDebug}>
             <Text style={styles.secondaryBtnText}>⠿ Print QR debug</Text>
           </TouchableOpacity>
+        </View>
+
+        {/* ── Scanner Sounds ── */}
+        <View style={styles.card}>
+          <View style={styles.cardHeader}>
+            <Text style={styles.cardIcon}>🔊</Text>
+            <Text style={styles.cardTitle}>Scanner sounds</Text>
+          </View>
+          <Text style={styles.cardBody}>
+            Tap to loop a sound while adjusting device volume. Tap again to stop.
+          </Text>
+          <View style={{ flexDirection: 'row', gap: spacing.sm }}>
+            <TouchableOpacity
+              style={[styles.secondaryBtn, { flex: 1, alignItems: 'center', borderColor: '#16a34a', backgroundColor: soundLooping === 'success' ? '#dcfce7' : colors.surfaceAlt }]}
+              onPress={() => playTestSound('success')}
+            >
+              <Text style={[styles.secondaryBtnText, { color: '#16a34a' }]}>
+                {soundLooping === 'success' ? '■ Stop' : '✓ Success'}
+              </Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={[styles.secondaryBtn, { flex: 1, alignItems: 'center', borderColor: '#dc2626', backgroundColor: soundLooping === 'error' ? '#fee2e2' : colors.surfaceAlt }]}
+              onPress={() => playTestSound('error')}
+            >
+              <Text style={[styles.secondaryBtnText, { color: '#dc2626' }]}>
+                {soundLooping === 'error' ? '■ Stop' : '✕ Error'}
+              </Text>
+            </TouchableOpacity>
+          </View>
         </View>
           </View>
         )}
