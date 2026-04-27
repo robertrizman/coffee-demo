@@ -28,20 +28,12 @@ async function ensureBluetoothConnectPermission() {
         results['android.permission.BLUETOOTH_CONNECT'] === PermissionsAndroid.RESULTS.GRANTED
       );
     } else {
-      // Android 6–11: BLUETOOTH/BLUETOOTH_ADMIN are normal (auto-granted), but BLE
-      // scanning requires ACCESS_FINE_LOCATION as a runtime permission
-      const already = await PermissionsAndroid.check('android.permission.ACCESS_FINE_LOCATION');
-      if (already) return true;
-      const result = await PermissionsAndroid.request(
-        'android.permission.ACCESS_FINE_LOCATION',
-        {
-          title: 'Location Permission Required',
-          message: 'Bluetooth printer discovery requires location permission on this device.',
-          buttonPositive: 'Allow',
-          buttonNegative: 'Deny',
-        }
-      );
-      return result === PermissionsAndroid.RESULTS.GRANTED;
+      // Android 6–11: BLUETOOTH and BLUETOOTH_ADMIN are install-time permissions (auto-granted).
+      // ACCESS_FINE_LOCATION is only required for BLE scanning/discovery — NOT for connecting
+      // to a known paired device via classic Bluetooth RFCOMM. Requesting it here was causing
+      // auto-print to silently fail on Samsung Android 9 when the dialog couldn't resolve
+      // from a non-gesture (realtime callback) context.
+      return true;
     }
   } catch {
     return false;
@@ -244,7 +236,7 @@ export async function buildBrotherQLLabelsHtml(order, visitorId = '', useShortha
   .info-row { line-height: 1.2; word-break: break-word; }
   .info-size  { font-size: 2.2mm; font-weight: 700; color: #5a8888; text-transform: uppercase; letter-spacing: 0.2mm; }
   .info-drink { font-size: 2.6mm; font-weight: 800; color: #0d2b2b; }
-  .info-detail { font-size: 2.1mm; color: #5a8888; }
+  .info-detail { font-size: 2.2mm; font-weight: 700; color: #5a8888; }
   .info-special { font-size: 2mm; color: #1a7a7a; font-style: italic; }
   .sh-line { font-size: 3mm; font-weight: 800; color: #0d2b2b; line-height: 1.25; }
   .sh-line:first-child { font-size: 3.6mm; color: #1a7a7a; margin-bottom: 0.4mm; }

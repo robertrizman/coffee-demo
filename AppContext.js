@@ -436,13 +436,10 @@ export function AppProvider({ children }) {
           const hasPrinter = defaultPrinter?.ip || bluetoothPrinter?.bluetoothAddress;
           if (autoPrintEnabled && hasPrinter) {
             console.log('[AutoPrint] Printing order', order.id, bluetoothPrinter?.bluetoothAddress ? 'via Bluetooth' : 'to ' + defaultPrinter?.ip);
-            // Warm up BT link before printing — ACL drops during sleep cause first print to fail
-            if (bluetoothPrinter?.bluetoothAddress) {
-              try {
-                await warmupBluetoothConnection(bluetoothPrinter.bluetoothAddress);
-                await new Promise((r) => setTimeout(r, 1200));
-              } catch {}
-            }
+            // Skip warmup here — checkPrinterConnectivity already warms the link on screen focus,
+            // and doing another open/close cycle right before printing causes RFCOMM socket
+            // exhaustion on Samsung/Android 9 devices (S9+), making the real print fail silently.
+            // The flushPrintQueue path (sleep→wake) handles its own warmup separately.
             const result = await printOrderReceipt(order, '', { silent: true });
             
             // Mark as printed if successful
