@@ -22,6 +22,7 @@ import { colors, typography, spacing, radius, shadow } from './theme';
 import { QrScanIcon, SettingsIcon, LogoutIcon, PrinterIcon, UserIcon } from './CoffeeIcons';
 
 const TABS = ['All', 'Pending', 'Complete'];
+const SOUND_VOLUME = 0.6;
 
 function timeAgo(ts) {
   if (!ts) return '';
@@ -54,10 +55,10 @@ export default function OperatorOrdersScreen() {
         shouldDuckAndroid: false,
         playThroughEarpieceAndroid: false,
       });
-      Audio.Sound.createAsync(require('./assets/sounds/scan_success.wav'), { volume: 1.0 })
+      Audio.Sound.createAsync(require('./assets/sounds/scan_success.wav'))
         .then(({ sound }) => { soundSuccess.current = sound; console.log('[Sound] success loaded'); })
         .catch(e => console.warn('[Sound] Failed to load success:', e.message));
-      Audio.Sound.createAsync(require('./assets/sounds/scan_error.wav'), { volume: 1.0 })
+      Audio.Sound.createAsync(require('./assets/sounds/scan_error.wav'))
         .then(({ sound }) => { soundError.current = sound; console.log('[Sound] error loaded'); })
         .catch(e => console.warn('[Sound] Failed to load error:', e.message));
     } catch (e) {
@@ -318,8 +319,7 @@ export default function OperatorOrdersScreen() {
     const sound = isSuccess ? soundSuccess.current : soundError.current;
     if (!sound) { console.warn('[Sound] not loaded yet for', type); return; }
     try {
-      await sound.setPositionAsync(0);
-      await sound.playAsync();
+      await sound.replayAsync({ volume: SOUND_VOLUME });
     } catch (e) {
       console.warn('[Sound] playback error:', e.message);
     }

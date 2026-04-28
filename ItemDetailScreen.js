@@ -20,7 +20,8 @@ export default function ItemDetailScreen() {
 
   const isTea = item.category === 'Tea';
   const isIcedCold = item.category === 'Iced & Cold';
-  const isNoMilkDefault = isTea || item.id === 'long-black' || item.id === 'iced-long-black';
+  const isNoMilkOnly = ['long-black', 'iced-long-black', 'americano', 'iced-americano'].includes(item.id);
+  const isNoMilkDefault = isTea || isNoMilkOnly;
   const isIcedMilkDrink = isIcedCold && !isNoMilkDefault;
 
   const defaultMilk = isNoMilkDefault ? 'No Milk' : 'Full Cream';
@@ -138,19 +139,23 @@ export default function ItemDetailScreen() {
           </>
         )}
 
-        {/* MILK — tea and iced drinks show No Milk first */}
-        <Text style={styles.sectionLabel}>{isTea ? 'MILK (OPTIONAL)' : 'MILK'}</Text>
-        <View style={styles.chipWrap}>
-          {milkOptionsForItem.map((m) => (
-            <TouchableOpacity
-              key={m}
-              style={[styles.chip, effectiveMilk === m && styles.chipActive]}
-              onPress={() => handleMilk(m)}
-            >
-              <Text style={[styles.chipText, effectiveMilk === m && styles.chipTextActive]}>{m}</Text>
-            </TouchableOpacity>
-          ))}
-        </View>
+        {/* MILK — hidden for black drinks (americano, long black) */}
+        {!isNoMilkOnly && (
+          <>
+            <Text style={styles.sectionLabel}>{isTea ? 'MILK (OPTIONAL)' : 'MILK'}</Text>
+            <View style={styles.chipWrap}>
+              {milkOptionsForItem.map((m) => (
+                <TouchableOpacity
+                  key={m}
+                  style={[styles.chip, effectiveMilk === m && styles.chipActive]}
+                  onPress={() => handleMilk(m)}
+                >
+                  <Text style={[styles.chipText, effectiveMilk === m && styles.chipTextActive]}>{m}</Text>
+                </TouchableOpacity>
+              ))}
+            </View>
+          </>
+        )}
 
         {/* EXTRAS — hidden for tea */}
         {!isTea && (

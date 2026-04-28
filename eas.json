@@ -28,7 +28,7 @@
     "production": {
       "distribution": "store",
       "ios": {
-        "autoIncrement": false
+        "autoIncrement": true
       },
       "android": {
         "buildType": "app-bundle",
