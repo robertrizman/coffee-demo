@@ -1,9 +1,13 @@
 import React, { useEffect, useState, useCallback, useRef } from 'react';
 import {
-  View, Text, ScrollView, StyleSheet,
+  View, Text, ScrollView, StyleSheet, Switch,
   TouchableOpacity, ActivityIndicator, RefreshControl,
-  TextInput, Alert, Modal, Clipboard,
+  TextInput, Alert, Modal, Clipboard, Platform, AppState, Linking,
+  PermissionsAndroid,
 } from 'react-native';
+import * as Notifications from 'expo-notifications';
+import Geolocation from '@react-native-community/geolocation';
+import { registerPushToken } from './push';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useApp } from './AppContext';
 import { useAuth } from './AuthContext';
@@ -65,6 +69,66 @@ export default function OrdersProfileScreen() {
   const [selectedLocationId, setSelectedLocationId] = useState(profile?.arc_location_id || null);
   const [selectedLocationName, setSelectedLocationName] = useState(profile?.arc_location_name || null);
   const [toast, setToast] = useState(null);
+
+  // Permission toggles
+  const [notifPermission, setNotifPermission] = useState(null);
+  const [locationPermission, setLocationPermission] = useState(null);
+
+  const checkPermissions = useCallback(async () => {
+    const { status } = await Notifications.getPermissionsAsync();
+    setNotifPermission(status);
+
+    if (Platform.OS === 'android') {
+      const granted = await PermissionsAndroid.check(
+        PermissionsAndroid.PERMISSIONS.ACCESS_FINE_LOCATION,
+      );
+      setLocationPermission(granted);
+    } else {
+      Geolocation.getCurrentPosition(
+        () => setLocationPermission(true),
+        (err) => setLocationPermission(err.code !== 1),
+        { timeout: 500, maximumAge: Infinity, enableHighAccuracy: false },
+      );
+    }
+  }, []);
+
+  useEffect(() => {
+    checkPermissions();
+    const sub = AppState.addEventListener('change', (s) => {
+      if (s === 'active') checkPermissions();
+    });
+    return () => sub.remove();
+  }, [checkPermissions]);
+
+  const handleNotifToggle = async () => {
+    if (notifPermission === 'granted') {
+      Linking.openSettings();
+    } else {
+      const { status } = await Notifications.requestPermissionsAsync();
+      setNotifPermission(status);
+      if (status === 'granted') {
+        // Re-register token now that permission is confirmed — catches devices
+        // where the initial registration silently failed (e.g. Oppo/ColorOS)
+        registerPushToken(profile?.arc_location_id || null);
+      } else {
+        Linking.openSettings();
+      }
+    }
+  };
+
+  const handleLocationToggle = async () => {
+    if (locationPermission) {
+      Linking.openSettings();
+    } else if (Platform.OS === 'android') {
+      const result = await PermissionsAndroid.request(
+        PermissionsAndroid.PERMISSIONS.ACCESS_FINE_LOCATION,
+        { title: 'Location', message: "Used to confirm you're at the venue." },
+      );
+      setLocationPermission(result === PermissionsAndroid.RESULTS.GRANTED);
+    } else {
+      Linking.openSettings();
+    }
+  };
 
   const showToast = (msg) => {
     setToast(msg);
@@ -665,6 +729,35 @@ export default function OrdersProfileScreen() {
             </Text>
           </View>
 
+          <View style={styles.permissionsCard}>
+            <Text style={styles.permissionsTitle}>PERMISSIONS</Text>
+            <View style={styles.permissionRow}>
+              <View style={styles.permissionInfo}>
+                <Text style={styles.permissionLabel}>Push Notifications</Text>
+                <Text style={styles.permissionSub}>Get notified when your order is ready</Text>
+              </View>
+              <Switch
+                value={notifPermission === 'granted'}
+                onValueChange={handleNotifToggle}
+                trackColor={{ false: '#e5e7eb', true: colors.primary }}
+                thumbColor="#fff"
+              />
+            </View>
+            <View style={styles.permissionDivider} />
+            <View style={styles.permissionRow}>
+              <View style={styles.permissionInfo}>
+                <Text style={styles.permissionLabel}>Location</Text>
+                <Text style={styles.permissionSub}>Confirms you're at the venue to order</Text>
+              </View>
+              <Switch
+                value={locationPermission === true}
+                onValueChange={handleLocationToggle}
+                trackColor={{ false: '#e5e7eb', true: colors.primary }}
+                thumbColor="#fff"
+              />
+            </View>
+          </View>
+
           <View style={styles.uuidCard}>
             <Text style={styles.uuidLabel}>CUSTOMER UUID (TEALIUM)</Text>
             <View style={styles.uuidRow}>
@@ -981,6 +1074,22 @@ const styles = StyleSheet.create({
   },
   infoTitle: { fontSize: 13, fontWeight: '700', color: colors.primary },
   infoText: { fontSize: 12, color: colors.textMid, lineHeight: 18 },
+  permissionsCard: {
+    backgroundColor: colors.surface, borderRadius: radius.lg,
+    borderWidth: 1, borderColor: colors.border, ...shadow.card,
+  },
+  permissionsTitle: {
+    fontSize: 11, fontWeight: '700', color: colors.textMuted,
+    letterSpacing: 0.8, paddingHorizontal: spacing.md, paddingTop: spacing.md, paddingBottom: spacing.sm,
+  },
+  permissionRow: {
+    flexDirection: 'row', alignItems: 'center',
+    paddingHorizontal: spacing.md, paddingVertical: spacing.sm,
+  },
+  permissionInfo: { flex: 1, gap: 2 },
+  permissionLabel: { fontSize: 15, fontWeight: '600', color: colors.textDark },
+  permissionSub: { fontSize: 12, color: colors.textMuted },
+  permissionDivider: { height: 1, backgroundColor: colors.border, marginHorizontal: spacing.md },
   insightCard: {
     backgroundColor: colors.surface, borderRadius: radius.xl,
     borderWidth: 1, borderColor: colors.primaryMid,

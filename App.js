@@ -17,8 +17,7 @@ import AppNavigator from './AppNavigator';
 import OnboardingScreen from './OnboardingScreen';
 import SplashLoadingScreen from './SplashLoadingScreen';
 import { trackAppOpen, initTealium, getCanonicalDeviceId } from './tealium';
-import { supabase } from './supabase';
-import { getDeviceId } from './deviceId';
+import { registerPushToken } from './push';
 import { LogBox } from 'react-native';
 LogBox.ignoreAllLogs(false);
 
@@ -32,68 +31,6 @@ Notifications.setNotificationHandler({
   }),
 });
 
-async function registerPushToken(arcLocationId = null) {
-  console.log('🔔 [Push] Starting registration...');
-  
-  try {
-    const { status: existingStatus } = await Notifications.getPermissionsAsync();
-    console.log('📱 [Push] Existing permission status:', existingStatus);
-    
-    let finalStatus = existingStatus;
-    if (existingStatus !== 'granted') {
-      const { status } = await Notifications.requestPermissionsAsync();
-      finalStatus = status;
-      console.log('📱 [Push] New permission status:', finalStatus);
-    }
-    
-    if (finalStatus !== 'granted') {
-      console.warn('❌ [Push] Permission denied');
-      return;
-    }
-    
-    console.log('🎫 [Push] Getting Expo push token...');
-    const tokenData = await Notifications.getExpoPushTokenAsync({
-      projectId: 'e0b60245-0625-41bc-a4b5-248e50f54c91',
-    });
-    const token = tokenData.data;
-    console.log('✅ [Push] Token received:', token);
-    
-    // CRITICAL FIX: Use Tealium customer_uuid (from PRISM), not local device ID
-    // This must match what's stored in orders.teal_app_uuid / orders.device_id
-    const tealiumUuid = getCanonicalDeviceId();
-    const fallbackUuid = await getDeviceId();
-    const deviceId = tealiumUuid || fallbackUuid;
-    
-    console.log('📱 [Push] Tealium UUID:', tealiumUuid);
-    console.log('📱 [Push] Fallback UUID:', fallbackUuid);
-    console.log('📱 [Push] Using device_id for push_tokens:', deviceId);
-    
-    const upsertData = {
-      device_id: deviceId,
-      push_token: token,
-      platform: Platform.OS,
-      updated_at: new Date().toISOString(),
-    };
-
-    // Only include arc_location_id if provided
-    if (arcLocationId) upsertData.arc_location_id = arcLocationId;
-
-    const { error } = await supabase
-      .from('push_tokens')
-      .upsert(upsertData, { onConflict: 'device_id' });
-    
-    if (error) {
-      console.error('❌ [Push] Supabase error:', error);
-      throw error;
-    }
-    
-    console.log('✅ [Push] Token registered successfully with device_id:', deviceId);
-    
-  } catch (e) {
-    console.error('❌ [Push] Registration failed:', e.message);
-    console.error('❌ [Push] Stack:', e.stack);
-  }
-}
 
 function Root() {
   console.log('🎬 [Root] Component called');
