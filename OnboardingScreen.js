@@ -31,14 +31,19 @@ export default function OnboardingScreen({ onComplete }) {
   const loadLocations = async () => {
     setLoadingLocations(true);
     try {
-      const today = new Date().toISOString().split('T')[0];
-      const { data } = await supabase
+      console.log('[Onboarding] Fetching locations…');
+      const { data, error } = await supabase
         .from('arc_locations')
         .select('*')
         .order('venue_name', { ascending: true });
+      if (error) {
+        console.warn('[Onboarding] Locations query error:', error.message, error.code, error.details);
+      } else {
+        console.log('[Onboarding] Locations loaded:', data?.length ?? 0, JSON.stringify(data));
+      }
       setLocations(data || []);
     } catch (err) {
-      console.warn('[Onboarding] Failed to load locations:', err.message);
+      console.warn('[Onboarding] Locations fetch threw:', err.message);
     }
     setLoadingLocations(false);
   };
@@ -208,7 +213,7 @@ export default function OnboardingScreen({ onComplete }) {
     </KeyboardAvoidingView>
 
     {/* Location Picker Modal */}
-    <Modal visible={locationPickerVisible} animationType="slide" presentationStyle="pageSheet">
+    <Modal visible={locationPickerVisible} animationType="slide" presentationStyle={Platform.OS === 'ios' ? 'pageSheet' : 'fullScreen'}>
       <SafeAreaView style={styles.modalSafe}>
         <View style={styles.modalHeader}>
           <Text style={styles.modalTitle}>📍 Select Arc Location</Text>
@@ -221,9 +226,16 @@ export default function OnboardingScreen({ onComplete }) {
           keyExtractor={item => item.id}
           contentContainerStyle={{ padding: spacing.lg, gap: spacing.sm }}
           ListEmptyComponent={
-            <Text style={{ color: colors.textMuted, textAlign: 'center', marginTop: 40 }}>
-              No locations available
-            </Text>
+            <View style={{ alignItems: 'center', marginTop: 40, gap: 16 }}>
+              <Text style={{ color: colors.textMuted, textAlign: 'center' }}>
+                {loadingLocations ? 'Loading…' : 'No locations available'}
+              </Text>
+              {!loadingLocations && (
+                <TouchableOpacity onPress={loadLocations} style={{ backgroundColor: colors.primaryLight, borderRadius: radius.sm, paddingHorizontal: 20, paddingVertical: 10 }}>
+                  <Text style={{ color: colors.primary, fontWeight: '700' }}>Retry</Text>
+                </TouchableOpacity>
+              )}
+            </View>
           }
           renderItem={({ item }) => {
             const active = isLocationActive(item);

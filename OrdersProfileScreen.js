@@ -8,6 +8,7 @@ import {
 import * as Notifications from 'expo-notifications';
 import Geolocation from '@react-native-community/geolocation';
 import { registerPushToken } from './push';
+import { getDeviceId } from './deviceId';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useApp } from './AppContext';
 import { useAuth } from './AuthContext';
@@ -72,11 +73,28 @@ export default function OrdersProfileScreen() {
 
   // Permission toggles
   const [notifPermission, setNotifPermission] = useState(null);
+  const [hasPushToken, setHasPushToken] = useState(false);
   const [locationPermission, setLocationPermission] = useState(null);
+
+  const checkPushTokenInDb = useCallback(async () => {
+    const deviceId = getCanonicalDeviceId() || state.deviceId || (await getDeviceId());
+    if (!deviceId) { setHasPushToken(false); return; }
+    const { data } = await supabase
+      .from('push_tokens')
+      .select('device_id')
+      .eq('device_id', deviceId)
+      .maybeSingle();
+    setHasPushToken(!!data);
+  }, [state.deviceId]);
 
   const checkPermissions = useCallback(async () => {
     const { status } = await Notifications.getPermissionsAsync();
     setNotifPermission(status);
+    if (status === 'granted') {
+      await checkPushTokenInDb();
+    } else {
+      setHasPushToken(false);
+    }
 
     if (Platform.OS === 'android') {
       const granted = await PermissionsAndroid.check(
@@ -90,7 +108,7 @@ export default function OrdersProfileScreen() {
         { timeout: 500, maximumAge: Infinity, enableHighAccuracy: false },
       );
     }
-  }, []);
+  }, [checkPushTokenInDb]);
 
   useEffect(() => {
     checkPermissions();
@@ -101,15 +119,17 @@ export default function OrdersProfileScreen() {
   }, [checkPermissions]);
 
   const handleNotifToggle = async () => {
-    if (notifPermission === 'granted') {
+    if (notifPermission === 'granted' && hasPushToken) {
+      // Both OS permission and token present — open Settings to disable
       Linking.openSettings();
     } else {
+      // Either OS permission not granted, or token missing — (re-)register
       const { status } = await Notifications.requestPermissionsAsync();
       setNotifPermission(status);
       if (status === 'granted') {
-        // Re-register token now that permission is confirmed — catches devices
-        // where the initial registration silently failed (e.g. Oppo/ColorOS)
-        registerPushToken(profile?.arc_location_id || null);
+        const ok = await registerPushToken(profile?.arc_location_id || null);
+        if (ok) setHasPushToken(true);
+        else Linking.openSettings();
       } else {
         Linking.openSettings();
       }
@@ -263,7 +283,8 @@ export default function OrdersProfileScreen() {
   }, [activeTab]);
 
   const loadLocations = async () => {
-    const { data } = await supabase.from('arc_locations').select('*').order('venue_name');
+    const { data, error } = await supabase.from('arc_locations').select('*').order('venue_name');
+    if (error) console.warn('[Profile] Locations query error:', error.message, error.code);
     setLocations(data || []);
   };
 
@@ -737,7 +758,7 @@ export default function OrdersProfileScreen() {
                 <Text style={styles.permissionSub}>Get notified when your order is ready</Text>
               </View>
               <Switch
-                value={notifPermission === 'granted'}
+                value={notifPermission === 'granted' && hasPushToken}
                 onValueChange={handleNotifToggle}
                 trackColor={{ false: '#e5e7eb', true: colors.primary }}
                 thumbColor="#fff"

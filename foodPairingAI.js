@@ -235,7 +235,7 @@ export async function getOrderInsight({ orders, dietaryRequirements = null }) {
       }
       _nativeLLMAvailable = false;
     } catch (e) {
-      _nativeLLMAvailable = false;
+      if (e.message !== 'timeout') _nativeLLMAvailable = false;
     }
   }
 
@@ -349,9 +349,12 @@ export async function getAIPairing({ orders, customItems, dietaryRequirements = 
           inputs: { drinkCategory, milkType, timeOfDay, orderCount, dayOfWeek },
         };
       }
+      // Native module returned a non-LLM result (decision tree fallback) — disable for session
       _nativeLLMAvailable = false;
     } catch (err) {
-      _nativeLLMAvailable = false;
+      // On timeout, leave _nativeLLMAvailable as-is so the next call retries (model may be cold-starting).
+      // Only mark unavailable on explicit module errors.
+      if (err.message !== 'timeout') _nativeLLMAvailable = false;
     }
   }
 

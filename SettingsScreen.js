@@ -828,6 +828,7 @@ export default function SettingsScreen() {
                 <Text style={styles.manageBaristasText}>👥  Manage baristas</Text>
               </TouchableOpacity>
             )}
+
           </View>
         )}
           </View>

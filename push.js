@@ -34,7 +34,18 @@ export async function registerPushToken(arcLocationId = null) {
       return false;
     }
 
-    const tokenData = await Notifications.getExpoPushTokenAsync({ projectId: PROJECT_ID });
+    let tokenData;
+    for (let attempt = 1; attempt <= 4; attempt++) {
+      try {
+        tokenData = await Notifications.getExpoPushTokenAsync({ projectId: PROJECT_ID });
+        break;
+      } catch (fcmErr) {
+        if (attempt === 4) throw fcmErr;
+        const delay = attempt * 3000;
+        console.warn(`⚠️ [Push] FCM attempt ${attempt} failed, retrying in ${delay / 1000}s…`);
+        await new Promise(res => setTimeout(res, delay));
+      }
+    }
     const token = tokenData.data;
     console.log('✅ [Push] Token received:', token);
 

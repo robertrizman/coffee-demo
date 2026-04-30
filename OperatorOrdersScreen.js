@@ -19,7 +19,7 @@ let Audio = null;
 try { Audio = require('expo-av').Audio; } catch {}
 import * as Haptics from 'expo-haptics';
 import { colors, typography, spacing, radius, shadow } from './theme';
-import { QrScanIcon, SettingsIcon, LogoutIcon, PrinterIcon, UserIcon } from './CoffeeIcons';
+import { QrScanIcon, SettingsIcon, LogoutIcon, PrinterIcon, UserIcon, AgendaIcon } from './CoffeeIcons';
 
 const TABS = ['All', 'Pending', 'Complete'];
 const SOUND_VOLUME = 0.6;
@@ -423,6 +423,11 @@ export default function OperatorOrdersScreen() {
           {isOwner && (
             <TouchableOpacity style={styles.iconBtn} onPress={() => navigation.navigate('BaristaManagement')}>
               <UserIcon size={20} color={colors.primary} />
+            </TouchableOpacity>
+          )}
+          {isOwner && (
+            <TouchableOpacity style={styles.iconBtn} onPress={() => navigation.navigate('AgendaManagement')}>
+              <AgendaIcon size={20} color={colors.primary} />
             </TouchableOpacity>
           )}
           <TouchableOpacity style={[styles.iconBtn, inlineScannerVisible && styles.iconBtnActive]} onPress={() => inlineScannerVisible ? setInlineScannerVisible(false) : openInlineScanner()}>

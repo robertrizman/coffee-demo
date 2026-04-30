@@ -50,6 +50,7 @@ const initialState = {
   profileLoaded: false,
   storeOpen: true,
   offersEnabled: true,
+  agendaEnabled: false,
   closedTitle: 'Back Soon!',
   closedMessage: "We're taking a short break — check back soon! ☕",
   storeBreaks: [],
@@ -121,6 +122,7 @@ function reducer(state, action) {
         closedTitle: action.payload.closed_title ?? state.closedTitle,
         closedMessage: action.payload.closed_message ?? state.closedMessage,
         offersEnabled: action.payload.offers_enabled ?? state.offersEnabled,
+        agendaEnabled: action.payload.agenda_enabled ?? state.agendaEnabled,
       };
 
     case 'SET_STORE_BREAKS':

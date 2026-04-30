@@ -108,6 +108,7 @@ class BrotherPrinterBridge(reactContext: ReactApplicationContext) :
         promise: Promise
     ) {
         CoroutineScope(Dispatchers.IO).launch {
+            var driver: com.brother.sdk.lmprinter.PrinterDriver? = null
             try {
                 val uri = java.net.URI(pdfUri)
                 val pdfFile = File(uri.path)
@@ -138,14 +139,42 @@ class BrotherPrinterBridge(reactContext: ReactApplicationContext) :
                     return@launch
                 }
 
-                val driver = driverResult.driver
+                driver = driverResult.driver
                 val settings = QLPrintSettings(PrinterModel.QL_820NWB)
                 settings.isAutoCut = autoCut
                 settings.labelSize = QLPrintSettings.LabelSize.DieCutW39H48
                 settings.workPath = reactApplicationContext.cacheDir.absolutePath
 
-                val printError = driver.printPDF(pdfFile.absolutePath, settings)
+                // Run printPDF in a dedicated thread with a 30-second timeout.
+                // Without this, a stuck/unresponsive printer causes the Brother SDK's
+                // internal JNI callback (JNIObserver::sendMessage) to fire against a
+                // stale jobject, producing a SIGABRT from art::Thread::DecodeJObject.
+                // Calling closeChannel() on timeout releases the SDK's JNI references.
+                val localDriver = driver
+                val executor = java.util.concurrent.Executors.newSingleThreadExecutor()
+                val future = executor.submit(java.util.concurrent.Callable {
+                    localDriver.printPDF(pdfFile.absolutePath, settings)
+                })
+                executor.shutdown()
+
+                val printError = try {
+                    future.get(30, java.util.concurrent.TimeUnit.SECONDS)
+                } catch (e: java.util.concurrent.TimeoutException) {
+                    future.cancel(true)
+                    try { localDriver.closeChannel() } catch (_: Exception) {}
+                    driver = null
+                    withContext(Dispatchers.Main) {
+                        promise.reject("PRINT_TIMEOUT", "Print timed out — check the printer is on and has paper.")
+                    }
+                    return@launch
+                } catch (e: java.util.concurrent.ExecutionException) {
+                    try { localDriver.closeChannel() } catch (_: Exception) {}
+                    driver = null
+                    throw e.cause ?: e
+                }
+
                 driver.closeChannel()
+                driver = null
 
                 withContext(Dispatchers.Main) {
                     if (printError.code != com.brother.sdk.lmprinter.PrintError.ErrorCode.NoError) {
@@ -160,6 +189,7 @@ class BrotherPrinterBridge(reactContext: ReactApplicationContext) :
                     }
                 }
             } catch (e: Exception) {
+                try { driver?.closeChannel() } catch (_: Exception) {}
                 withContext(Dispatchers.Main) {
                     promise.reject("PRINT_ERROR", "Bluetooth print failed: ${e.message}", e)
                 }

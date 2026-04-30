@@ -247,6 +247,11 @@ export const LightbulbIcon = ({ size = 24, color = '#006D80' }) => (
   <MCI name="lightbulb-outline" size={size} color={color} />
 );
 
+/** Agenda / calendar — used for Agenda tab */
+export const AgendaIcon = ({ size = 24, color = '#006D80' }) => (
+  <MCI name="calendar-clock" size={size} color={color} />
+);
+
 /** Animated AI spark — pulsing ✦ for AI-powered features */
 export function AiSparkIcon({ size = 22, color = '#fff' }) {
   const scale   = useRef(new Animated.Value(1)).current;

@@ -18,11 +18,13 @@ import OperatorMenuScreen from './OperatorMenuScreen';
 import OperatorOrdersScreen from './OperatorOrdersScreen';
 import SettingsScreen from './SettingsScreen';
 import BaristaManagementScreen from './BaristaManagementScreen';
+import AgendaScreen from './AgendaScreen';
+import AgendaManagementScreen from './AgendaManagementScreen';
 import LoginScreen from './LoginScreen';
 
 import { useAuth } from './AuthContext';
 import { colors } from './theme';
-import { TakeawayCupIcon, ReceiptIcon, BaristaIcon as BaristaHat, TagIcon } from './CoffeeIcons';
+import { TakeawayCupIcon, ReceiptIcon, BaristaIcon as BaristaHat, TagIcon, AgendaIcon } from './CoffeeIcons';
 
 const Stack = createNativeStackNavigator();
 const Tab = createBottomTabNavigator();
@@ -44,6 +46,7 @@ function OperatorStack() {
       <Stack.Screen name="OperatorMenu" component={OperatorMenuScreen} />
       <Stack.Screen name="Settings" component={SettingsScreen} />
       <Stack.Screen name="BaristaManagement" component={BaristaManagementScreen} />
+      <Stack.Screen name="AgendaManagement" component={AgendaManagementScreen} />
     </Stack.Navigator>
   );
 }
@@ -66,6 +69,9 @@ function OffersIcon({ focused }) {
 }
 function BaristaIcon({ focused }) {
   return <BaristaHat size={24} color={focused ? colors.primary : colors.textMuted} />;
+}
+function AgendaTabIcon({ focused }) {
+  return <AgendaIcon size={24} color={focused ? colors.primary : colors.textMuted} />;
 }
 
 export default function AppNavigator() {
@@ -108,6 +114,14 @@ export default function AppNavigator() {
             component={OffersScreen}
             listeners={{ focus: () => trackTabNavigation('Offers') }}
             options={{ tabBarIcon: ({ focused }) => <OffersIcon focused={focused} /> }}
+          />
+        )}
+        {state.agendaEnabled && (
+          <Tab.Screen
+            name="Agenda"
+            component={AgendaScreen}
+            listeners={{ focus: () => trackTabNavigation('Agenda') }}
+            options={{ tabBarIcon: ({ focused }) => <AgendaTabIcon focused={focused} /> }}
           />
         )}
         <Tab.Screen

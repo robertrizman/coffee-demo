@@ -95,7 +95,7 @@ class FoodPairingModule: NSObject {
                     userInfo: [NSLocalizedDescriptionKey: "No JSON in response: \(text)"])
     }
 
-    let jsonStr = String(text[startRange.lowerBound...endRange.upperBound])
+    let jsonStr = String(text[startRange.lowerBound...endRange.lowerBound])
     guard let data = jsonStr.data(using: String.Encoding.utf8),
           let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any] else {
       throw NSError(domain: "FoodPairing", code: 2,
@@ -133,13 +133,21 @@ class FoodPairingModule: NSObject {
       if #available(iOS 26.0, *) {
         Task {
           do {
-            let result = try await self.predictWithFoundationModels(
-              drink: safeDrink,
-              milk: safeMilk,
-              time: safeTime,
-              day: safeDay,
-              menuItems: menuItemsJson
-            )
+            let result = try await withThrowingTaskGroup(of: [String: Any].self) { group in
+              group.addTask {
+                try await self.predictWithFoundationModels(
+                  drink: safeDrink, milk: safeMilk, time: safeTime,
+                  day: safeDay, menuItems: menuItemsJson
+                )
+              }
+              group.addTask {
+                try await Task.sleep(nanoseconds: 6_000_000_000)
+                throw CancellationError()
+              }
+              let result = try await group.next()!
+              group.cancelAll()
+              return result
+            }
             print("[FoodPairing] ✅ Apple Intelligence: \(result["category1"] ?? ""), \(result["category2"] ?? "")")
             resolve(result)
           } catch {
@@ -172,13 +180,7 @@ class FoodPairingModule: NSObject {
     if #available(iOS 26.0, *) {
       Task {
         do {
-          let session: LanguageModelSession
-          do {
-            session = LanguageModelSession()
-          } catch {
-            reject("UNAVAILABLE", "Failed to create session: \(error.localizedDescription)", error)
-            return
-          }
+          let session = LanguageModelSession()
           let prompt = """
           You are a friendly café health assistant. Based on this customer's recent café order history, estimate their total kilojoule (kJ) intake from these orders and provide a short, warm, non-judgmental insight about their café habits.
 
@@ -192,12 +194,20 @@ class FoodPairingModule: NSObject {
           Reply ONLY with a valid JSON object, no markdown:
           {"kj_total":<number>,"kj_per_visit":<number>,"insight":"<2 sentences>","tip":"<one short friendly tip>","engine":"Apple Intelligence (ANE)"}
           """
-          let response = try await session.respond(to: prompt)
-          let text = response.content
+          let text: String = try await withThrowingTaskGroup(of: String.self) { group in
+            group.addTask { try await session.respond(to: prompt).content }
+            group.addTask {
+              try await Task.sleep(nanoseconds: 9_000_000_000)
+              throw CancellationError()
+            }
+            let result = try await group.next()!
+            group.cancelAll()
+            return result
+          }
           guard let start = text.range(of: "{"), let end = text.range(of: "}", options: .backwards) else {
             throw NSError(domain: "Insight", code: 1, userInfo: [NSLocalizedDescriptionKey: "No JSON in response"])
           }
-          let jsonStr = String(text[start.lowerBound...end.upperBound])
+          let jsonStr = String(text[start.lowerBound...end.lowerBound])
           guard let data = jsonStr.data(using: .utf8),
                 var json = try? JSONSerialization.jsonObject(with: data) as? [String: Any] else {
             throw NSError(domain: "Insight", code: 2, userInfo: [NSLocalizedDescriptionKey: "Invalid JSON"])

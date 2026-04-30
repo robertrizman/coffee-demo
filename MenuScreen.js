@@ -382,8 +382,16 @@ export default function MenuScreen() {
 
       {/* AI Pairing Modal — customers only */}
       <Modal visible={aiOpen && !isAdmin} transparent animationType="fade" onRequestClose={closeAi}>
-        <TouchableOpacity style={styles.modalOverlay} activeOpacity={1} onPress={closeAi}>
-          <TouchableOpacity style={styles.aiModal} activeOpacity={1} onPress={() => {}}>
+        <TouchableOpacity
+          style={styles.modalOverlay}
+          activeOpacity={1}
+          onPress={closeAi}
+        >
+          <TouchableOpacity
+            style={styles.aiModal}
+            activeOpacity={1}
+            onPress={() => {}}
+          >
 
             {/* Header */}
             <View style={styles.aiModalHeader}>
