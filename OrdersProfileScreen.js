@@ -12,8 +12,8 @@ import { getDeviceId } from './deviceId';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useApp } from './AppContext';
 import { useAuth } from './AuthContext';
-import { getOrderInsight } from './foodPairingAI';
 import { supabase } from './supabase';
+import { getOrderPersonality } from './foodPairingAI';
 import { trackProfileTab, trackEditProfile, trackProfileUpdated, trackUuidCopy, trackDietaryRequirementsUpdated, joinTrace, leaveTrace, getCanonicalDeviceId } from './tealium';
 import { colors, typography, spacing, radius, shadow } from './theme';
 import { UserIcon, EmailIcon, LocationPinIcon, TakeawayCupIcon, CheckIcon, CopyIcon, EditIcon, AiSparkIcon, LightbulbIcon, MagnifyIcon, LightningBoltIcon, LeafIcon, ShieldIcon } from './CoffeeIcons';
@@ -58,6 +58,7 @@ export default function OrdersProfileScreen() {
   const { state, dispatch } = useApp();
   const { isAdmin } = useAuth();
   const { deviceId, profile } = state;
+
 
   // Profile edit state
   const [editMode, setEditMode] = useState(false);
@@ -172,9 +173,9 @@ export default function OrdersProfileScreen() {
   const [momentsUnlocked, setMomentsUnlocked] = useState(false);
   const [tealiumUuid, setTealiumUuid] = useState(null);
   const [editDietary, setEditDietary] = useState(profile?.dietary_requirements || '');
-  const [orderInsight, setOrderInsight] = useState(null);
-  const [insightLoading, setInsightLoading] = useState(false);
-  const [insightExpanded, setInsightExpanded] = useState(false);
+  const [personalityData, setPersonalityData] = useState(null);
+  const [personalityLoading, setPersonalityLoading] = useState(false);
+  const personalityFetched = useRef(false);
 
   // Listen for Tealium UUID to be ready
   useEffect(() => {
@@ -232,35 +233,27 @@ export default function OrdersProfileScreen() {
     loadLocations();
   }, [fetchRemoteOrders]);
 
-  const insightFetched = useRef(false);
-
-  const fetchInsight = useCallback((orders) => {
-    if (!orders.length) return;
-    setInsightLoading(true);
-    setOrderInsight(null);
-    getOrderInsight({ orders, dietaryRequirements: profile?.dietary_requirements || null })
-      .then(result => { setOrderInsight(result); setInsightLoading(false); })
-      .catch(() => setInsightLoading(false));
-  }, [profile?.dietary_requirements]);
-
   const onRefresh = useCallback(async () => {
     setRefreshing(true);
+    personalityFetched.current = false;
+    setPersonalityData(null);
     const freshRemote = await fetchRemoteOrders();
-    // Build the merged list with fresh data immediately — don't wait for state to settle
     const localIds = new Set(myOrders.map(o => o.id));
     const fresh = [
       ...myOrders,
       ...freshRemote.filter(o => !localIds.has(o.id)),
     ].sort((a, b) => (b.placedAt || b.placed_at) - (a.placedAt || a.placed_at));
-    insightFetched.current = false;
-    if (fresh.length) fetchInsight(fresh);
-  }, [fetchRemoteOrders, myOrders, fetchInsight]);
+    setRefreshing(false);
+  }, [fetchRemoteOrders, myOrders]);
 
   useEffect(() => {
-    if (!mergedOrders.length || insightFetched.current) return;
-    insightFetched.current = true;
-    fetchInsight(mergedOrders);
-  }, [mergedOrders.length]);
+    if (isAdmin || !mergedOrders.length || personalityFetched.current) return;
+    personalityFetched.current = true;
+    setPersonalityLoading(true);
+    getOrderPersonality(mergedOrders)
+      .then(result => { setPersonalityData(result); setPersonalityLoading(false); })
+      .catch(() => setPersonalityLoading(false));
+  }, [mergedOrders.length, isAdmin]);
 
   useEffect(() => {
     if (activeTab !== 'profile' || momentsData) return;
@@ -428,7 +421,7 @@ export default function OrdersProfileScreen() {
       <View style={styles.header}>
         <View>
           <Text style={styles.title}>
-            {activeTab === 'orders' ? 'My orders' : 'My profile'}
+            {activeTab === 'orders' ? 'My Account' : 'My profile'}
           </Text>
           <Text style={styles.subtitle}>
             {activeTab === 'orders'
@@ -481,57 +474,35 @@ export default function OrdersProfileScreen() {
             showsVerticalScrollIndicator={false}
             refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={colors.primary} />}
           >
-            {/* AI intake insight card — customers only */}
-            {!isAdmin && (insightLoading || orderInsight) && (
+            {/* Coffee personality card */}
+            {!isAdmin && (personalityLoading || personalityData) && (
               <View style={styles.insightCard}>
-                {/* Always-visible header — tap to expand/collapse */}
-                <TouchableOpacity
-                  style={styles.insightHeader}
-                  onPress={() => !insightLoading && setInsightExpanded(e => !e)}
-                  activeOpacity={0.7}
-                >
+                <View style={styles.insightHeader}>
                   <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
                     <AiSparkIcon size={14} color={colors.primary} />
-                    <Text style={styles.insightTitle}>Your Café Intake</Text>
+                    <Text style={styles.insightTitle}>Your Coffee Personality</Text>
                   </View>
-                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
-                    {insightLoading ? (
-                      <ActivityIndicator size="small" color={colors.primary} />
-                    ) : (
-                      <View style={styles.insightAiBadge}>
-                        <Text style={styles.insightAiBadgeText}>
-                          {orderInsight?.engine || 'AI Suggestion'}
-                        </Text>
-                      </View>
-                    )}
-                    <Text style={styles.insightChevron}>{insightExpanded ? '▲' : '▼'}</Text>
-                  </View>
-                </TouchableOpacity>
-
-                {/* Collapsible body */}
-                {insightExpanded && !insightLoading && orderInsight && (
+                  {personalityLoading ? (
+                    <ActivityIndicator size="small" color={colors.primary} />
+                  ) : personalityData?.engine ? (
+                    <View style={styles.insightAiBadge}>
+                      <Text style={styles.insightAiBadgeText}>{personalityData.engine}</Text>
+                    </View>
+                  ) : null}
+                </View>
+                {!personalityLoading && personalityData && (
                   <>
-                    <Text style={styles.insightEngine}>{orderInsight.engine}</Text>
-
                     <View style={styles.insightKjRow}>
                       <View style={styles.insightKjChip}>
-                        <Text style={styles.insightKjValue}>{orderInsight.kj_total?.toLocaleString()}</Text>
-                        <Text style={styles.insightKjLabel}>total kJ</Text>
+                        <Text style={styles.insightKjValue}>{personalityData.totalDrinks}</Text>
+                        <Text style={styles.insightKjLabel}>drinks ordered</Text>
                       </View>
                       <View style={styles.insightKjChip}>
-                        <Text style={styles.insightKjValue}>{orderInsight.kj_per_visit?.toLocaleString()}</Text>
-                        <Text style={styles.insightKjLabel}>avg per visit</Text>
+                        <Text style={styles.insightKjValue}>{personalityData.uniqueDrinks}</Text>
+                        <Text style={styles.insightKjLabel}>drink types</Text>
                       </View>
                     </View>
-
-                    {orderInsight.insight ? <Text style={styles.insightText}>{orderInsight.insight}</Text> : null}
-
-                    {orderInsight.tip ? (
-                      <View style={styles.insightTipRow}>
-                        <LightbulbIcon size={16} color={colors.teal} />
-                        <Text style={styles.insightTip}>{orderInsight.tip}</Text>
-                      </View>
-                    ) : null}
+                    <Text style={styles.insightText}>{personalityData.text}</Text>
                   </>
                 )}
               </View>

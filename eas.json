@@ -47,6 +47,13 @@
         "serviceAccountKeyPath": "./google-play-service-account.json",
         "track": "internal"
       }
+    },
+    "testflight": {
+      "ios": {
+        "appleId": "robert.rizman@gmail.com",
+        "ascAppId": "6762507451",
+        "bundleIdentifier": "com.robrizzy.coffeecafe"
+      }
     }
   }
 }

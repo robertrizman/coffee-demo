@@ -260,7 +260,7 @@ const styles = StyleSheet.create({
     width: 68,
     minWidth: 68,
     fontSize: 13,
-    color: colors.textMuted,
+    color: colors.textMid,
     lineHeight: 20,
     flexShrink: 0,
   },

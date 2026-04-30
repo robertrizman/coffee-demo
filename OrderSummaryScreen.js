@@ -302,7 +302,7 @@ export default function OrderSummaryScreen() {
     startBrewingAnimation();
     setTimeout(() => {
       setBrewingVisible(false);
-      navigation.navigate('Orders & Profile');
+      navigation.navigate('My Account');
     }, 4200);
   };
 

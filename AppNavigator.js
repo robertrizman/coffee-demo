@@ -103,9 +103,9 @@ export default function AppNavigator() {
           options={{ tabBarIcon: ({ focused }) => <CupIcon focused={focused} /> }}
         />
         <Tab.Screen
-          name="Orders & Profile"
+          name="My Account"
           component={OrdersProfileScreen}
-          listeners={{ focus: () => trackTabNavigation('Orders & Profile') }}
+          listeners={{ focus: () => trackTabNavigation('My Account') }}
           options={{ tabBarIcon: ({ focused }) => <OrdersIcon focused={focused} /> }}
         />
         {state.offersEnabled !== false && (

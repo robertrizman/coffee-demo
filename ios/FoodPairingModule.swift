@@ -90,7 +90,8 @@ class FoodPairingModule: NSObject {
     let text = response.content
 
     guard let startRange = text.range(of: "{"),
-          let endRange = text.range(of: "}", options: .backwards) else {
+          let endRange = text.range(of: "}", options: .backwards),
+          startRange.lowerBound < endRange.lowerBound else {
       throw NSError(domain: "FoodPairing", code: 1,
                     userInfo: [NSLocalizedDescriptionKey: "No JSON in response: \(text)"])
     }
@@ -204,7 +205,9 @@ class FoodPairingModule: NSObject {
             group.cancelAll()
             return result
           }
-          guard let start = text.range(of: "{"), let end = text.range(of: "}", options: .backwards) else {
+          guard let start = text.range(of: "{"),
+                let end = text.range(of: "}", options: .backwards),
+                start.lowerBound < end.lowerBound else {
             throw NSError(domain: "Insight", code: 1, userInfo: [NSLocalizedDescriptionKey: "No JSON in response"])
           }
           let jsonStr = String(text[start.lowerBound...end.lowerBound])
@@ -216,6 +219,40 @@ class FoodPairingModule: NSObject {
           resolve(json)
         } catch {
           reject("INSIGHT_ERROR", error.localizedDescription, error)
+        }
+      }
+    } else {
+      reject("UNAVAILABLE", "iOS 26+ required", nil)
+    }
+  }
+
+  // ── Generic text generation (arbitrary prompt) ──────────────────────────
+  @objc func generateText(
+    _ prompt: String,
+    resolve: @escaping RCTPromiseResolveBlock,
+    reject: @escaping RCTPromiseRejectBlock
+  ) {
+    guard foundationModelsAvailable else {
+      reject("UNAVAILABLE", "Apple Intelligence not available", nil)
+      return
+    }
+    if #available(iOS 26.0, *) {
+      Task {
+        do {
+          let session = LanguageModelSession()
+          let text: String = try await withThrowingTaskGroup(of: String.self) { group in
+            group.addTask { try await session.respond(to: prompt).content }
+            group.addTask {
+              try await Task.sleep(nanoseconds: 9_000_000_000)
+              throw CancellationError()
+            }
+            let result = try await group.next()!
+            group.cancelAll()
+            return result
+          }
+          resolve(["text": text.trimmingCharacters(in: .whitespacesAndNewlines), "engine": "Apple Intelligence (ANE)"] as [String: Any])
+        } catch {
+          reject("GENERATE_ERROR", error.localizedDescription, error)
         }
       }
     } else {

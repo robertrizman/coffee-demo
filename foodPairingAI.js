@@ -12,9 +12,11 @@ import { NativeModules, Platform } from 'react-native';
 
 const FoodPairingModule = NativeModules.FoodPairingModule || null;
 console.log('[FoodPairingAI] Module available:', !!FoodPairingModule, Platform.OS);
+console.log('[FoodPairingAI] generateText available:', !!FoodPairingModule?.generateText);
 
 let _openAIKey = null;
-let _nativeLLMAvailable = null; // null = untested, true = confirmed LLM, false = unavailable
+let _nativeLLMAvailable = null; // null = untested, true = confirmed LLM, false = unavailable — for predict/generateInsight
+let _nativeTextAvailable = null; // separate flag for generateText — avoids poisoning getAIPairing
 let _keyFetchPromise = null;
 
 export function setOpenAIKey(key) { _openAIKey = key || null; }
@@ -428,4 +430,136 @@ function getRulesPairing({ drinkCategory, milkType, timeOfDay, orderCount, custo
     engine: Platform.OS === 'android' ? 'Rules (TFLite coming soon)' : 'Rules fallback',
     inputs: { drinkCategory, milkType, timeOfDay, orderCount, dayOfWeek: getDayOfWeek() },
   };
+}
+
+export async function getOrderPersonality(orders) {
+  if (!orders?.length) return null;
+
+  const drinkCounts = {};
+  for (const order of orders) {
+    for (const item of order.items || []) {
+      if (item.name) drinkCounts[item.name] = (drinkCounts[item.name] || 0) + 1;
+    }
+  }
+
+  const uniqueDrinks = Object.entries(drinkCounts)
+    .sort((a, b) => b[1] - a[1])
+    .slice(0, 5);
+
+  if (!uniqueDrinks.length) return null;
+
+  const totalDrinks = Object.values(drinkCounts).reduce((a, b) => a + b, 0);
+  const drinkList = uniqueDrinks
+    .map(([name, count]) => (count > 1 ? `${name} (${count}x)` : name))
+    .join(', ');
+
+  const basePrompt = `Write 2-3 warm, fun, positive sentences describing the personality and vibe of someone who orders these café drinks: ${drinkList}. Be uplifting, specific to each drink, and celebratory. Never be negative, condescending, offensive, harmful, or sexual. Keep it under 60 words.`;
+
+  // Try native LLM (Apple Intelligence / ANE on iOS, Gemini Nano on Android)
+  if (FoodPairingModule?.generateText && _nativeTextAvailable !== false) {
+    try {
+      const timeout = new Promise((_, reject) => setTimeout(() => reject(new Error('timeout')), 9000));
+      const result = await Promise.race([
+        FoodPairingModule.generateText(basePrompt + ' Return plain text only.'),
+        timeout,
+      ]);
+      if (result?.text) {
+        _nativeTextAvailable = true;
+        return {
+          text: result.text,
+          totalDrinks,
+          uniqueDrinks: uniqueDrinks.length,
+          engine: result.engine || (Platform.OS === 'ios' ? 'Apple Intelligence (ANE)' : 'Gemini Nano'),
+        };
+      }
+    } catch (e) {
+      if (e?.message !== 'timeout') _nativeTextAvailable = false;
+    }
+  }
+
+  // OpenAI fallback
+  if (!_openAIKey) await ensureOpenAIKey();
+  if (_openAIKey) {
+    try {
+      const prompt = basePrompt + ' Respond with ONLY valid JSON, no markdown:\n{"text":"your text here","engine":"GPT-4o mini"}';
+      const timeout = new Promise((_, reject) => setTimeout(() => reject(new Error('timeout')), 10000));
+      const result = await Promise.race([
+        fetch('https://api.openai.com/v1/chat/completions', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${_openAIKey}` },
+          body: JSON.stringify({
+            model: 'gpt-4o-mini',
+            messages: [{ role: 'user', content: prompt }],
+            max_tokens: 150,
+            temperature: 0.85,
+          }),
+        }).then(async r => {
+          if (!r.ok) throw new Error(`OpenAI ${r.status}`);
+          const json = await r.json();
+          return JSON.parse(json.choices?.[0]?.message?.content?.trim());
+        }),
+        timeout,
+      ]);
+      if (result?.text) {
+        return { text: result.text, totalDrinks, uniqueDrinks: uniqueDrinks.length, engine: result.engine || 'GPT-4o mini' };
+      }
+    } catch (e) {
+      console.warn('[OrderPersonality] OpenAI failed:', e.message);
+    }
+  }
+
+  return null;
+}
+
+export async function getCoffeeOrigin(drinkName) {
+  if (!drinkName) return null;
+
+  // Try native LLM (Apple Intelligence / ANE on iOS, Gemini Nano on Android)
+  if (FoodPairingModule?.generateText && _nativeTextAvailable !== false) {
+    try {
+      const nativePrompt = `Write a short, engaging paragraph (3-5 sentences) about the origin and history of a ${drinkName}. Focus on where it came from, who invented it, and what makes it distinctive. Write in a warm, conversational tone for a café app. Return plain text only, no JSON, no bullet points.`;
+      const timeout = new Promise((_, reject) => setTimeout(() => reject(new Error('timeout')), 9000));
+      const result = await Promise.race([FoodPairingModule.generateText(nativePrompt), timeout]);
+      if (result?.text) {
+        _nativeTextAvailable = true;
+        return { text: result.text, engine: result.engine || (Platform.OS === 'ios' ? 'Apple Intelligence (ANE)' : 'Gemini Nano') };
+      }
+      // Empty result: method works, leave _nativeTextAvailable as-is so next call retries
+    } catch (e) {
+      // Timeout means the model is busy — leave flag as-is so next call retries.
+      // Only mark unavailable on a definitive rejection (module error).
+      if (e?.message !== 'timeout') _nativeTextAvailable = false;
+    }
+  }
+
+  // OpenAI fallback
+  if (!_openAIKey) await ensureOpenAIKey();
+  if (_openAIKey) {
+    try {
+      const prompt = `Write a short, engaging paragraph (3-5 sentences) about the origin and history of a ${drinkName}. Focus on where it came from, who invented it, and what makes it distinctive. Write in a warm, conversational tone for a café app. Respond with ONLY valid JSON, no markdown:\n{"text":"your paragraph here","engine":"GPT-4o mini"}`;
+      const timeout = new Promise((_, reject) => setTimeout(() => reject(new Error('timeout')), 10000));
+      const result = await Promise.race([
+        fetch('https://api.openai.com/v1/chat/completions', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${_openAIKey}` },
+          body: JSON.stringify({
+            model: 'gpt-4o-mini',
+            messages: [{ role: 'user', content: prompt }],
+            max_tokens: 300,
+            temperature: 0.7,
+          }),
+        }).then(async r => {
+          if (!r.ok) throw new Error(`OpenAI ${r.status}`);
+          const json = await r.json();
+          return JSON.parse(json.choices?.[0]?.message?.content?.trim());
+        }),
+        timeout,
+      ]);
+      if (result?.text) return result;
+    } catch (e) {
+      console.warn('[CoffeeOrigin] OpenAI failed:', e.message);
+    }
+  }
+
+  return null;
 }
