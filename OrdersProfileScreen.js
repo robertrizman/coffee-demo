@@ -1098,7 +1098,7 @@ const styles = StyleSheet.create({
   },
   insightLoading: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm, paddingVertical: spacing.sm },
   insightLoadingText: { ...typography.caption, color: colors.primary },
-  insightHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
+  insightHeader: { flexDirection: 'column', alignItems: 'flex-start', gap: 6 },
   insightTitle: { fontSize: 15, fontWeight: '700', color: colors.midnight },
   insightAiBadge: {
     backgroundColor: colors.midnight, borderRadius: radius.full,
