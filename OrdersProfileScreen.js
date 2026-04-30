@@ -235,7 +235,6 @@ export default function OrdersProfileScreen() {
 
   const onRefresh = useCallback(async () => {
     setRefreshing(true);
-    personalityFetched.current = false;
     setPersonalityData(null);
     const freshRemote = await fetchRemoteOrders();
     const localIds = new Set(myOrders.map(o => o.id));
@@ -244,7 +243,17 @@ export default function OrdersProfileScreen() {
       ...freshRemote.filter(o => !localIds.has(o.id)),
     ].sort((a, b) => (b.placedAt || b.placed_at) - (a.placedAt || a.placed_at));
     setRefreshing(false);
-  }, [fetchRemoteOrders, myOrders]);
+    if (!isAdmin) {
+      const ordersForPersonality = fresh.length ? fresh : mergedOrders;
+      if (ordersForPersonality.length) {
+        personalityFetched.current = true;
+        setPersonalityLoading(true);
+        getOrderPersonality(ordersForPersonality)
+          .then(result => { setPersonalityData(result); setPersonalityLoading(false); })
+          .catch(() => setPersonalityLoading(false));
+      }
+    }
+  }, [fetchRemoteOrders, myOrders, mergedOrders, isAdmin]);
 
   useEffect(() => {
     if (isAdmin || !mergedOrders.length || personalityFetched.current) return;

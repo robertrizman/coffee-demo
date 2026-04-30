@@ -31,6 +31,13 @@ class FoodPairingModule: NSObject {
 
   @objc static func requiresMainQueueSetup() -> Bool { return false }
 
+  @objc func constantsToExport() -> [AnyHashable: Any]! {
+    return [
+      "llmAvailable": foundationModelsAvailable,
+      "engineLabel":  foundationModelsAvailable ? "Apple Intelligence (ANE)" : "",
+    ]
+  }
+
   // ── Swift decision tree fallback ─────────────────────────────────────────
   private func swiftPredict(drink: String, time: String) -> (String, String) {
     switch drink {

@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import {
   View, Text, ScrollView, TouchableOpacity,
-  StyleSheet, Modal, Animated, Easing, Image, useWindowDimensions, Platform,
+  StyleSheet, Modal, Animated, Easing, Image, useWindowDimensions,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useNavigation } from '@react-navigation/native';
@@ -12,7 +12,7 @@ import { trackMenuView, trackItemView, queryMomentsAPI, trackAIPairingOpened, tr
 import { colors, typography, spacing, radius, shadow } from './theme';
 import { EspressoIcon, LatteIcon, IcedCupIcon, HotChocIcon, ChaiIcon, TeaIcon, ChevronIcon, AiSparkIcon, MorningTeaIcon, LunchIcon, SnacksIcon } from './CoffeeIcons';
 import { buildRecommendation } from './recommendations';
-import { getAIPairing, getExpectedAIProvider } from './foodPairingAI';
+import { getAIPairing, getExpectedAIProvider, getThinkingLabel } from './foodPairingAI';
 import { formatTime, isCurrentlyInBreak } from './storeUtils';
 
 const CATEGORY_ICONS = {
@@ -423,11 +423,7 @@ export default function MenuScreen() {
             {aiPhase === 'thinking' && (
               <View style={styles.aiThinking}>
                 <Text style={styles.aiThinkingLabel}>
-                  {getExpectedAIProvider() === 'openai'
-                    ? 'Consulting OpenAI…'
-                    : getExpectedAIProvider() === 'native'
-                      ? Platform.OS === 'ios' ? 'Using Apple Intelligence…' : 'Using Gemini Nano…'
-                      : 'Analysing your taste profile'}
+                  {getThinkingLabel()}
                 </Text>
                 <View style={styles.dotsRow}>{thinkingDots}</View>
                 {getExpectedAIProvider() === 'openai' && (
@@ -475,6 +471,17 @@ export default function MenuScreen() {
                     <View key={index} style={{ width: slideWidth, paddingHorizontal: 4 }}>
                         {slide.type === 'standard' && (
                           <>
+                            {/* Badges from AudienceStream — top of card */}
+                            {recommendation.badges?.length > 0 && (
+                              <View style={styles.badgesRow}>
+                                {recommendation.badges.map((badge, i) => (
+                                  <View key={i} style={styles.badge}>
+                                    <Text style={styles.badgeText}>🏅 {badge}</Text>
+                                  </View>
+                                ))}
+                              </View>
+                            )}
+
                             {/* Visitor insights strip */}
                             <View style={styles.insightsRow}>
                               <View style={styles.insightChip}>
@@ -505,17 +512,6 @@ export default function MenuScreen() {
                                   <Text style={styles.favouriteStatementDrink}>{recommendation.favouriteDrink}</Text>
                                   , here's what we recommend:
                                 </Text>
-                              </View>
-                            )}
-
-                            {/* Badges from AudienceStream */}
-                            {recommendation.badges?.length > 0 && (
-                              <View style={styles.badgesRow}>
-                                {recommendation.badges.map((badge, i) => (
-                                  <View key={i} style={styles.badge}>
-                                    <Text style={styles.badgeText}>🏅 {badge}</Text>
-                                  </View>
-                                ))}
                               </View>
                             )}
 
@@ -579,7 +575,7 @@ export default function MenuScreen() {
 
                               <View style={styles.bedrockExplainer}>
                                 <Text style={styles.bedrockExplainerText}>
-                                  Using Amazon Bedrock AI, we've analyzed your order history and preferences to provide personalized recommendations.
+                                  Triggered via Tealium Connector. Data sent to Moments API on first purchase.
                                 </Text>
                               </View>
                             </View>
@@ -698,7 +694,7 @@ const styles = StyleSheet.create({
 
   // AI Modal
   modalOverlay: { flex: 1, backgroundColor: 'rgba(5,24,56,0.6)', justifyContent: 'center', alignItems: 'center', paddingHorizontal: 16, paddingVertical: spacing.lg },
-  aiModal: { backgroundColor: colors.surface, borderRadius: 24, width: '100%', padding: spacing.lg, ...shadow.modal },
+  aiModal: { backgroundColor: colors.surface, borderRadius: 24, width: '100%', padding: spacing.md, ...shadow.modal },
 
   aiModalHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: spacing.md },
   aiModalTitleRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
@@ -726,14 +722,14 @@ const styles = StyleSheet.create({
   insightChipLabel: { fontSize: 9, fontWeight: '700', color: colors.textMuted, textTransform: 'uppercase', letterSpacing: 0.5 },
   insightChipValue: { fontSize: 12, fontWeight: '700', color: colors.midnight, marginTop: 2 },
 
-  recSection: { gap: spacing.sm, marginBottom: spacing.md },
-  recSectionTitle: { fontSize: 15, fontWeight: '800', color: colors.midnight, marginBottom: 4 },
+  recSection: { gap: spacing.xs, marginBottom: spacing.sm },
+  recSectionTitle: { fontSize: 14, fontWeight: '800', color: colors.midnight, marginBottom: 4 },
   recCatLabel: { backgroundColor: colors.primaryLight, borderRadius: radius.full, paddingHorizontal: spacing.sm, paddingVertical: 3, alignSelf: 'flex-start', borderWidth: 1, borderColor: colors.primaryMid },
   recCatText: { fontSize: 11, fontWeight: '700', color: colors.primary },
-  recItem: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm, backgroundColor: colors.surfaceAlt, borderRadius: radius.lg, padding: spacing.md, borderWidth: 1, borderColor: colors.borderLight },
-  recItemEmoji: { fontSize: 20 },
-  recItemName: { fontSize: 15, fontWeight: '600', color: colors.midnight },
-  recItemCat: { fontSize: 11, color: colors.textMuted, marginTop: 1 },
+  recItem: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm, backgroundColor: colors.surfaceAlt, borderRadius: radius.md, padding: spacing.sm, borderWidth: 1, borderColor: colors.borderLight },
+  recItemEmoji: { fontSize: 16 },
+  recItemName: { fontSize: 13, fontWeight: '600', color: colors.midnight },
+  recItemCat: { fontSize: 10, color: colors.textMuted, marginTop: 1 },
   aiReasonText: { fontSize: 13, color: colors.textMid, lineHeight: 19, fontStyle: 'italic', marginTop: spacing.sm },
 
   favouriteStatement: {

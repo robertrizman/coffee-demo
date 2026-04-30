@@ -15,8 +15,16 @@ console.log('[FoodPairingAI] Module available:', !!FoodPairingModule, Platform.O
 console.log('[FoodPairingAI] generateText available:', !!FoodPairingModule?.generateText);
 
 let _openAIKey = null;
-let _nativeLLMAvailable = null; // null = untested, true = confirmed LLM, false = unavailable — for predict/generateInsight
-let _nativeTextAvailable = null; // separate flag for generateText — avoids poisoning getAIPairing
+// Pre-seed from native constants (set synchronously at module init by the native side).
+// true  = on-device LLM confirmed (ANE / Gemini Nano)
+// false = module present but no on-device LLM (Random Forest only)
+// null  = old build without constants — discovered on first call
+let _nativeLLMAvailable = FoodPairingModule != null
+  ? (FoodPairingModule.llmAvailable === true ? true
+  : FoodPairingModule.llmAvailable === false ? false
+  : null)
+  : null;
+let _nativeTextAvailable = _nativeLLMAvailable; // mirror initial state for generateText flag
 let _keyFetchPromise = null;
 
 export function setOpenAIKey(key) { _openAIKey = key || null; }
@@ -48,6 +56,27 @@ export function getExpectedAIProvider() {
   if (FoodPairingModule && _nativeLLMAvailable !== false) return 'native';
   if (_openAIKey) return 'openai';
   return 'rules';
+}
+
+// Returns the on-device engine name ("Apple Intelligence (ANE)", "Gemini Nano (Samsung NPU)", etc.)
+// or null if no on-device LLM is available. Safe to call before any AI call is made.
+export function getNativeEngineLabel() {
+  if (!FoodPairingModule || _nativeLLMAvailable === false) return null;
+  const label = FoodPairingModule.engineLabel;
+  return (label && label.length > 0) ? label : null;
+}
+
+// Returns the "Consulting X…" string for the thinking state — always matches what will actually run.
+// "Consulting Apple Intelligence…" | "Consulting Gemini…" | "Consulting OpenAI…"
+export function getThinkingLabel() {
+  if (getExpectedAIProvider() === 'native') {
+    const label = getNativeEngineLabel();
+    if (label) {
+      const name = label.startsWith('Gemini') ? 'Gemini' : label.split(' (')[0];
+      return `Consulting ${name}…`;
+    }
+  }
+  return 'Consulting OpenAI…';
 }
 
 async function callOpenAI({ drinkCategory, milkType, timeOfDay, dayOfWeek, orderCount, customItems, dietaryRequirements }) {
@@ -469,7 +498,7 @@ export async function getOrderPersonality(orders) {
           text: result.text,
           totalDrinks,
           uniqueDrinks: uniqueDrinks.length,
-          engine: result.engine || (Platform.OS === 'ios' ? 'Apple Intelligence (ANE)' : 'Gemini Nano'),
+          engine: result.engine || (Platform.OS === 'ios' ? 'Apple Intelligence (ANE)' : 'On-device AI'),
         };
       }
     } catch (e) {
@@ -522,7 +551,7 @@ export async function getCoffeeOrigin(drinkName) {
       const result = await Promise.race([FoodPairingModule.generateText(nativePrompt), timeout]);
       if (result?.text) {
         _nativeTextAvailable = true;
-        return { text: result.text, engine: result.engine || (Platform.OS === 'ios' ? 'Apple Intelligence (ANE)' : 'Gemini Nano') };
+        return { text: result.text, engine: result.engine || (Platform.OS === 'ios' ? 'Apple Intelligence (ANE)' : 'On-device AI') };
       }
       // Empty result: method works, leave _nativeTextAvailable as-is so next call retries
     } catch (e) {

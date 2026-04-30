@@ -12,6 +12,11 @@ class FoodPairingModule(reactContext: ReactApplicationContext) :
 
     override fun getName() = "FoodPairingModule"
 
+    override fun getConstants(): Map<String, Any> = mapOf(
+        "llmAvailable" to geminiAvailable,
+        "engineLabel"  to if (geminiAvailable) geminiEngineLabel else ""
+    )
+
     // ── Random Forest model ──────────────────────────────────────────────────
     private var model: JSONObject? = null
     private var featureEncoders: Map<String, List<String>> = emptyMap()
@@ -25,8 +30,7 @@ class FoodPairingModule(reactContext: ReactApplicationContext) :
 
     private val geminiEngineLabel: String get() = when {
         Build.MANUFACTURER.equals("Google", ignoreCase = true) -> "Gemini Nano (Tensor NPU)"
-        Build.MANUFACTURER.equals("samsung", ignoreCase = true) -> "Gemini Nano (Samsung NPU)"
-        else -> "Gemini Nano (On-device AI)"
+        else -> "Gemini Nano (On-device NPU)"
     }
 
     init {
