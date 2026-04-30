@@ -79,7 +79,7 @@ export function getThinkingLabel() {
   return 'Consulting OpenAI…';
 }
 
-async function callOpenAI({ drinkCategory, milkType, timeOfDay, dayOfWeek, orderCount, customItems, dietaryRequirements }) {
+async function callOpenAI({ drinkCategory, favouriteDrink, milkType, timeOfDay, dayOfWeek, orderCount, customItems, dietaryRequirements, specialRequests }) {
   if (!_openAIKey) return null;
 
   const menuItemsText = customItems
@@ -101,16 +101,17 @@ async function callOpenAI({ drinkCategory, milkType, timeOfDay, dayOfWeek, order
   const prompt = `You are a barista at a specialty coffee cart. Recommend 2 food items that pair well with the customer's coffee order.
 
 Customer profile:
-- Favourite drink type: ${drinkCategory}
+- Favourite drink: ${favouriteDrink || drinkCategory}
 - Preferred milk: ${milkType}
 - Time of day: ${timeOfDay} (${dayOfWeek})
 - Past orders: ${orderCount}
 ${dietaryRequirements ? `- Dietary requirements: ${dietaryRequirements}` : ''}
+${specialRequests ? `- Customer preferences/special requests: ${specialRequests}` : ''}
 
 Available menu items:
 ${menuItemsText || 'No items currently available'}
 
-Write the reason field in a ${tone} style. Keep it to 1-2 sentences, specific to their drink and the pairing.
+Write the reason field in a ${tone} style. Keep it to 1-2 sentences, specific to their actual drink and the pairing.${specialRequests ? ' If the customer\'s special requests are relevant (e.g. sustainability, dietary preferences), weave a natural reference to how the café accommodates that into the reason.' : ''}
 
 Respond with ONLY valid JSON, no markdown:
 {"item1":"item name","category1":"category","item2":"item name","category2":"category","reason":"your pairing reason here"}`;
@@ -154,6 +155,31 @@ function getDrinkCategory(orders) {
   }
   if (!Object.keys(counts).length) return 'Milk-Based';
   return Object.entries(counts).sort((a, b) => b[1] - a[1])[0][0];
+}
+
+function getFavouriteDrink(orders) {
+  const counts = {};
+  for (const order of orders) {
+    for (const item of order.items || []) {
+      if (item.name) counts[item.name] = (counts[item.name] || 0) + 1;
+    }
+  }
+  if (!Object.keys(counts).length) return null;
+  return Object.entries(counts).sort((a, b) => b[1] - a[1])[0][0];
+}
+
+function getSpecialRequests(orders) {
+  const seen = new Set();
+  const requests = [];
+  for (const order of (orders || []).slice(0, 10)) {
+    for (const item of order.items || []) {
+      if (item.specialRequest && !seen.has(item.specialRequest)) {
+        seen.add(item.specialRequest);
+        requests.push(item.specialRequest);
+      }
+    }
+  }
+  return requests.length ? requests.join('; ') : null;
 }
 
 function getMilkType(orders) {
@@ -321,10 +347,12 @@ export async function getAIPairing({ orders, customItems, dietaryRequirements = 
   const timeOfDay = getTimeOfDay();
   const dayOfWeek = getDayOfWeek();
   const drinkCategory = getDrinkCategory(orders);
+  const favouriteDrink = getFavouriteDrink(orders);
   const milkType = getMilkType(orders);
   const orderCount = orders.length;
+  const specialRequests = getSpecialRequests(orders);
 
-  // Build context string for LLM prompt — menu items + optional dietary requirements
+  // Build context string for LLM prompt — menu items + optional dietary requirements + special requests
   const menuItemsJson = customItems
     ? Object.entries(customItems)
         .filter(([cat, items]) => ['Morning Tea', 'Lunch', 'Snacks'].includes(cat) && items?.length > 0)
@@ -334,6 +362,7 @@ export async function getAIPairing({ orders, customItems, dietaryRequirements = 
   const contextJson = [
     menuItemsJson,
     dietaryRequirements ? `Dietary requirements: ${dietaryRequirements}` : '',
+    specialRequests ? `Customer special requests: ${specialRequests}` : '',
   ].filter(Boolean).join(' | ');
 
   // Try native module (Gemini Nano on supported Android devices / Apple Intelligence on iOS)
@@ -377,7 +406,7 @@ export async function getAIPairing({ orders, customItems, dietaryRequirements = 
           confidence: result.avgConfidence || 95,
           source: 'on-device-llm',
           engine: result.engine,
-          inputs: { drinkCategory, milkType, timeOfDay, orderCount, dayOfWeek },
+          inputs: { drinkCategory, favouriteDrink, milkType, timeOfDay, orderCount, dayOfWeek },
         };
       }
       // Native module returned a non-LLM result (decision tree fallback) — disable for session
@@ -395,7 +424,7 @@ export async function getAIPairing({ orders, customItems, dietaryRequirements = 
     try {
       const timeout = new Promise((_, reject) => setTimeout(() => reject(new Error('timeout')), 8000));
       const result = await Promise.race([
-        callOpenAI({ drinkCategory, milkType, timeOfDay, dayOfWeek, orderCount, customItems, dietaryRequirements }),
+        callOpenAI({ drinkCategory, favouriteDrink, milkType, timeOfDay, dayOfWeek, orderCount, customItems, dietaryRequirements, specialRequests }),
         timeout,
       ]);
       if (result?.item1 && result?.item2) {
@@ -410,7 +439,7 @@ export async function getAIPairing({ orders, customItems, dietaryRequirements = 
           confidence: 90,
           source: 'openai',
           engine: 'GPT-4o mini',
-          inputs: { drinkCategory, milkType, timeOfDay, orderCount, dayOfWeek },
+          inputs: { drinkCategory, favouriteDrink, milkType, timeOfDay, orderCount, dayOfWeek },
         };
       }
     } catch (err) {

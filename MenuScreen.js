@@ -3,7 +3,7 @@ import {
   View, Text, ScrollView, TouchableOpacity,
   StyleSheet, Modal, Animated, Easing, Image, useWindowDimensions,
 } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useNavigation } from '@react-navigation/native';
 import { MENU, CATEGORIES } from './menu';
 import { useApp } from './AppContext';
@@ -108,6 +108,7 @@ export default function MenuScreen() {
   const { isAdmin } = useAuth();
   const { width: screenWidth } = useWindowDimensions();
   const slideWidth = screenWidth - 32 - (spacing.lg * 2);
+  const insets = useSafeAreaInsets();
 
   const isClosed = !state.storeOpen || isCurrentlyInBreak(state.storeBreaks);
 
@@ -383,7 +384,7 @@ export default function MenuScreen() {
       {/* AI Pairing Modal — customers only */}
       <Modal visible={aiOpen && !isAdmin} transparent animationType="fade" onRequestClose={closeAi}>
         <TouchableOpacity
-          style={styles.modalOverlay}
+          style={[styles.modalOverlay, { paddingTop: insets.top + spacing.lg, paddingBottom: insets.bottom + spacing.lg }]}
           activeOpacity={1}
           onPress={closeAi}
         >

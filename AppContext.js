@@ -14,6 +14,12 @@ import { setOpenAIKey } from './foodPairingAI';
 
 const AppContext = createContext(null);
 
+// Serialises auto-print jobs so two simultaneous orders never hit the printer concurrently.
+let _printQueue = Promise.resolve();
+function enqueuePrint(fn) {
+  _printQueue = _printQueue.then(fn).catch(() => {});
+}
+
 // Build initial menuEnabled from static menu.js (used as fallback before DB loads)
 function buildDefaultMenuEnabled() {
   const result = {};
@@ -428,7 +434,8 @@ export function AppProvider({ children }) {
         const order = rowToOrder(p.new);
         dispatch({ type: 'REALTIME_ORDER_ADDED', payload: order });
 
-        // Auto-print if enabled and a printer is configured (WiFi or Bluetooth)
+        // Auto-print if enabled and a printer is configured (WiFi or Bluetooth).
+        // enqueuePrint serialises jobs so simultaneous orders never hit the printer concurrently.
         try {
           const [autoPrintEnabled, defaultPrinter, bluetoothPrinter] = await Promise.all([
             loadAutoPrint(),
@@ -437,23 +444,25 @@ export function AppProvider({ children }) {
           ]);
           const hasPrinter = defaultPrinter?.ip || bluetoothPrinter?.bluetoothAddress;
           if (autoPrintEnabled && hasPrinter) {
-            console.log('[AutoPrint] Printing order', order.id, bluetoothPrinter?.bluetoothAddress ? 'via Bluetooth' : 'to ' + defaultPrinter?.ip);
-            // Skip warmup here — checkPrinterConnectivity already warms the link on screen focus,
-            // and doing another open/close cycle right before printing causes RFCOMM socket
-            // exhaustion on Samsung/Android 9 devices (S9+), making the real print fail silently.
-            // The flushPrintQueue path (sleep→wake) handles its own warmup separately.
-            const result = await printOrderReceipt(order, '', { silent: true });
-            
-            // Mark as printed if successful
-            if (result && result.ok) {
-              console.log('[AutoPrint] ✓ Print successful, marking as printed');
-              await supabase
-                .from('orders')
-                .update({ printed: true, printed_at: new Date().toISOString() })
-                .eq('id', order.id);
-            } else {
-              console.log('[AutoPrint] ✗ Print failed, leaving printed=false');
-            }
+            enqueuePrint(async () => {
+              console.log('[AutoPrint] Printing order', order.id, bluetoothPrinter?.bluetoothAddress ? 'via Bluetooth' : 'to ' + defaultPrinter?.ip);
+              // Skip warmup here — checkPrinterConnectivity already warms the link on screen focus,
+              // and doing another open/close cycle right before printing causes RFCOMM socket
+              // exhaustion on Samsung/Android 9 devices (S9+), making the real print fail silently.
+              // The flushPrintQueue path (sleep→wake) handles its own warmup separately.
+              const result = await printOrderReceipt(order, '', { silent: true });
+
+              // Mark as printed if successful
+              if (result && result.ok) {
+                console.log('[AutoPrint] ✓ Print successful, marking as printed');
+                await supabase
+                  .from('orders')
+                  .update({ printed: true, printed_at: new Date().toISOString() })
+                  .eq('id', order.id);
+              } else {
+                console.log('[AutoPrint] ✗ Print failed, leaving printed=false');
+              }
+            });
           }
         } catch (err) {
           console.warn('[AutoPrint] Error:', err.message);
