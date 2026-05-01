@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import {
   View, Text, ScrollView, TouchableOpacity,
-  StyleSheet, Modal, Animated, Easing, Image, useWindowDimensions,
+  StyleSheet, Modal, Animated, Easing, Image, useWindowDimensions, Platform,
 } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useNavigation } from '@react-navigation/native';
@@ -106,7 +106,7 @@ export default function MenuScreen() {
   const navigation = useNavigation();
   const { state } = useApp();
   const { isAdmin } = useAuth();
-  const { width: screenWidth } = useWindowDimensions();
+  const { width: screenWidth, height: screenHeight } = useWindowDimensions();
   const slideWidth = screenWidth - 32 - (spacing.lg * 2);
   const insets = useSafeAreaInsets();
 
@@ -226,7 +226,12 @@ export default function MenuScreen() {
       const dietaryRequirements = state.profile?.dietary_requirements
         || momentsData?.properties?.['Dietary Requirements']
         || null;
-      const aiQuery = getAIPairing({ orders: myOrders, customItems: state.customItems, dietaryRequirements }).catch(() => null);
+      const enabledCustomItems = Object.fromEntries(
+        Object.entries(state.customItems).map(([cat, items]) => [
+          cat, items.filter(item => state.menuEnabled[item.id] !== false),
+        ])
+      );
+      const aiQuery = getAIPairing({ orders: myOrders, customItems: enabledCustomItems, dietaryRequirements }).catch(() => null);
 
       Promise.all([minDelay, aiQuery]).then(([, aiResult]) => {
         // No connection — OpenAI was attempted but failed
@@ -238,7 +243,7 @@ export default function MenuScreen() {
 
       const rec = buildRecommendation({
         orders: myOrders,
-        customItems: state.customItems,
+        customItems: enabledCustomItems,
         momentsData,
         aiResult,
       });
@@ -356,6 +361,10 @@ export default function MenuScreen() {
                 );
               })}
               <View style={styles.foodDisclaimer}>
+                <Text style={styles.foodDisclaimerTitle}>Dietary Legend</Text>
+                <Text style={styles.foodDisclaimerText}>
+                v – vegetarian{"\n"}ve – vegan{"\n"}g – contains gluten{"\n"}m – contains milk{"\n\n"}
+                </Text>
                 <Text style={styles.foodDisclaimerTitle}>Please note</Text>
                 <Text style={styles.foodDisclaimerText}>
                   Food items are provided directly by the venue and cannot be ordered through this app. For any dietary requirements or allergen information, please speak with a member of our staff.
@@ -384,12 +393,12 @@ export default function MenuScreen() {
       {/* AI Pairing Modal — customers only */}
       <Modal visible={aiOpen && !isAdmin} transparent animationType="fade" onRequestClose={closeAi}>
         <TouchableOpacity
-          style={[styles.modalOverlay, { paddingTop: insets.top + spacing.lg, paddingBottom: insets.bottom + spacing.lg }]}
+          style={[styles.modalOverlay, { paddingTop: insets.top + spacing.lg, paddingBottom: Math.max(insets.bottom, Platform.OS === 'android' ? 24 : 0) + spacing.lg }]}
           activeOpacity={1}
           onPress={closeAi}
         >
           <TouchableOpacity
-            style={styles.aiModal}
+            style={[styles.aiModal, { maxHeight: screenHeight - insets.top - Math.max(insets.bottom, Platform.OS === 'android' ? 24 : 0) - spacing.lg * 4 }]}
             activeOpacity={1}
             onPress={() => {}}
           >
@@ -469,7 +478,14 @@ export default function MenuScreen() {
                   contentContainerStyle={{ flexDirection: 'row' }}
                 >
                   {slides.map((slide, index) => (
-                    <View key={index} style={{ width: slideWidth, paddingHorizontal: 4 }}>
+                    <ScrollView
+                      key={index}
+                      style={{ width: slideWidth }}
+                      contentContainerStyle={{ paddingHorizontal: 4, paddingBottom: 12 }}
+                      showsVerticalScrollIndicator={false}
+                      nestedScrollEnabled
+                      bounces={false}
+                    >
                         {slide.type === 'standard' && (
                           <>
                             {/* Badges from AudienceStream — top of card */}
@@ -560,13 +576,6 @@ export default function MenuScreen() {
                             </View>
 
                             <View style={styles.bedrockContent}>
-                              {slide.data.rank && (
-                                <View style={styles.bedrockMetric}>
-                                  <Text style={styles.bedrockMetricLabel}>Recommendation Rank</Text>
-                                  <Text style={styles.bedrockMetricValue}>{slide.data.rank}</Text>
-                                </View>
-                              )}
-
                               {slide.data.sentiment && (
                                 <View style={styles.bedrockMetric}>
                                   <Text style={styles.bedrockMetricLabel}>Sentiment Analysis</Text>
@@ -582,8 +591,7 @@ export default function MenuScreen() {
                             </View>
                           </View>
                         )}
-                        <View style={{ height: 12 }} />
-                      </View>
+                      </ScrollView>
                     ))}
                   </ScrollView>
 

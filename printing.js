@@ -104,7 +104,6 @@ async function buildSingleLabelHtml(order, item, itemIndex, totalItems, visitorI
     : `
         <div class="item"><span class="item-text">${esc(drink.title)}</span></div>
         ${drink.detail ? `<div class="item-detail">${esc(drink.detail)}</div>` : ''}
-        ${drink.special ? `<div class="special">"${esc(drink.special)}"</div>` : ''}
       `;
 
   return `
@@ -135,9 +134,41 @@ async function buildSingleLabelHtml(order, item, itemIndex, totalItems, visitorI
   `;
 }
 
+function buildNotesLabelHtml(order) {
+  const customerName = esc(order?.name || 'Guest');
+  const placedTime = formatTime(order?.placedAt);
+  const notesItems = (order?.items || []).filter(i => i.specialRequest);
+  const notesContent = notesItems.length === 1
+    ? `<div class="notes-text">${esc(notesItems[0].specialRequest)}</div>`
+    : notesItems.map(i => `<div class="notes-text"><span class="notes-drink">${esc(i.name)}:</span> ${esc(i.specialRequest)}</div>`).join('');
+  return `
+    <div class="page-break-wrap">
+      <div class="page">
+        <div class="label">
+          <div class="header">
+            <div class="order-id">${esc(order.id || '')}</div>
+            <div class="order-right">
+              ${order.station ? `<div class="station">${esc(order.station)}</div>` : ''}
+              <div class="order-time">${placedTime}</div>
+            </div>
+          </div>
+          <div class="body">
+            <div class="body-left">
+              <div class="customer-name">${customerName}</div>
+              <div class="notes-heading">SPECIAL NOTES</div>
+              ${notesContent}
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>`;
+}
+
 export async function buildLabelsHtml(order, visitorId = '', useShorthand = false) {
   const items = order?.items || [];
   const labelParts = await Promise.all(items.map((item, index) => buildSingleLabelHtml(order, item, index, items.length, visitorId, useShorthand)));
+  const hasNotes = items.some(i => i.specialRequest);
+  if (hasNotes) labelParts.push(buildNotesLabelHtml(order));
   const labelsHtml = labelParts.join('');
 
   return `<!DOCTYPE html><html><head><meta charset="utf-8" /><meta name="viewport" content="width=device-width,initial-scale=1" /><style>
@@ -164,12 +195,41 @@ export async function buildLabelsHtml(order, visitorId = '', useShorthand = fals
     .special { font-size: 2.1mm; color: #1a7a7a; font-style: italic; line-height: 1.2; margin-top: 0.3mm; }
     .sh-line { font-size: 3.2mm; font-weight: 800; color: #0d2b2b; line-height: 1.3; letter-spacing: 0.1mm; }
     .sh-line:first-child { font-size: 3.8mm; color: #1a7a7a; margin-bottom: 0.5mm; }
+    .notes-heading { font-size: 2mm; font-weight: 800; color: #1a7a7a; text-transform: uppercase; letter-spacing: 0.3mm; margin-bottom: 1mm; margin-top: 0.5mm; }
+    .notes-text { font-size: 2.4mm; color: #0d2b2b; line-height: 1.3; margin-bottom: 0.5mm; }
+    .notes-drink { font-weight: 700; color: #5a8888; }
     .qr-wrap { width: 13mm; height: 13mm; margin-left: auto; padding: 1mm; background: #fff; border: 0.2mm solid #eee; }
     .qr-wrap svg { width: 100%; height: 100%; display: block; }
     .scan { margin-top: 0.8mm; font-size: 1.6mm; color: #8a8a8a; text-align: right; line-height: 1.2; }
   </style></head><body>${labelsHtml}</body></html>`;
 }
 
+
+function buildBrotherQLNotesLabelHtml(order) {
+  const customerName = esc(order?.name || 'Guest');
+  const orderId = esc(order.id || '');
+  const placedTime = formatTime(order?.placedAt);
+  const notesItems = (order?.items || []).filter(i => i.specialRequest);
+  const notesContent = notesItems.length === 1
+    ? `<div class="info-row notes-text">${esc(notesItems[0].specialRequest)}</div>`
+    : notesItems.map(i => `<div class="info-row notes-text"><span class="notes-drink">${esc(i.name)}:</span> ${esc(i.specialRequest)}</div>`).join('');
+  return `
+      <div class="sheet">
+        <div class="label">
+          <div class="top">
+            <div class="order-id">${orderId}</div>
+            <div class="top-right">
+              <div class="order-time">${placedTime}</div>
+            </div>
+          </div>
+          <div class="content">
+            <div class="customer">${customerName}</div>
+            <div class="notes-heading">SPECIAL NOTES</div>
+            ${notesContent}
+          </div>
+        </div>
+      </div>`;
+}
 
 export async function buildBrotherQLLabelsHtml(order, visitorId = '', useShorthand = false) {
   const items = order?.items || [];
@@ -189,8 +249,7 @@ export async function buildBrotherQLLabelsHtml(order, visitorId = '', useShortha
       const sizeMilk    = [item.size, (item.milk && item.milk !== 'No Milk') ? item.milk : null].filter(Boolean);
       const sizeMilkLine = sizeMilk.length ? `<div class="info-row info-size">${sizeMilk.map(esc).join(' · ')}</div>` : '';
       const extLine     = item.extras?.length ? `<div class="info-row info-detail">${esc(item.extras.join(', '))}</div>` : '';
-      const specLine    = item.specialRequest ? `<div class="info-row info-special">"${esc(item.specialRequest)}"</div>` : '';
-      infoContent = nameLine + sizeMilkLine + extLine + specLine;
+      infoContent = nameLine + sizeMilkLine + extLine;
     }
     return `
       <div class="sheet">
@@ -240,7 +299,10 @@ export async function buildBrotherQLLabelsHtml(order, visitorId = '', useShortha
   .info-special { font-size: 2mm; color: #1a7a7a; font-style: italic; }
   .sh-line { font-size: 3mm; font-weight: 800; color: #0d2b2b; line-height: 1.25; }
   .sh-line:first-child { font-size: 3.6mm; color: #1a7a7a; margin-bottom: 0.4mm; }
-  </style></head><body>${parts.join('')}</body></html>`;
+  .notes-heading { font-size: 2mm; font-weight: 800; color: #1a7a7a; text-transform: uppercase; letter-spacing: 0.3mm; margin-bottom: 1mm; margin-top: 1mm; }
+  .notes-text { font-size: 2.4mm; color: #0d2b2b; line-height: 1.3; margin-bottom: 0.5mm; word-break: break-word; }
+  .notes-drink { font-weight: 700; color: #5a8888; }
+  </style></head><body>${[...parts, ...(items.some(i => i.specialRequest) ? [buildBrotherQLNotesLabelHtml(order)] : [])].join('')}</body></html>`;
 }
 
 async function printBrotherQL(printer, order, visitorId, useShorthand, autoCutEnabled) {

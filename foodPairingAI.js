@@ -85,7 +85,7 @@ async function callOpenAI({ drinkCategory, favouriteDrink, milkType, timeOfDay, 
   const menuItemsText = customItems
     ? Object.entries(customItems)
         .filter(([cat, items]) => ['Morning Tea', 'Lunch', 'Snacks'].includes(cat) && items?.length > 0)
-        .map(([cat, items]) => `${cat}: ${items.join(', ')}`)
+        .map(([cat, items]) => `${cat}: ${items.map(i => i.name || i).join(', ')}`)
         .join('\n')
     : '';
 
@@ -112,6 +112,8 @@ Available menu items:
 ${menuItemsText || 'No items currently available'}
 
 Write the reason field in a ${tone} style. Keep it to 1-2 sentences, specific to their actual drink and the pairing.${specialRequests ? ' If the customer\'s special requests are relevant (e.g. sustainability, dietary preferences), weave a natural reference to how the café accommodates that into the reason.' : ''}
+
+IMPORTANT: item1 and item2 MUST be copied exactly from the available menu items list above. Do not invent or suggest any item not in that list.
 
 Respond with ONLY valid JSON, no markdown:
 {"item1":"item name","category1":"category","item2":"item name","category2":"category","reason":"your pairing reason here"}`;
@@ -343,6 +345,30 @@ Respond with ONLY valid JSON, no markdown:
   return null;
 }
 
+// Snap an AI-suggested item name to a real item in customItems.
+// Tries exact → partial match within the suggested category first, then other categories.
+// Falls back to the first available real item if nothing matches.
+function resolveToRealItem(suggestedName, suggestedCat, customItems) {
+  const FOOD_CATS = ['Morning Tea', 'Lunch', 'Snacks'];
+  const name = (suggestedName || '').toLowerCase().trim();
+  const catsToCheck = [suggestedCat, ...FOOD_CATS.filter(c => c !== suggestedCat)];
+  for (const cat of catsToCheck) {
+    const items = customItems?.[cat] || [];
+    const exact = items.find(i => (i.name || i).toLowerCase() === name);
+    if (exact) return { name: exact.name || exact, cat };
+    const partial = items.find(i => {
+      const n = (i.name || i).toLowerCase();
+      return n.includes(name) || name.includes(n);
+    });
+    if (partial) return { name: partial.name || partial, cat };
+  }
+  for (const cat of catsToCheck) {
+    const items = customItems?.[cat] || [];
+    if (items.length) return { name: items[0].name || items[0], cat };
+  }
+  return null;
+}
+
 export async function getAIPairing({ orders, customItems, dietaryRequirements = null }) {
   const timeOfDay = getTimeOfDay();
   const dayOfWeek = getDayOfWeek();
@@ -356,7 +382,7 @@ export async function getAIPairing({ orders, customItems, dietaryRequirements = 
   const menuItemsJson = customItems
     ? Object.entries(customItems)
         .filter(([cat, items]) => ['Morning Tea', 'Lunch', 'Snacks'].includes(cat) && items?.length > 0)
-        .map(([cat, items]) => `${cat}: ${items.join(', ')}`)
+        .map(([cat, items]) => `${cat}: ${items.map(i => i.name || i).join(', ')}`)
         .join(' | ')
     : '';
   const contextJson = [
@@ -388,7 +414,9 @@ export async function getAIPairing({ orders, customItems, dietaryRequirements = 
         // iOS (Apple Intelligence) returns category1/category2 — pick items from those categories
         let items;
         if (result.item1 && result.item2) {
-          items = [result.item1, result.item2];
+          const ri1 = resolveToRealItem(result.item1, result.category1, customItems);
+          const ri2 = resolveToRealItem(result.item2, result.category2, customItems);
+          items = [ri1, ri2].filter(Boolean);
         } else {
           const cat1 = result.category1 || 'Morning Tea';
           const cat2 = result.category2 || 'Snacks';
@@ -429,18 +457,27 @@ export async function getAIPairing({ orders, customItems, dietaryRequirements = 
       ]);
       if (result?.item1 && result?.item2) {
         console.log('[FoodPairingAI] OpenAI result:', result.item1, result.item2);
-        return {
-          items: [
-            { name: result.item1, cat: result.category1 },
-            { name: result.item2, cat: result.category2 },
-          ],
-          categories: [result.category1, result.category2],
-          reason: result.reason || null,
-          confidence: 90,
-          source: 'openai',
-          engine: 'GPT-4o mini',
-          inputs: { drinkCategory, favouriteDrink, milkType, timeOfDay, orderCount, dayOfWeek },
-        };
+        const r1 = resolveToRealItem(result.item1, result.category1, customItems);
+        let r2 = resolveToRealItem(result.item2, result.category2, customItems);
+        // Ensure two distinct items
+        if (r1 && r2 && r1.name === r2.name) {
+          const FOOD_CATS = ['Morning Tea', 'Lunch', 'Snacks'];
+          for (const cat of FOOD_CATS) {
+            const alt = (customItems?.[cat] || []).find(i => i !== r1.name);
+            if (alt) { r2 = { name: alt, cat }; break; }
+          }
+        }
+        if (r1 && r2) {
+          return {
+            items: [r1, r2],
+            categories: [r1.cat, r2.cat],
+            reason: result.reason || null,
+            confidence: 90,
+            source: 'openai',
+            engine: 'GPT-4o mini',
+            inputs: { drinkCategory, favouriteDrink, milkType, timeOfDay, orderCount, dayOfWeek },
+          };
+        }
       }
     } catch (err) {
       console.warn('[FoodPairingAI] OpenAI error:', err.message);

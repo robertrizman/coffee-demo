@@ -32,6 +32,8 @@ export const MENU = [
   { id: 'chai-latte', name: 'Chai Latte', description: 'Spiced tea with steamed milk', category: 'Specialty', defaultEnabled: true },
   { id: 'matcha-latte', name: 'Matcha Latte', description: 'Japanese green tea with milk', category: 'Specialty', defaultEnabled: true },
   { id: 'turmeric-latte', name: 'Turmeric Latte', description: 'Golden milk, anti-inflammatory', category: 'Specialty', defaultEnabled: true },
+  { id: 'orange-juice', name: 'Orange Juice', description: 'Freshly squeezed orange juice', category: 'Specialty', defaultEnabled: true },
+  { id: 'pineapple-juice', name: 'Pineapple Juice', description: 'Fresh tropical pineapple juice', category: 'Specialty', defaultEnabled: true },
 
   // TEA
   { id: 'english-breakfast', name: 'English Breakfast', description: 'Classic black tea, bold & malty', category: 'Tea', defaultEnabled: true },
