@@ -156,33 +156,19 @@ function reducer(state, action) {
     }
 
     case 'PLACE_ORDER': {
-      // Always read device ID directly from tealium.js at placement time
-      // This ensures we use PRISM's app_uuid, not our local UUID
+      // Insert is handled by OrderSummaryScreen before this dispatch (with retry on duplicate key).
+      // The reducer only updates local state.
       const deviceId = getCanonicalDeviceId() || state.deviceId;
-      console.log('[PLACE_ORDER] Using deviceId:', deviceId);
       const newOrder = {
         id: action.payload?.orderId || generateOrderId(),
         name: state.currentOrder.name,
         email: state.currentOrder.email,
         items: state.currentOrder.items,
         status: 'pending',
-        placedAt: Date.now(),
+        placedAt: action.payload?.placedAt || Date.now(),
         deviceId: deviceId,
         station: action.payload?.station || null,
       };
-      supabase.from('orders').insert({
-        id: newOrder.id,
-        name: newOrder.name,
-        email: newOrder.email,
-        items: newOrder.items,
-        status: newOrder.status,
-        placed_at: newOrder.placedAt,
-        device_id: deviceId,
-        teal_app_uuid: getCanonicalDeviceId() || deviceId,
-        station: newOrder.station,
-      }).then(({ error }) => {
-        if (error) console.warn('[Supabase] Insert order error:', error.message);
-      });
       return {
         ...state,
         orders: [newOrder, ...state.orders],

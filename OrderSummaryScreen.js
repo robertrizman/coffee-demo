@@ -6,7 +6,8 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useNavigation } from '@react-navigation/native';
-import { useApp, generateOrderId, generateSequentialOrderId } from './AppContext';
+import { useApp, generateOrderId } from './AppContext';
+import { getCanonicalDeviceId } from './tealium';
 import { trackRemoveFromOrder, trackEmailEntered, trackOrderPlaced, track } from './tealium';
 import { colors, typography, spacing, radius, shadow } from './theme';
 import { LocationPinIcon, UserIcon, EmailIcon, TrashIcon, TakeawayCupIcon } from './CoffeeIcons';
@@ -277,7 +278,12 @@ export default function OrderSummaryScreen() {
     dispatch({ type: 'SET_NAME', payload: name });
     dispatch({ type: 'SET_EMAIL', payload: email });
 
-    const orderId = await generateSequentialOrderId();
+    // Snapshot order details before any dispatch clears currentOrder
+    const orderName = name;
+    const orderEmail = email;
+    const orderItems = [...currentOrder.items];
+    const deviceId = getCanonicalDeviceId() || state.deviceId;
+    const placedAt = Date.now();
 
     // Log customer location
     const loc = state.customerLocation;
@@ -286,12 +292,26 @@ export default function OrderSummaryScreen() {
     } else {
       console.log('[Order] Customer location: not available');
     }
-    dispatch({ type: 'PLACE_ORDER', payload: { station: null, orderId } });
+
+    // DB-side atomic insert — nextval('order_number_seq') guarantees unique IDs under any concurrency
+    const { data: rpcId, error: insertError } = await supabase.rpc('place_order', {
+      p_name: orderName,
+      p_email: orderEmail,
+      p_items: orderItems,
+      p_placed_at: placedAt,
+      p_device_id: deviceId,
+      p_teal_app_uuid: deviceId,
+      p_station: null,
+    });
+    if (insertError) console.warn('[Order] Insert error:', insertError.message);
+    const orderId = rpcId || generateOrderId();
+
+    dispatch({ type: 'PLACE_ORDER', payload: { station: null, orderId, placedAt } });
     trackOrderPlaced({
       id: orderId,
-      name,
-      email,
-      items: currentOrder.items,
+      name: orderName,
+      email: orderEmail,
+      items: orderItems,
       customerLocation: state.customerLocation || null,
       arc_location_id: state.profile?.arc_location_id || '',
       arc_location_name: state.profile?.arc_location_name || '',
