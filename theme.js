@@ -41,14 +41,23 @@ export const colors = {
   shadow: 'rgba(0,109,128,0.12)',
 };
 
+// Named font families for explicit use anywhere in the app
+export const fonts = {
+  regular:   'Montserrat_400Regular',
+  medium:    'Montserrat_500Medium',
+  semibold:  'Montserrat_600SemiBold',
+  bold:      'Montserrat_700Bold',
+  extrabold: 'Montserrat_800ExtraBold',
+};
+
 export const typography = {
-  heading1: { fontSize: 30, fontWeight: '800', color: colors.textDark, letterSpacing: -0.5 },
-  heading2: { fontSize: 22, fontWeight: '700', color: colors.textDark },
-  heading3: { fontSize: 17, fontWeight: '700', color: colors.textDark },
-  subtitle: { fontSize: 14, color: colors.textLight },
-  label: { fontSize: 11, fontWeight: '700', color: colors.textMid, letterSpacing: 1, textTransform: 'uppercase' },
-  body: { fontSize: 15, color: colors.textDark },
-  caption: { fontSize: 13, color: colors.textLight },
+  heading1: { fontSize: 29, fontFamily: fonts.extrabold, color: colors.textDark, letterSpacing: -0.5 },
+  heading2: { fontSize: 21, fontFamily: fonts.bold,      color: colors.textDark },
+  heading3: { fontSize: 16, fontFamily: fonts.bold,      color: colors.textDark },
+  subtitle: { fontSize: 13, fontFamily: fonts.regular,   color: colors.textLight },
+  label:    { fontSize: 10, fontFamily: fonts.bold,      color: colors.textMid, letterSpacing: 1, textTransform: 'uppercase' },
+  body:     { fontSize: 14, fontFamily: fonts.regular,   color: colors.textDark },
+  caption:  { fontSize: 12, fontFamily: fonts.regular,   color: colors.textLight },
 };
 
 export const spacing = {

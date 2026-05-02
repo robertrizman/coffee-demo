@@ -18,7 +18,7 @@ import { ensureBluetoothConnected } from './brotherPrinter';
 let Audio = null;
 try { Audio = require('expo-av').Audio; } catch {}
 import * as Haptics from 'expo-haptics';
-import { colors, typography, spacing, radius, shadow } from './theme';
+import { colors, typography, spacing, radius, shadow, fonts } from './theme';
 import { QrScanIcon, SettingsIcon, LogoutIcon, PrinterIcon, UserIcon, AgendaIcon } from './CoffeeIcons';
 
 const TABS = ['All', 'Pending', 'Complete'];
@@ -738,7 +738,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: spacing.lg, paddingTop: spacing.lg, paddingBottom: spacing.md,
   },
   operatorLabel: { ...typography.label, color: colors.teal },
-  baristaName: { fontSize: 12, color: colors.textLight, marginTop: 1 },
+  baristaName: { fontSize: 11, color: colors.textLight, marginTop: 1 },
   title: { ...typography.heading1 },
   headerIcons: { flexDirection: 'row', gap: spacing.sm },
   iconBtn: {
@@ -750,8 +750,8 @@ const styles = StyleSheet.create({
 
   tabRow: { flexDirection: 'row', paddingHorizontal: spacing.lg, gap: spacing.lg },
   tabWrap: { paddingBottom: spacing.sm },
-  tabText: { fontSize: 15, fontWeight: '500', color: colors.textLight },
-  tabTextActive: { fontWeight: '700', color: colors.primary },
+  tabText: { fontSize: 14, fontFamily: fonts.medium, color: colors.textLight },
+  tabTextActive: { fontFamily: fonts.bold, color: colors.primary },
   tabUnderline: { height: 2, backgroundColor: colors.primary, borderRadius: 2, marginTop: 4 },
   divider: { height: 1, backgroundColor: colors.border },
 
@@ -760,7 +760,7 @@ const styles = StyleSheet.create({
     backgroundColor: '#fef3c7', borderBottomWidth: 1, borderBottomColor: '#fde68a',
     paddingHorizontal: spacing.lg, paddingVertical: 8,
   },
-  printerBannerText: { fontSize: 12, fontWeight: '600', color: '#92400e', flex: 1 },
+  printerBannerText: { fontSize: 11, fontFamily: fonts.semibold, color: '#92400e', flex: 1 },
 
   list: { padding: spacing.md, gap: spacing.md },
 
@@ -781,8 +781,8 @@ const styles = StyleSheet.create({
     paddingVertical: 2,
   },
   unprintedBadgeText: {
-    fontSize: 9,
-    fontWeight: '700',
+    fontSize: 8,
+    fontFamily: fonts.bold,
     color: '#dc2626',
     letterSpacing: 0.4,
   },
@@ -791,24 +791,24 @@ const styles = StyleSheet.create({
     padding: spacing.md, paddingBottom: spacing.sm,
   },
   orderMeta: { flex: 1 },
-  orderId: { fontSize: 13, fontWeight: '700', color: colors.primary },
-  orderEmail: { fontSize: 13, color: colors.textMid, marginTop: 2 },
-  orderStation: { fontSize: 11, color: colors.teal, marginTop: 2 },
+  orderId: { fontSize: 12, fontFamily: fonts.bold, color: colors.primary },
+  orderEmail: { fontSize: 12, color: colors.textMid, marginTop: 2 },
+  orderStation: { fontSize: 10, color: colors.teal, marginTop: 2 },
   statusBadge: {
     backgroundColor: '#fff3e8', borderRadius: radius.full,
     paddingHorizontal: spacing.sm, paddingVertical: 3,
     borderWidth: 1, borderColor: '#f0c080',
   },
   statusBadgeDone: { backgroundColor: colors.primaryLight, borderColor: colors.primaryMid },
-  statusText: { fontSize: 11, fontWeight: '700', color: colors.pending },
+  statusText: { fontSize: 10, fontFamily: fonts.bold, color: colors.pending },
   statusTextDone: { color: colors.primary },
 
   orderItems: { paddingHorizontal: spacing.md, paddingBottom: spacing.sm },
   orderItem: { flexDirection: 'row', gap: spacing.sm, paddingVertical: 3 },
-  orderItemDot: { color: colors.textMuted, fontSize: 16, lineHeight: 20 },
-  orderItemName: { fontSize: 14, fontWeight: '600', color: colors.textDark },
-  orderItemDetail: { fontSize: 12, color: colors.textLight },
-  orderItemSpecial: { fontSize: 12, color: colors.primary, fontStyle: 'italic' },
+  orderItemDot: { color: colors.textMuted, fontSize: 15, lineHeight: 20 },
+  orderItemName: { fontSize: 13, fontFamily: fonts.semibold, color: colors.textDark },
+  orderItemDetail: { fontSize: 11, color: colors.textLight },
+  orderItemSpecial: { fontSize: 11, color: colors.primary, fontStyle: 'italic' },
 
   orderFooter: {
     flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center',
@@ -829,7 +829,7 @@ const styles = StyleSheet.create({
     backgroundColor: colors.surface,
   },
   qrBtnActive: { backgroundColor: colors.primary, borderColor: colors.primary },
-  qrBtnText: { fontSize: 12, fontWeight: '700', color: colors.primary },
+  qrBtnText: { fontSize: 11, fontFamily: fonts.bold, color: colors.primary },
   qrBtnTextActive: { color: '#fff' },
   qrContainer: {
     alignItems: 'center', paddingVertical: spacing.md,
@@ -837,22 +837,22 @@ const styles = StyleSheet.create({
     backgroundColor: '#fff', gap: spacing.sm,
   },
   qrWebView: { width: 200, height: 200, backgroundColor: '#fff' },
-  qrLabel: { fontSize: 13, fontWeight: '700', color: colors.midnight },
-  qrSubLabel: { fontSize: 11, color: colors.textMuted },
+  qrLabel: { fontSize: 12, fontFamily: fonts.bold, color: colors.midnight },
+  qrSubLabel: { fontSize: 10, color: colors.textMuted },
   completeBtn: {
     backgroundColor: colors.primary, borderRadius: radius.full,
     paddingHorizontal: spacing.md, paddingVertical: 8,
     flex: 1, alignItems: 'center',
   },
-  completeBtnText: { color: '#fff', fontWeight: '700', fontSize: 13 },
-  completedText: { fontSize: 12, color: colors.primary, fontWeight: '600' },
+  completeBtnText: { color: '#fff', fontFamily: fonts.bold, fontSize: 12 },
+  completedText: { fontSize: 11, color: colors.primary, fontFamily: fonts.semibold },
   cancelOrderBtn: {
     backgroundColor: '#fee2e2', borderRadius: radius.full,
     paddingHorizontal: spacing.md, paddingVertical: 8,
     borderWidth: 1, borderColor: '#fca5a5',
     flex: 1, alignItems: 'center',
   },
-  cancelOrderBtnText: { color: '#dc2626', fontWeight: '700', fontSize: 13 },
+  cancelOrderBtnText: { color: '#dc2626', fontFamily: fonts.bold, fontSize: 12 },
   orderCardCancelled: { opacity: 0.6, borderColor: '#fca5a5', borderWidth: 1 },
   statusBadgeCancelled: { backgroundColor: '#fee2e2' },
   statusTextCancelled: { color: '#dc2626' },
@@ -886,28 +886,28 @@ const styles = StyleSheet.create({
     paddingHorizontal: spacing.md, paddingVertical: spacing.sm,
     backgroundColor: colors.midnight,
   },
-  inlineScanHint: { fontSize: 12, color: 'rgba(255,255,255,0.6)', flex: 1 },
+  inlineScanHint: { fontSize: 11, color: 'rgba(255,255,255,0.6)', flex: 1 },
   inlineScannerActions: { flexDirection: 'row', gap: spacing.sm },
   inlineFlipBtn: {
     paddingHorizontal: spacing.sm, paddingVertical: 6,
     borderRadius: radius.full, backgroundColor: 'rgba(255,255,255,0.15)',
   },
-  inlineFlipBtnText: { color: '#fff', fontSize: 12, fontWeight: '600' },
+  inlineFlipBtnText: { color: '#fff', fontSize: 11, fontFamily: fonts.semibold },
   inlineFullscreenBtn: {
     paddingHorizontal: spacing.sm, paddingVertical: 6,
     borderRadius: radius.full, backgroundColor: colors.primary,
   },
-  inlineFullscreenBtnText: { color: '#fff', fontSize: 12, fontWeight: '600' },
+  inlineFullscreenBtnText: { color: '#fff', fontSize: 11, fontFamily: fonts.semibold },
   scannerHeader: {
     flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
     paddingHorizontal: spacing.lg, paddingVertical: spacing.md,
     backgroundColor: colors.midnight,
   },
   scannerClose: { paddingHorizontal: spacing.sm, paddingVertical: 6 },
-  scannerCloseText: { color: '#fff', fontSize: 15, fontWeight: '600' },
-  scannerTitle: { color: '#fff', fontSize: 16, fontWeight: '700' },
+  scannerCloseText: { color: '#fff', fontSize: 14, fontFamily: fonts.semibold },
+  scannerTitle: { color: '#fff', fontSize: 15, fontFamily: fonts.bold },
   flipBtn: { paddingHorizontal: spacing.sm, paddingVertical: 6 },
-  flipBtnText: { color: colors.teal, fontSize: 15, fontWeight: '700' },
+  flipBtnText: { color: colors.teal, fontSize: 14, fontFamily: fonts.bold },
 
   cameraContainer: { flex: 1, position: 'relative' },
   camera: { flex: 1 },
@@ -946,12 +946,12 @@ const styles = StyleSheet.create({
   },
   feedbackSuccess: { backgroundColor: 'rgba(0,109,128,0.92)' },
   feedbackError: { backgroundColor: 'rgba(30,30,30,0.88)' },
-  feedbackText: { color: '#fff', fontSize: 15, fontWeight: '700', textAlign: 'center' },
+  feedbackText: { color: '#fff', fontSize: 14, fontFamily: fonts.bold, textAlign: 'center' },
 
   scannerFooter: {
     backgroundColor: colors.midnight,
     paddingVertical: spacing.lg, paddingHorizontal: spacing.lg, gap: spacing.sm, alignItems: 'center',
   },
-  scannerHint: { color: '#fff', fontSize: 14, fontWeight: '600', textAlign: 'center' },
-  scannerSubHint: { color: 'rgba(255,255,255,0.55)', fontSize: 12, textAlign: 'center' },
+  scannerHint: { color: '#fff', fontSize: 13, fontFamily: fonts.semibold, textAlign: 'center' },
+  scannerSubHint: { color: 'rgba(255,255,255,0.55)', fontSize: 11, textAlign: 'center' },
 });

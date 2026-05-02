@@ -1,6 +1,6 @@
 import React, { useEffect, useRef } from 'react';
 import { View, Text, StyleSheet, Animated, Modal } from 'react-native';
-import { colors, spacing, radius } from './theme';
+import { colors, spacing, radius, fonts } from './theme';
 import { formatTime } from './storeUtils';
 
 export default function StoreClosedOverlay({ title = 'Back Soon!', message, breaks = [], visible }) {
@@ -67,9 +67,9 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     gap: 12,
   },
-  icon: { fontSize: 56, marginBottom: 4 },
-  title: { fontSize: 28, fontWeight: '800', color: colors.midnight },
-  message: { fontSize: 16, color: colors.textMuted, textAlign: 'center', lineHeight: 24 },
+  icon: { fontSize: 55, marginBottom: 4 },
+  title: { fontSize: 27, fontFamily: fonts.extrabold, color: colors.midnight },
+  message: { fontSize: 15, color: colors.textMuted, textAlign: 'center', lineHeight: 24 },
   hoursSection: {
     width: '100%',
     backgroundColor: colors.surface,
@@ -78,10 +78,10 @@ const styles = StyleSheet.create({
     marginTop: 8,
     gap: 8,
   },
-  hoursTitle: { fontSize: 11, fontWeight: '700', color: colors.textMuted, letterSpacing: 1, textTransform: 'uppercase', marginBottom: 4 },
+  hoursTitle: { fontSize: 10, fontFamily: fonts.bold, color: colors.textMuted, letterSpacing: 1, textTransform: 'uppercase', marginBottom: 4 },
   breakRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
-  breakLabel: { fontSize: 14, fontWeight: '600', color: colors.midnight },
-  breakTime: { fontSize: 14, color: colors.primary, fontWeight: '600' },
+  breakLabel: { fontSize: 13, fontFamily: fonts.semibold, color: colors.midnight },
+  breakTime: { fontSize: 13, color: colors.primary, fontFamily: fonts.semibold },
   brand: { marginTop: 8 },
-  brandText: { fontSize: 11, color: colors.textMuted, letterSpacing: 1 },
+  brandText: { fontSize: 10, color: colors.textMuted, letterSpacing: 1 },
 });

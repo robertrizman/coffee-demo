@@ -8,7 +8,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import Svg, { Path, Circle } from 'react-native-svg';
 import Constants from 'expo-constants';
 import { useAuth } from './AuthContext';
-import { colors, typography, spacing, radius, shadow } from './theme';
+import { colors, typography, spacing, radius, shadow, fonts } from './theme';
 import { UserIcon, LockIcon } from './CoffeeIcons';
 
 function EyeIcon({ size = 18, color = '#006D80' }) {
@@ -55,7 +55,7 @@ export default function LoginScreen() {
 
           <View style={styles.logoArea}>
             <View style={styles.logoCircle}>
-              <Svg viewBox="0 0 99 23.8" width={56} height={14} fill="#fff">
+              <Svg viewBox="0 0 99 23.8" width={88} height={42} fill="#fff">
                 <Path d="m3.82,8.22c-.02-1-.51-1.81-1.09-1.8-.58.01-1.04.83-1.02,1.84.02,1,.51,1.8,1.09,1.79.58-.01,1.04-.83,1.02-1.83Z"/>
                 <Path d="m1.72,5.51c-.02-.89-.41-1.61-.89-1.6C.36,3.92-.02,4.65,0,5.55c.02.89.42,1.61.89,1.6.47,0,.85-.74.83-1.63Z"/>
                 <Path d="m8.72,5.19c.9.27,1.33,1.51.96,2.79-.37,1.28-1.41,2.1-2.31,1.84-.91-.27-1.33-1.51-.97-2.79.38-1.28,1.42-2.1,2.32-1.84Z"/>
@@ -77,8 +77,8 @@ export default function LoginScreen() {
                 <Path d="m97.12,16.13h-2.45l-1.11-7-2.81,7h-2.61l-2.75-7-1.13,7h-2.37l1.58-9.01h3.41l2.55,6.6,2.71-6.6h3.38l1.61,9.01Z"/>
               </Svg>
             </View>
-            <Text style={styles.appName}>Architect Arc Cafe</Text>
-            <Text style={styles.tagline}>Barista Sign In</Text>
+            <Text style={styles.appName}>Architect Arc</Text>
+            <Text style={styles.tagline}>Admin/Barista Sign In</Text>
           </View>
 
           <View style={styles.card}>
@@ -154,9 +154,9 @@ export default function LoginScreen() {
           <View style={styles.aboutSection}>
             <Text style={styles.aboutTitle}>About</Text>
             <Text style={styles.aboutText}>
-              This is a demonstration app built for Tealium event tracking and analytics purposes. It is not intended for commercial use, resale, or production deployment. All data collected is used solely for Tealium platform demonstration and testing.
+              This is a demonstration app built for Tealium event tracking and analytics purposes. It is not intended for commercial use, resale. All data collected is used solely for Tealium platform demonstration purposes.
             </Text>
-            <Text style={styles.aboutVersion}>Coffee Demo · Powered by Tealium PRISM SDK</Text>
+            <Text style={styles.aboutVersion}>Architect Arc · Powered by Tealium PRISM SDK</Text>
             <Text style={styles.buildVersion}>
               v{Constants.expoConfig?.version ?? '—'}
             </Text>
@@ -176,14 +176,14 @@ const styles = StyleSheet.create({
     backgroundColor: colors.primary, alignItems: 'center', justifyContent: 'center',
     marginBottom: spacing.sm,
   },
-  appName: { ...typography.heading1, fontSize: 28 },
+  appName: { ...typography.heading1, fontSize: 27 },
   tagline: { ...typography.subtitle },
   card: {
     backgroundColor: colors.surface, borderRadius: radius.xl,
     padding: spacing.lg, gap: spacing.md,
     borderWidth: 1, borderColor: colors.borderLight, ...shadow.card,
   },
-  cardTitle: { ...typography.heading2 },
+  cardTitle: { ...typography.heading2, fontFamily: fonts.bold },
   cardSubtitle: { ...typography.caption, marginTop: -8 },
   fieldLabel: { ...typography.label, marginBottom: -8 },
   inputRow: {
@@ -191,26 +191,26 @@ const styles = StyleSheet.create({
     backgroundColor: colors.surfaceAlt, borderRadius: radius.lg,
     borderWidth: 1.5, borderColor: colors.border, paddingHorizontal: spacing.md,
   },
-  input: { flex: 1, height: 48, fontSize: 16, color: colors.textDark },
+  input: { flex: 1, height: 48, fontSize: 15, color: colors.textDark },
   eyeBtn: { padding: 6 },
   errorBox: {
     backgroundColor: '#fef0ee', borderRadius: radius.md,
     padding: spacing.md, borderWidth: 1, borderColor: '#f0c0b8',
   },
-  errorText: { fontSize: 14, color: '#c0392b', fontWeight: '600' },
+  errorText: { fontSize: 13, color: '#c0392b', fontFamily: fonts.semibold },
   loginBtn: {
     backgroundColor: colors.primary, borderRadius: radius.lg,
     paddingVertical: 14, alignItems: 'center', marginTop: spacing.sm,
   },
   loginBtnDisabled: { opacity: 0.4 },
-  loginBtnText: { color: '#fff', fontSize: 17, fontWeight: '700', letterSpacing: 0.3 },
+  loginBtnText: { color: '#fff', fontSize: 16, fontFamily: fonts.bold, letterSpacing: 0.3 },
   hint: { ...typography.caption, textAlign: 'center', color: colors.textMuted, lineHeight: 20 },
   aboutSection: {
     borderTopWidth: 1, borderTopColor: colors.borderLight,
     paddingTop: spacing.md, gap: spacing.xs, alignItems: 'center',
   },
-  aboutTitle: { fontSize: 10, fontWeight: '700', color: colors.textMuted, letterSpacing: 1, textTransform: 'uppercase' },
-  aboutText: { fontSize: 11, color: colors.textMuted, textAlign: 'center', lineHeight: 16, opacity: 0.8 },
-  aboutVersion: { fontSize: 10, color: colors.teal, fontWeight: '600', letterSpacing: 0.5 },
-  buildVersion: { fontSize: 10, color: colors.textMuted, opacity: 0.5, marginTop: 2 },
+  aboutTitle: { fontSize: 9, fontFamily: fonts.bold, color: colors.textMuted, letterSpacing: 1, textTransform: 'uppercase' },
+  aboutText: { fontSize: 11, fontFamily: fonts.regular, color: colors.textMuted, textAlign: 'center', lineHeight: 16, opacity: 0.8 },
+  aboutVersion: { fontSize: 9, color: colors.teal, fontFamily: fonts.semibold, letterSpacing: 0.5, marginTop: 20 },
+  buildVersion: { fontSize: 13, color: colors.textMuted, opacity: 0.5, marginTop: 5, fontWeight:'bold' },
 });

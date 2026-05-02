@@ -6,7 +6,7 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useFocusEffect } from '@react-navigation/native';
 import { supabase } from './supabase';
-import { colors, typography, spacing, radius, shadow } from './theme';
+import { colors, typography, spacing, radius, shadow, fonts } from './theme';
 
 function parseTimeSlot(str) {
   if (!str) return null;
@@ -25,12 +25,26 @@ function parseTimeSlot(str) {
 function getCurrentSlotIndex(items) {
   if (!items || items.length === 0) return -1;
   const now = new Date();
-  let current = -1;
+
   for (let i = 0; i < items.length; i++) {
     const t = parseTimeSlot(items[i].time_slot);
-    if (t && t <= now) current = i;
+    if (!t || t > now) continue;
+
+    if (i < items.length - 1) {
+      // Current if now is between this item and the next
+      const next = parseTimeSlot(items[i + 1].time_slot);
+      if (next && now < next) return i;
+    } else {
+      // Last item — infer duration from the gap before it, fallback 1 hour
+      let windowMs = 60 * 60 * 1000;
+      if (items.length >= 2) {
+        const prev = parseTimeSlot(items[items.length - 2].time_slot);
+        if (prev) windowMs = t - prev;
+      }
+      if (now - t < windowMs) return i;
+    }
   }
-  return current;
+  return -1;
 }
 
 export default function AgendaScreen() {
@@ -119,30 +133,34 @@ export default function AgendaScreen() {
               const hasDesc = !!item.description;
               const Row = hasDesc ? TouchableOpacity : View;
               return (
-                <Row
-                  key={item.id}
-                  style={[styles.row, isCurrent && styles.rowCurrent]}
-                  {...(hasDesc ? { onPress: () => setSelectedItem(item), activeOpacity: 0.7 } : {})}
-                >
-                  {isCurrent && <View style={styles.currentBar} />}
-                  <Text style={[styles.time, isCurrent && styles.timeCurrent]}>
-                    {item.time_slot}
-                  </Text>
-                  <View style={styles.titleWrap}>
-                    <Text
-                      style={[
-                        styles.title,
-                        item.is_highlight && styles.titleBold,
-                        isCurrent && styles.titleCurrent,
-                      ]}
-                    >
-                      {item.title}
+                <React.Fragment key={item.id}>
+                  <Row
+                    style={[styles.row, isCurrent && styles.rowCurrent]}
+                    {...(hasDesc ? { onPress: () => setSelectedItem(item), activeOpacity: 0.7 } : {})}
+                  >
+                    {isCurrent && <View style={styles.currentBar} />}
+                    <Text style={[styles.time, isCurrent && styles.timeCurrent]}>
+                      {item.time_slot}
                     </Text>
-                    {hasDesc && (
-                      <Text style={styles.moreHint}>tap for details</Text>
-                    )}
-                  </View>
-                </Row>
+                    <View style={styles.titleWrap}>
+                      <Text
+                        style={[
+                          styles.title,
+                          item.is_highlight && styles.titleBold,
+                          isCurrent && styles.titleCurrent,
+                        ]}
+                      >
+                        {item.title}
+                      </Text>
+                      {hasDesc && (
+                        <Text style={styles.moreHint}>tap for details</Text>
+                      )}
+                    </View>
+                  </Row>
+                  {index < items.length - 1 && (
+                    <View style={styles.rowDivider} />
+                  )}
+                </React.Fragment>
               );
             })
           )}
@@ -195,8 +213,8 @@ const styles = StyleSheet.create({
   },
   headerLeft: { flex: 1, marginRight: spacing.md },
   eventTitle: {
-    fontSize: 28,
-    fontWeight: '800',
+    fontSize: 27,
+    fontFamily: fonts.extrabold,
     color: '#ffffff',
     letterSpacing: -0.5,
     lineHeight: 34,
@@ -211,20 +229,21 @@ const styles = StyleSheet.create({
     borderColor: 'rgba(104,216,213,0.3)',
   },
   wifiLabel: {
-    fontSize: 9,
-    fontWeight: '800',
+    fontSize: 12,
+    fontFamily: fonts.extrabold,
     color: colors.teal,
     letterSpacing: 1.5,
     marginBottom: 6,
     textTransform: 'uppercase',
   },
   wifiRow: {
-    fontSize: 11,
+    fontSize: 10,
+    fontFamily: fonts.regular,
     color: 'rgba(255,255,255,0.5)',
     marginBottom: 3,
     lineHeight: 16,
   },
-  wifiValue: { color: '#ffffff', fontWeight: '700' },
+  wifiValue: { color: '#ffffff', fontFamily: fonts.bold },
 
   body: {
     backgroundColor: colors.surface,
@@ -239,10 +258,10 @@ const styles = StyleSheet.create({
 
   row: {
     flexDirection: 'row',
-    paddingVertical: 11,
+    paddingVertical: 13,
     paddingHorizontal: 10,
     borderRadius: radius.sm,
-    marginBottom: 2,
+    marginBottom: 8,
     alignItems: 'flex-start',
     position: 'relative',
   },
@@ -259,26 +278,33 @@ const styles = StyleSheet.create({
   time: {
     width: 68,
     minWidth: 68,
-    fontSize: 13,
+    fontSize: 12,
+    fontFamily: fonts.regular,
     color: colors.textMid,
     lineHeight: 20,
     flexShrink: 0,
   },
-  timeCurrent: { color: colors.primary, fontWeight: '600' },
+  timeCurrent: { color: colors.primary, fontFamily: fonts.semibold },
   titleWrap: { flex: 1, minWidth: 0 },
   title: {
-    fontSize: 14,
+    fontSize: 13,
+    fontFamily: fonts.regular,
     color: colors.textDark,
     lineHeight: 20,
     flexShrink: 1,
   },
-  titleBold: { fontWeight: '700', color: colors.midnight, fontSize: 15 },
+  titleBold: { fontFamily: fonts.bold, color: colors.midnight, fontSize: 14 },
   titleCurrent: { color: colors.primary },
   moreHint: {
-    fontSize: 11,
+    fontSize: 10,
     color: colors.primary,
     marginTop: 2,
     opacity: 0.7,
+  },
+  rowDivider: {
+    height: 1,
+    backgroundColor: colors.borderLight,
+    marginHorizontal: 10,
   },
   empty: { ...typography.caption, textAlign: 'center', paddingVertical: 40 },
 
@@ -297,16 +323,16 @@ const styles = StyleSheet.create({
     ...shadow.modal,
   },
   descModalTime: {
-    fontSize: 12,
+    fontSize: 11,
     color: colors.primary,
-    fontWeight: '700',
+    fontFamily: fonts.bold,
     letterSpacing: 0.5,
     textTransform: 'uppercase',
     marginBottom: 6,
   },
   descModalTitle: {
-    fontSize: 18,
-    fontWeight: '800',
+    fontSize: 17,
+    fontFamily: fonts.extrabold,
     color: colors.midnight,
     lineHeight: 24,
   },
@@ -316,7 +342,8 @@ const styles = StyleSheet.create({
     marginVertical: 14,
   },
   descModalBody: {
-    fontSize: 14,
+    fontSize: 13,
+    fontFamily: fonts.regular,
     color: colors.textMid,
     lineHeight: 22,
   },
@@ -329,7 +356,7 @@ const styles = StyleSheet.create({
   },
   descCloseBtnText: {
     color: '#fff',
-    fontWeight: '700',
-    fontSize: 15,
+    fontFamily: fonts.bold,
+    fontSize: 14,
   },
 });

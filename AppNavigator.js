@@ -23,7 +23,7 @@ import AgendaManagementScreen from './AgendaManagementScreen';
 import LoginScreen from './LoginScreen';
 
 import { useAuth } from './AuthContext';
-import { colors } from './theme';
+import { colors, fonts } from './theme';
 import { TakeawayCupIcon, ReceiptIcon, BaristaIcon as BaristaHat, TagIcon, AgendaIcon } from './CoffeeIcons';
 
 const Stack = createNativeStackNavigator();
@@ -136,5 +136,5 @@ export default function AppNavigator() {
 }
 
 const styles = StyleSheet.create({
-  tabLabel: { fontSize: 11, fontWeight: '600' },
+  tabLabel: { fontSize: 10, fontFamily: fonts.semibold },
 });

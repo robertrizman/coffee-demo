@@ -8,7 +8,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { saveProfile } from './userProfile';
 import { supabase } from './supabase';
-import { colors, typography, spacing, radius, shadow } from './theme';
+import { colors, typography, spacing, radius, shadow, fonts } from './theme';
 import { TakeawayCupIcon, UserIcon, LockIcon, EmailIcon } from './CoffeeIcons';
 import { trackCustomerRegistration } from './tealium';
 
@@ -232,7 +232,7 @@ export default function OnboardingScreen({ onComplete }) {
               </Text>
               {!loadingLocations && (
                 <TouchableOpacity onPress={loadLocations} style={{ backgroundColor: colors.primaryLight, borderRadius: radius.sm, paddingHorizontal: 20, paddingVertical: 10 }}>
-                  <Text style={{ color: colors.primary, fontWeight: '700' }}>Retry</Text>
+                  <Text style={{ color: colors.primary, fontFamily: fonts.bold }}>Retry</Text>
                 </TouchableOpacity>
               )}
             </View>
@@ -309,7 +309,7 @@ const styles = StyleSheet.create({
     marginBottom: spacing.sm,
   },
   logoEmoji: { fontSize: 36 },
-  appName: { ...typography.heading1, fontSize: 30 },
+  appName: { ...typography.heading1, fontSize: 29 },
   tagline: { ...typography.subtitle },
 
   card: {
@@ -333,11 +333,11 @@ const styles = StyleSheet.create({
   },
   inputRowError: { borderColor: '#c0392b' },
   inputIcon: { fontSize: 16, marginRight: spacing.sm, color: colors.textMuted },
-  input: { flex: 1, height: 52, fontSize: 16, color: colors.textDark },
-  errorText: { fontSize: 13, color: '#c0392b', marginTop: -8 },
+  input: { flex: 1, height: 52, fontSize: 15, color: colors.textDark },
+  errorText: { fontSize: 12, color: '#c0392b', marginTop: -8 },
 
   privacyNote: {
-    fontSize: 12, color: colors.textMuted, lineHeight: 18,
+    fontSize: 11, color: colors.textMuted, lineHeight: 18,
     backgroundColor: colors.surfaceAlt,
     padding: spacing.md, borderRadius: radius.md,
   },
@@ -371,18 +371,18 @@ const styles = StyleSheet.create({
   },
   checkmark: {
     color: '#fff',
-    fontSize: 16,
-    fontWeight: '700',
+    fontSize: 15,
+    fontFamily: fonts.bold,
   },
   consentText: {
     flex: 1,
-    fontSize: 14,
+    fontSize: 13,
     color: colors.textDark,
     lineHeight: 20,
   },
   privacyLink: {
     color: colors.primary,
-    fontWeight: '600',
+    fontFamily: fonts.semibold,
     textDecorationLine: 'underline',
   },
 
@@ -391,7 +391,7 @@ const styles = StyleSheet.create({
     paddingVertical: 12, alignItems: 'center', marginTop: spacing.sm,
   },
   continueBtnDisabled: { opacity: 0.5 },
-  continueBtnText: { color: '#fff', fontSize: 17, fontWeight: '700', letterSpacing: 0.3 },
+  continueBtnText: { color: '#fff', fontSize: 16, fontFamily: fonts.bold, letterSpacing: 0.3 },
 
   locationPicker: {
     flexDirection: 'row', alignItems: 'center',
@@ -399,7 +399,7 @@ const styles = StyleSheet.create({
     borderRadius: radius.lg, borderWidth: 1.5, borderColor: colors.border,
     paddingHorizontal: spacing.md, paddingVertical: 12, minHeight: 52,
   },
-  locationPickerSelected: { fontSize: 15, fontWeight: '600', color: colors.textDark },
+  locationPickerSelected: { fontSize: 14, fontFamily: fonts.semibold, color: colors.textDark },
   locationPickerSub: { fontSize: 12, color: colors.textMuted, marginTop: 2 },
   locationPickerPlaceholder: { flex: 1, fontSize: 15, color: colors.textMuted },
   locationPickerChevron: { fontSize: 22, color: colors.textMuted, marginLeft: spacing.sm },
@@ -416,7 +416,7 @@ const styles = StyleSheet.create({
     width: 32, height: 32, borderRadius: 16,
     backgroundColor: colors.surfaceAlt, alignItems: 'center', justifyContent: 'center',
   },
-  modalCloseText: { fontSize: 14, color: colors.textDark, fontWeight: '600' },
+  modalCloseText: { fontSize: 13, color: colors.textDark, fontFamily: fonts.semibold },
   locationItem: {
     flexDirection: 'row', alignItems: 'center',
     backgroundColor: colors.surface, borderRadius: radius.lg,
@@ -424,19 +424,19 @@ const styles = StyleSheet.create({
   },
   locationItemSelected: { borderColor: colors.primary, backgroundColor: colors.primaryLight + '22' },
   locationItemDisabled: { opacity: 0.5 },
-  locationItemName: { fontSize: 15, fontWeight: '700', color: colors.textDark },
+  locationItemName: { fontSize: 14, fontFamily: fonts.bold, color: colors.textDark },
   locationItemNameDisabled: { color: colors.textMuted },
   locationItemAddress: { fontSize: 13, color: colors.textMuted, marginTop: 2 },
-  locationItemDates: { fontSize: 11, color: colors.teal, marginTop: 3, fontWeight: '600' },
-  locationItemCheck: { fontSize: 18, color: colors.primary, fontWeight: '700', marginLeft: spacing.sm },
+  locationItemDates: { fontSize: 10, color: colors.teal, marginTop: 3, fontFamily: fonts.semibold },
+  locationItemCheck: { fontSize: 17, color: colors.primary, fontFamily: fonts.bold, marginLeft: spacing.sm },
   locationBadgeActive: {
     backgroundColor: '#dcfce7', borderRadius: radius.full,
     paddingHorizontal: 8, paddingVertical: 2,
   },
-  locationBadgeActiveText: { fontSize: 10, fontWeight: '700', color: '#16a34a' },
+  locationBadgeActiveText: { fontSize: 9, fontFamily: fonts.bold, color: '#16a34a' },
   locationBadgeInactive: {
     backgroundColor: '#f1f5f9', borderRadius: radius.full,
     paddingHorizontal: 8, paddingVertical: 2,
   },
-  locationBadgeInactiveText: { fontSize: 10, fontWeight: '700', color: colors.textMuted },
+  locationBadgeInactiveText: { fontSize: 9, fontFamily: fonts.bold, color: colors.textMuted },
 });

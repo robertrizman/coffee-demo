@@ -7,7 +7,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import * as Notifications from 'expo-notifications';
 import { useApp } from './AppContext';
 import { supabase } from './supabase';
-import { colors, typography, spacing, radius, shadow } from './theme';
+import { colors, typography, spacing, radius, shadow, fonts } from './theme';
 
 function timeAgo(ts) {
   const secs = Math.floor((Date.now() - ts) / 1000);
@@ -205,12 +205,12 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: colors.primaryMid,
   },
-  notifBannerIcon: { fontSize: 15 },
-  notifBannerText: { flex: 1, fontSize: 13, color: colors.primary, fontWeight: '500', lineHeight: 18 },
-  notifBannerArrow: { fontSize: 18, color: colors.primary, fontWeight: '600' },
+  notifBannerIcon: { fontSize: 14 },
+  notifBannerText: { flex: 1, fontSize: 12, color: colors.primary, fontFamily: fonts.medium, lineHeight: 18 },
+  notifBannerArrow: { fontSize: 17, color: colors.primary, fontFamily: fonts.semibold },
 
   emptyState: { alignItems: 'center', paddingTop: 80, gap: spacing.md },
-  emptyIcon: { fontSize: 56 },
+  emptyIcon: { fontSize: 55 },
   emptyTitle: { ...typography.heading2 },
   emptySubtitle: { ...typography.caption, textAlign: 'center', lineHeight: 22 },
 
@@ -230,7 +230,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start',
     padding: spacing.md, paddingBottom: spacing.sm,
   },
-  orderId: { fontSize: 18, fontWeight: '800', color: colors.textDark },
+  orderId: { fontSize: 17, fontFamily: fonts.extrabold, color: colors.textDark },
   orderTime: { ...typography.caption, marginTop: 2 },
 
   badge: {
@@ -243,7 +243,7 @@ const styles = StyleSheet.create({
   badgeDot: { width: 7, height: 7, borderRadius: 4 },
   badgeDotPending: { backgroundColor: colors.pending },
   badgeDotDone: { backgroundColor: colors.primary },
-  badgeText: { fontSize: 12, fontWeight: '700' },
+  badgeText: { fontSize: 11, fontFamily: fonts.bold },
   badgeTextPending: { color: colors.pending },
   badgeTextDone: { color: colors.primary },
 
@@ -257,7 +257,7 @@ const styles = StyleSheet.create({
     width: 7, height: 7, borderRadius: 4,
     backgroundColor: colors.primary, marginTop: 6, flexShrink: 0,
   },
-  itemName: { fontSize: 15, fontWeight: '600', color: colors.textDark },
+  itemName: { fontSize: 14, fontFamily: fonts.semibold, color: colors.textDark },
   itemMods: { ...typography.caption, marginTop: 2 },
 
   readyBanner: {
@@ -266,5 +266,5 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     borderTopWidth: 1, borderTopColor: colors.primaryMid,
   },
-  readyText: { fontSize: 14, fontWeight: '700', color: colors.primary },
+  readyText: { fontSize: 13, fontFamily: fonts.bold, color: colors.primary },
 });

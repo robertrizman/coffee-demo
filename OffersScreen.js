@@ -5,7 +5,7 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useApp } from './AppContext';
-import { colors, spacing, radius } from './theme';
+import { colors, spacing, radius, fonts } from './theme';
 import { track } from './tealium';
 import { HandshakeIcon, PeopleIcon, ClockIcon, StarIcon, CheckIcon } from './CoffeeIcons';
 
@@ -34,7 +34,7 @@ export default function OffersScreen() {
         {/* Header */}
         <View style={styles.header}>
           <View style={styles.badge}>
-            <ClockIcon size={12} color="#856404" />
+            <ClockIcon size={16} color="#856404" />
             <Text style={styles.badgeText}>Limited-time offer</Text>
           </View>
           <Text style={styles.title}>AI Accelerator</Text>
@@ -122,9 +122,9 @@ const styles = StyleSheet.create({
     paddingHorizontal: 14, paddingVertical: 5,
     borderWidth: 1, borderColor: '#ffc107',
   },
-  badgeText: { fontSize: 12, fontWeight: '700', color: '#856404' },
-  title: { fontSize: 30, fontWeight: '800', color: colors.midnight, textAlign: 'center' },
-  subtitle: { fontSize: 15, color: colors.textMuted, textAlign: 'center', lineHeight: 22 },
+  badgeText: { fontSize: 12, fontFamily: fonts.bold, color: '#856404' },
+  title: { fontSize: 29, fontFamily: fonts.extrabold, color: colors.midnight, textAlign: 'center' },
+  subtitle: { fontSize: 14, fontFamily: fonts.regular, color: colors.textMuted, textAlign: 'center', lineHeight: 22 },
 
   heroCard: {
     backgroundColor: colors.midnight,
@@ -132,9 +132,9 @@ const styles = StyleSheet.create({
     padding: spacing.lg,
     gap: spacing.sm,
   },
-  heroTitle: { fontSize: 20, fontWeight: '800', color: '#fff' },
-  heroDesc: { fontSize: 15, color: 'rgba(255,255,255,0.8)', lineHeight: 22 },
-  heroHighlight: { color: colors.teal, fontWeight: '700' },
+  heroTitle: { fontSize: 19, fontFamily: fonts.extrabold, color: '#fff' },
+  heroDesc: { fontSize: 14, fontFamily: fonts.regular, color: 'rgba(255,255,255,0.8)', lineHeight: 22 },
+  heroHighlight: { color: colors.teal, fontFamily: fonts.bold },
 
   card: {
     backgroundColor: '#fff',
@@ -144,24 +144,24 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: colors.borderLight,
   },
-  cardTitle: { fontSize: 16, fontWeight: '700', color: colors.midnight },
+  cardTitle: { fontSize: 15, fontFamily: fonts.bold, color: colors.midnight },
   cardTitleRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
-  cardBody: { fontSize: 14, color: colors.textMuted, lineHeight: 20 },
+  cardBody: { fontSize: 12, fontFamily: fonts.regular, color: colors.textMuted, lineHeight: 20 },
 
-  checkList: { gap: 8, marginTop: 4 },
-  checkRow: { flexDirection: 'row', alignItems: 'center', gap: 10 },
+  checkList: { gap: 8, marginTop: 4},
+  checkRow: { flexDirection: 'row', alignItems: 'center', gap: 10},
   checkIcon: {
     width: 24, height: 24, borderRadius: 12,
     backgroundColor: colors.teal, alignItems: 'center', justifyContent: 'center',
   },
-  checkText: { fontSize: 15, fontWeight: '600', color: '#fff', flex: 1 },
+  checkText: { fontSize: 14, fontFamily: fonts.semibold, color: '#fff', flex: 1 },
   checkIconSmall: {
     width: 20, height: 20, borderRadius: 10,
     backgroundColor: colors.primary, alignItems: 'center', justifyContent: 'center',
   },
-  checkTextSmall: { fontSize: 14, color: colors.textMuted, flex: 1 },
+  checkTextSmall: { fontSize: 12, fontFamily: fonts.regular, color: colors.textMuted, flex: 1 },
 
-  tcs: { fontSize: 12, color: colors.textMuted, textAlign: 'center', lineHeight: 18 },
+  tcs: { fontSize: 11, fontFamily: fonts.regular, color: colors.textMuted, textAlign: 'center', lineHeight: 18 },
 
   ctaBtn: {
     backgroundColor: colors.primary,
@@ -173,5 +173,5 @@ const styles = StyleSheet.create({
     gap: spacing.sm,
     marginTop: 4,
   },
-  ctaBtnText: { color: '#fff', fontSize: 17, fontWeight: '800', letterSpacing: 0.3 },
+  ctaBtnText: { color: '#fff', fontSize: 14, fontFamily: fonts.extrabold, letterSpacing: 0.3 },
 });

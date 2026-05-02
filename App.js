@@ -18,8 +18,17 @@ import OnboardingScreen from './OnboardingScreen';
 import SplashLoadingScreen from './SplashLoadingScreen';
 import { trackAppOpen, initTealium, getCanonicalDeviceId } from './tealium';
 import { registerPushToken } from './push';
-import { LogBox } from 'react-native';
+import { useFonts, Montserrat_400Regular, Montserrat_500Medium, Montserrat_600SemiBold, Montserrat_700Bold, Montserrat_800ExtraBold } from '@expo-google-fonts/montserrat';
+import { LogBox, Text, TextInput } from 'react-native';
 LogBox.ignoreAllLogs(false);
+
+// Apply Montserrat globally to every <Text> and <TextInput>.
+// theme.js typography overrides per-weight (700→Bold, 800→ExtraBold etc).
+// Inline styles that only set fontWeight without fontFamily get Regular as base.
+if (!Text.defaultProps) Text.defaultProps = {};
+Text.defaultProps.style = [{ fontFamily: 'Montserrat_400Regular' }];
+if (!TextInput.defaultProps) TextInput.defaultProps = {};
+TextInput.defaultProps.style = [{ fontFamily: 'Montserrat_400Regular' }];
 
 console.log('🎬 [App.js] File loaded successfully');
 
@@ -37,6 +46,13 @@ function Root() {
   const { state, dispatch } = useApp();
   const { profileLoaded, profile } = state;
   const [ready, setReady] = useState(false);
+  const [fontsLoaded] = useFonts({
+    Montserrat_400Regular,
+    Montserrat_500Medium,
+    Montserrat_600SemiBold,
+    Montserrat_700Bold,
+    Montserrat_800ExtraBold,
+  });
 
   useEffect(() => {
     console.log('🚀 [App] Initializing...');
@@ -65,11 +81,21 @@ function Root() {
       console.log('✅ [App] Ready state achieved');
       
       // Wait a bit longer to ensure Tealium UUID is available
-      setTimeout(() => {
+      setTimeout(async () => {
         const tealiumUuid = getCanonicalDeviceId();
         console.log('📱 [App] Tealium UUID before push registration:', tealiumUuid);
-        
-        registerPushToken(profile?.arc_location_id || null);
+
+        // Only refresh the token if permission was already granted — never trigger
+        // the OS dialog here. The user is likely on the onboarding screen and would
+        // accidentally dismiss it. Permission is requested explicitly via the opt-in
+        // checkbox on the order page or the My Account toggle.
+        const { status } = await Notifications.getPermissionsAsync();
+        if (status === 'granted') {
+          registerPushToken(profile?.arc_location_id || null);
+        } else {
+          console.log('📵 [App] Push permission not granted — skipping silent registration');
+        }
+
         requestLocationSilently();
       }, 3000); // Increased from 2s to 3s to give Tealium more time
 
@@ -185,7 +211,7 @@ function Root() {
     );
   };
 
-  if (!ready) {
+  if (!ready || !fontsLoaded) {
     console.log('⏳ [App] Showing splash screen');
     return <SplashLoadingScreen />;
   }

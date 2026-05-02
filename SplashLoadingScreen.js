@@ -7,7 +7,7 @@ import {
   Image,
   Easing,
 } from 'react-native';
-import { colors } from './theme';
+import { colors, fonts } from './theme';
 
 export default function SplashLoadingScreen() {
   const fadeAnim = useRef(new Animated.Value(0)).current;
@@ -162,15 +162,16 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   poweredBy: {
-    fontSize: 11,
-    fontWeight: '600',
+    fontSize: 10,
+    fontFamily: fonts.semibold,
     color: 'rgba(255,255,255,0.52)',
     letterSpacing: 2,
     marginBottom: 6,
   },
   prismText: {
-    fontSize: 18,
-    fontWeight: '700',
+    fontSize: 17,
+    fontFamily: fonts.bold,
+    fontWeight: 'bold',
     color: colors.teal || '#2ED3E6',
     letterSpacing: 3,
   },

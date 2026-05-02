@@ -18,7 +18,7 @@ import { saveDefaultPrinter, loadDefaultPrinter, clearDefaultPrinter, saveAutoPr
 import { scanForPrinters, getDeviceIP, deriveSubnet } from './printerScanner';
 import StoreHoursManager from './StoreHoursManager';
 import PushBroadcastScreen from './PushBroadcastScreen';
-import { colors, typography, spacing, radius, shadow } from './theme';
+import { colors, typography, spacing, radius, shadow, fonts } from './theme';
 import Svg, { Path } from 'react-native-svg';
 
 let Audio = null;
@@ -750,7 +750,7 @@ export default function SettingsScreen() {
               {loadingLocations ? (
                 <ActivityIndicator color={colors.primary} style={{ marginVertical: 8 }} />
               ) : locations.length === 0 ? (
-                <Text style={{ color: colors.textMuted, fontSize: 13, marginTop: 4 }}>No locations added yet.</Text>
+                <Text style={{ color: colors.textMuted, fontSize: 12, marginTop: 4 }}>No locations added yet.</Text>
               ) : (
                 locations.map(loc => {
                   const active = isLocationActive(loc);
@@ -994,7 +994,7 @@ export default function SettingsScreen() {
             <Text style={styles.cardIcon}>🔌</Text>
             <Text style={styles.cardTitle}>Connection Type</Text>
           </View>
-          <Text style={{ fontSize: 13, color: colors.textMuted, marginBottom: spacing.sm }}>
+          <Text style={{ fontSize: 12, color: colors.textMuted, marginBottom: spacing.sm }}>
             Select how the barista phone connects to the printer.
           </Text>
           <View style={styles.connectionTypeRow}>
@@ -1127,7 +1127,7 @@ export default function SettingsScreen() {
                     {isPairing
                       ? <ActivityIndicator size="small" color={colors.primary} />
                       : isActive
-                      ? <Text style={{ color: colors.primary, fontWeight: '700' }}>✓</Text>
+                      ? <Text style={{ color: colors.primary, fontFamily: fonts.bold }}>✓</Text>
                       : null
                     }
                   </TouchableOpacity>
@@ -1533,7 +1533,7 @@ export default function SettingsScreen() {
               placeholderTextColor={colors.textMuted}
               keyboardType="numbers-and-punctuation"
             />
-            <Text style={{ fontSize: 12, color: colors.textMuted, lineHeight: 16 }}>
+            <Text style={{ fontSize: 11, color: colors.textMuted, lineHeight: 16 }}>
               💡 If start/end dates are set, the location auto-enables/disables based on today's date. Leave blank to use the Enabled toggle only.
             </Text>
 
@@ -1597,7 +1597,7 @@ export default function SettingsScreen() {
                     : <Text style={styles.detectCoordsBtnText}>📡 Use my current location</Text>
                   }
                 </TouchableOpacity>
-                <Text style={{ fontSize: 11, color: colors.textMuted, lineHeight: 15 }}>
+                <Text style={{ fontSize: 10, color: colors.textMuted, lineHeight: 15 }}>
                   Tap the button while at the venue to auto-fill coordinates.
                 </Text>
               </>
@@ -1632,8 +1632,8 @@ const styles = StyleSheet.create({
     height: 52,
   },
   tabBtnActive: { backgroundColor: colors.primary },
-  tabBtnIcon: { fontSize: 20, marginBottom: 2 },
-  tabBtnLabel: { fontSize: 10, fontWeight: '600', color: colors.textMuted, textAlign: 'center' },
+  tabBtnIcon: { fontSize: 19, marginBottom: 2 },
+  tabBtnLabel: { fontSize: 9, fontFamily: fonts.semibold, color: colors.textMuted, textAlign: 'center' },
   tabBtnLabelActive: { color: '#fff' },
   section: { gap: spacing.md },
   header: {
@@ -1641,7 +1641,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: spacing.lg, paddingTop: spacing.lg, paddingBottom: spacing.md,
   },
   backBtn: { width: 40, height: 40, alignItems: 'center', justifyContent: 'center' },
-  backIcon: { fontSize: 28, color: colors.textDark, fontWeight: '300' },
+  backIcon: { fontSize: 27, color: colors.textDark, fontFamily: fonts.regular },
   title: { ...typography.heading2 },
 
   body: { padding: spacing.lg, gap: spacing.lg },
@@ -1653,7 +1653,7 @@ const styles = StyleSheet.create({
     gap: spacing.md, ...shadow.card,
   },
   cardHeader: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
-  cardIcon: { fontSize: 22 },
+  cardIcon: { fontSize: 21 },
   cardTitle: { ...typography.heading3 },
   cardBody: { ...typography.caption, lineHeight: 20 },
 
@@ -1666,14 +1666,14 @@ const styles = StyleSheet.create({
   },
   defaultPrinterLeft: { flex: 1 },
   preferredBadgeRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm, flexWrap: 'wrap' },
-  defaultPrinterName: { fontSize: 15, fontWeight: '700', color: colors.textDark },
+  defaultPrinterName: { fontSize: 14, fontFamily: fonts.bold, color: colors.textDark },
   defaultPrinterIp: { ...typography.caption, marginTop: 2, fontFamily: 'monospace' },
   clearBtn: {
     width: 32, height: 32, borderRadius: radius.full,
     backgroundColor: '#fef0ee', alignItems: 'center', justifyContent: 'center',
     borderWidth: 1, borderColor: '#f0c0b8',
   },
-  clearBtnText: { fontSize: 12, fontWeight: '700', color: '#c0392b' },
+  clearBtnText: { fontSize: 11, fontFamily: fonts.bold, color: '#c0392b' },
   noPrinterBox: {
     backgroundColor: colors.surfaceAlt, borderRadius: radius.md,
     padding: spacing.md, borderWidth: 1, borderColor: colors.border,
@@ -1685,20 +1685,20 @@ const styles = StyleSheet.create({
     paddingHorizontal: 8, paddingVertical: 3,
     borderWidth: 1, borderColor: '#e07b39',
   },
-  qlBadgeText: { fontSize: 10, fontWeight: '700', color: '#e07b39' },
+  qlBadgeText: { fontSize: 9, fontFamily: fonts.bold, color: '#e07b39' },
 
   // Network info
   networkInfo: {
     backgroundColor: colors.primaryLight, borderRadius: radius.md,
     padding: spacing.md, borderWidth: 1, borderColor: colors.primaryMid,
   },
-  networkInfoText: { fontSize: 13, color: colors.textMid, lineHeight: 20 },
-  networkInfoHighlight: { fontWeight: '700', color: colors.primary, fontFamily: 'monospace' },
+  networkInfoText: { fontSize: 12, color: colors.textMid, lineHeight: 20 },
+  networkInfoHighlight: { fontFamily: fonts.bold, color: colors.primary },
   noWifiBox: {
     backgroundColor: '#fff8f0', borderRadius: radius.md,
     padding: spacing.md, borderWidth: 1, borderColor: '#f0c0b8',
   },
-  noWifiText: { fontSize: 13, color: '#c0392b', lineHeight: 20 },
+  noWifiText: { fontSize: 12, color: '#c0392b', lineHeight: 20 },
 
   // Scan buttons
   scanBtn: {
@@ -1706,7 +1706,7 @@ const styles = StyleSheet.create({
     paddingVertical: 11, alignItems: 'center',
   },
   scanBtnDisabled: { opacity: 0.4 },
-  scanBtnText: { color: '#fff', fontSize: 15, fontWeight: '700' },
+  scanBtnText: { color: '#fff', fontSize: 14, fontFamily: fonts.bold },
   btPrinterRow: {
     flexDirection: 'row', alignItems: 'center',
     backgroundColor: colors.primaryLight, borderRadius: radius.md,
@@ -1714,20 +1714,20 @@ const styles = StyleSheet.create({
     borderWidth: 1, borderColor: colors.primaryMid,
     marginBottom: spacing.sm,
   },
-  btPrinterName: { fontSize: 14, fontWeight: '700', color: colors.textDark },
-  btPrinterAddress: { fontSize: 12, color: colors.textMuted, marginTop: 2 },
+  btPrinterName: { fontSize: 13, fontFamily: fonts.bold, color: colors.textDark },
+  btPrinterAddress: { fontSize: 11, color: colors.textMuted, marginTop: 2 },
   btClearBtn: {
     paddingHorizontal: spacing.md, paddingVertical: 6,
     borderRadius: radius.full, borderWidth: 1, borderColor: colors.border,
   },
-  btClearBtnText: { fontSize: 13, color: colors.textMid, fontWeight: '600' },
-  noPrinterText: { fontSize: 14, color: colors.textMuted, marginBottom: spacing.sm },
+  btClearBtnText: { fontSize: 12, color: colors.textMid, fontFamily: fonts.semibold },
+  noPrinterText: { fontSize: 13, color: colors.textMuted, marginBottom: spacing.sm },
   manualMacRow: {
     flexDirection: 'row', alignItems: 'center', gap: spacing.sm,
     marginTop: spacing.sm,
   },
   manualMacInput: {
-    flex: 1, height: 42, fontSize: 13, color: colors.textDark,
+    flex: 1, height: 42, fontSize: 12, color: colors.textDark,
     backgroundColor: colors.surfaceAlt, borderRadius: radius.md,
     borderWidth: 1, borderColor: colors.border,
     paddingHorizontal: spacing.md,
@@ -1736,15 +1736,15 @@ const styles = StyleSheet.create({
     paddingHorizontal: spacing.md, paddingVertical: 10,
     backgroundColor: colors.primary, borderRadius: radius.md,
   },
-  manualMacBtnText: { fontSize: 13, fontWeight: '700', color: '#fff' },
+  manualMacBtnText: { fontSize: 12, fontFamily: fonts.bold, color: '#fff' },
   iosBluetoothNote: {
     backgroundColor: '#f0f7ff', borderRadius: radius.md,
     padding: spacing.sm, marginBottom: spacing.sm,
     borderWidth: 1, borderColor: '#c5dff8',
   },
-  iosBluetoothNoteText: { fontSize: 13, color: '#1a4e7a', lineHeight: 19 },
+  iosBluetoothNoteText: { fontSize: 12, color: '#1a4e7a', lineHeight: 19 },
   iosSettingsLink: { marginTop: 6 },
-  iosSettingsLinkText: { fontSize: 13, color: colors.primary, fontWeight: '600' },
+  iosSettingsLinkText: { fontSize: 12, color: colors.primary, fontFamily: fonts.semibold },
   connectionTypeRow: { flexDirection: 'row', gap: spacing.sm },
   connectionTypeBtn: {
     flex: 1, paddingVertical: 10, borderRadius: radius.lg,
@@ -1752,14 +1752,14 @@ const styles = StyleSheet.create({
     backgroundColor: colors.surface, alignItems: 'center',
   },
   connectionTypeBtnActive: { backgroundColor: colors.primary, borderColor: colors.primary },
-  connectionTypeBtnText: { fontSize: 14, fontWeight: '600', color: colors.textMid },
+  connectionTypeBtnText: { fontSize: 13, fontFamily: fonts.semibold, color: colors.textMid },
   connectionTypeBtnTextActive: { color: '#fff' },
   stopBtn: {
     backgroundColor: colors.surfaceAlt, borderRadius: radius.lg,
     paddingVertical: 11, alignItems: 'center',
     borderWidth: 1.5, borderColor: colors.border,
   },
-  stopBtnText: { fontSize: 15, fontWeight: '600', color: colors.textMid },
+  stopBtnText: { fontSize: 14, fontFamily: fonts.semibold, color: colors.textMid },
 
   // Progress
   progressWrap: { gap: spacing.sm },
@@ -1778,7 +1778,7 @@ const styles = StyleSheet.create({
     backgroundColor: '#fef0ee', borderRadius: radius.md,
     padding: spacing.md, borderWidth: 1, borderColor: '#f0c0b8',
   },
-  errorText: { fontSize: 13, color: '#c0392b', lineHeight: 20 },
+  errorText: { fontSize: 12, color: '#c0392b', lineHeight: 20 },
 
   // Results
   resultsWrap: {
@@ -1799,25 +1799,25 @@ const styles = StyleSheet.create({
   printerResultBorder: { borderBottomWidth: 1, borderBottomColor: colors.borderLight },
   printerResultLeft: { flex: 1 },
   printerResultNameRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm, flexWrap: 'wrap' },
-  printerResultName: { fontSize: 14, fontWeight: '600', color: colors.textDark },
-  printerResultIp: { fontSize: 12, color: colors.textMuted, marginTop: 2, fontFamily: 'monospace' },
+  printerResultName: { fontSize: 13, fontFamily: fonts.semibold, color: colors.textDark },
+  printerResultIp: { fontSize: 11, color: colors.textMuted, marginTop: 2, fontFamily: 'monospace' },
   setDefaultBtn: {
     paddingHorizontal: spacing.md, paddingVertical: spacing.sm,
     borderRadius: radius.full, backgroundColor: colors.primary,
   },
-  setDefaultBtnText: { fontSize: 12, fontWeight: '700', color: '#fff' },
+  setDefaultBtnText: { fontSize: 11, fontFamily: fonts.bold, color: '#fff' },
   defaultTag: {
     paddingHorizontal: spacing.md, paddingVertical: spacing.sm,
     borderRadius: radius.full, backgroundColor: colors.primaryLight,
     borderWidth: 1, borderColor: colors.primaryMid,
   },
-  defaultTagText: { fontSize: 12, fontWeight: '700', color: colors.primary },
+  defaultTagText: { fontSize: 11, fontFamily: fonts.bold, color: colors.primary },
 
   noneFoundBox: {
     backgroundColor: colors.surfaceAlt, borderRadius: radius.md,
     padding: spacing.md, borderWidth: 1, borderColor: colors.border,
   },
-  noneFoundText: { fontSize: 13, color: colors.textMuted, lineHeight: 20, textAlign: 'center' },
+  noneFoundText: { fontSize: 12, color: colors.textMuted, lineHeight: 20, textAlign: 'center' },
 
   // User info card
   userInfoRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.md },
@@ -1825,34 +1825,34 @@ const styles = StyleSheet.create({
     width: 48, height: 48, borderRadius: radius.full,
     backgroundColor: colors.primary, alignItems: 'center', justifyContent: 'center',
   },
-  userAvatarText: { fontSize: 20, fontWeight: '700', color: '#fff' },
-  userName: { fontSize: 16, fontWeight: '700', color: colors.textDark },
+  userAvatarText: { fontSize: 19, fontFamily: fonts.bold, color: '#fff' },
+  userName: { fontSize: 15, fontFamily: fonts.bold, color: colors.textDark },
   userMeta: { ...typography.caption, marginTop: 2 },
-  userRole: { fontSize: 11, fontWeight: '700', color: colors.primary, marginTop: 2 },
+  userRole: { fontSize: 10, fontFamily: fonts.bold, color: colors.primary, marginTop: 2 },
   manageBaristasBtn: {
     backgroundColor: colors.primaryLight, borderRadius: radius.lg,
     paddingVertical: 12, alignItems: 'center',
     borderWidth: 1, borderColor: colors.primaryMid,
   },
-  manageBaristasText: { fontSize: 14, fontWeight: '700', color: colors.primary },
+  manageBaristasText: { fontSize: 13, fontFamily: fonts.bold, color: colors.primary },
 
   // Auto-print
   autoPrintRow: {
     flexDirection: 'row', alignItems: 'center', gap: spacing.md,
   },
   autoPrintLeft: { flex: 1 },
-  autoPrintLabel: { fontSize: 15, fontWeight: '600', color: colors.textDark },
+  autoPrintLabel: { fontSize: 14, fontFamily: fonts.semibold, color: colors.textDark },
   autoPrintSub: { ...typography.caption, marginTop: 2, lineHeight: 18 },
   autoPrintActive: {
     backgroundColor: colors.primaryLight, borderRadius: radius.md,
     padding: spacing.md, borderWidth: 1, borderColor: colors.primaryMid,
   },
-  autoPrintActiveText: { fontSize: 13, fontWeight: '600', color: colors.primary },
+  autoPrintActiveText: { fontSize: 12, fontFamily: fonts.semibold, color: colors.primary },
   autoPrintWarning: {
     backgroundColor: '#fff8f0', borderRadius: radius.md,
     padding: spacing.md, borderWidth: 1, borderColor: '#f0c0b8',
   },
-  autoPrintWarningText: { fontSize: 13, color: '#c0392b' },
+  autoPrintWarningText: { fontSize: 12, color: '#c0392b' },
 
   // Shorthand preview
   shorthandPreview: {
@@ -1864,14 +1864,14 @@ const styles = StyleSheet.create({
   shorthandCol: { flex: 1 },
   shorthandColLabel: { ...typography.label, marginBottom: spacing.sm },
   shorthandExample: {
-    fontSize: 13, color: colors.textMid, lineHeight: 20,
+    fontSize: 12, color: colors.textMid, lineHeight: 20,
     fontFamily: 'monospace',
   },
   shorthandExampleActive: {
-    fontSize: 15, fontWeight: '700', color: colors.primary,
+    fontSize: 14, fontFamily: fonts.bold, color: colors.primary,
     letterSpacing: 0.5,
   },
-  shorthandArrow: { fontSize: 18, color: colors.textMuted },
+  shorthandArrow: { fontSize: 17, color: colors.textMuted },
 
   // Test print
   secondaryBtn: {
@@ -1879,36 +1879,36 @@ const styles = StyleSheet.create({
     borderRadius: radius.lg, paddingVertical: 15,
     alignItems: 'center', backgroundColor: colors.surfaceAlt,
   },
-  secondaryBtnText: { fontWeight: '600', fontSize: 14, color: colors.textMid },
+  secondaryBtnText: { fontFamily: fonts.semibold, fontSize: 13, color: colors.textMid },
 
   // Tealium
   tealiumRows: { gap: spacing.sm },
   tealiumRow: { flexDirection: 'row', justifyContent: 'space-between' },
-  tealiumLabel: { ...typography.caption, fontWeight: '600' },
-  tealiumValue: { ...typography.caption, color: colors.primary, fontWeight: '600' },
+  tealiumLabel: { ...typography.caption, fontFamily: fonts.semibold },
+  tealiumValue: { ...typography.caption, color: colors.primary, fontFamily: fonts.semibold },
   tealiumEditBtn: {
     marginLeft: 'auto', paddingHorizontal: spacing.md, paddingVertical: 4,
     borderRadius: radius.full, borderWidth: 1.5, borderColor: colors.primary,
   },
-  tealiumEditBtnText: { fontSize: 12, fontWeight: '700', color: colors.primary },
-  tealiumHint: { fontSize: 11, color: colors.textMuted, textAlign: 'center', lineHeight: 16 },
+  tealiumEditBtnText: { fontSize: 11, fontFamily: fonts.bold, color: colors.primary },
+  tealiumHint: { fontSize: 10, color: colors.textMuted, textAlign: 'center', lineHeight: 16 },
   tealiumCancelBtn: {
     flex: 1, paddingVertical: 12, borderRadius: radius.lg,
     borderWidth: 1.5, borderColor: colors.border,
     alignItems: 'center', backgroundColor: colors.surface,
   },
-  tealiumCancelBtnText: { fontSize: 15, fontWeight: '600', color: colors.textMid },
+  tealiumCancelBtnText: { fontSize: 14, fontFamily: fonts.semibold, color: colors.textMid },
   tealiumSaveBtn: {
     flex: 1, paddingVertical: 12, borderRadius: radius.lg,
     backgroundColor: colors.primary, alignItems: 'center',
   },
-  tealiumSaveBtnText: { fontSize: 15, fontWeight: '700', color: '#fff' },
+  tealiumSaveBtnText: { fontSize: 14, fontFamily: fonts.bold, color: '#fff' },
   broadcastBtn: {
     backgroundColor: colors.midnight, borderRadius: radius.xl,
     padding: spacing.lg, alignItems: 'center', gap: 4,
   },
-  broadcastBtnText: { color: '#fff', fontSize: 16, fontWeight: '700' },
-  broadcastBtnSub: { color: 'rgba(255,255,255,0.6)', fontSize: 12 },
+  broadcastBtnText: { color: '#fff', fontSize: 15, fontFamily: fonts.bold },
+  broadcastBtnSub: { color: 'rgba(255,255,255,0.6)', fontSize: 11 },
   modalHeader: {
     flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
     paddingHorizontal: spacing.lg, paddingVertical: spacing.md,
@@ -1919,56 +1919,56 @@ const styles = StyleSheet.create({
     width: 32, height: 32, borderRadius: 16,
     backgroundColor: colors.lightGray, alignItems: 'center', justifyContent: 'center',
   },
-  modalCloseText: { fontSize: 14, color: colors.textDark, fontWeight: '600' },
+  modalCloseText: { fontSize: 13, color: colors.textDark, fontFamily: fonts.semibold },
   toggleRow: {
     flexDirection: 'row', alignItems: 'center',
     justifyContent: 'space-between', paddingVertical: spacing.sm,
     borderTopWidth: 1, borderTopColor: colors.borderLight, marginTop: spacing.sm,
   },
-  toggleLabel: { fontSize: 15, fontWeight: '600', color: colors.textDark },
-  toggleSub: { fontSize: 12, color: colors.textMuted, marginTop: 2 },
+  toggleLabel: { fontSize: 14, fontFamily: fonts.semibold, color: colors.textDark },
+  toggleSub: { fontSize: 11, color: colors.textMuted, marginTop: 2 },
   inputField: {
     borderWidth: 1.5, borderColor: colors.border, borderRadius: radius.md,
     paddingHorizontal: spacing.md, paddingVertical: 12,
-    fontSize: 15, color: colors.textDark, backgroundColor: colors.surface,
+    fontSize: 14, color: colors.textDark, backgroundColor: colors.surface,
   },
   addLocationBtn: {
     backgroundColor: colors.primary, borderRadius: radius.lg,
     paddingVertical: 12, alignItems: 'center', marginTop: spacing.sm,
   },
-  addLocationBtnText: { color: '#fff', fontSize: 15, fontWeight: '700' },
+  addLocationBtnText: { color: '#fff', fontSize: 14, fontFamily: fonts.bold },
   saveLocationBtn: {
     backgroundColor: colors.midnight, borderRadius: radius.lg,
     paddingVertical: 14, alignItems: 'center', marginTop: spacing.md,
   },
-  saveLocationBtnText: { color: '#fff', fontSize: 16, fontWeight: '700' },
+  saveLocationBtnText: { color: '#fff', fontSize: 15, fontFamily: fonts.bold },
   sectionDivider: { height: 1, backgroundColor: colors.borderLight, marginVertical: spacing.md },
-  sectionHeading: { fontSize: 13, fontWeight: '700', color: colors.textMuted, letterSpacing: 0.5, textTransform: 'uppercase', marginBottom: spacing.sm },
+  sectionHeading: { fontSize: 12, fontFamily: fonts.bold, color: colors.textMuted, letterSpacing: 0.5, textTransform: 'uppercase', marginBottom: spacing.sm },
   detectCoordsBtn: {
     backgroundColor: colors.primary, borderRadius: radius.md,
     paddingVertical: 12, alignItems: 'center',
   },
-  detectCoordsBtnText: { color: '#fff', fontSize: 14, fontWeight: '700' },
+  detectCoordsBtnText: { color: '#fff', fontSize: 13, fontFamily: fonts.bold },
   locationRow: {
     flexDirection: 'row', alignItems: 'flex-start',
     paddingVertical: spacing.sm, borderTopWidth: 1, borderTopColor: colors.borderLight, gap: spacing.sm,
   },
   locationRowInfo: { flex: 1 },
-  locationRowName: { fontSize: 14, fontWeight: '700', color: colors.textDark },
-  locationRowAddress: { fontSize: 12, color: colors.textMuted, marginTop: 2 },
-  locationRowDates: { fontSize: 11, color: colors.teal, marginTop: 2, fontWeight: '600' },
+  locationRowName: { fontSize: 13, fontFamily: fonts.bold, color: colors.textDark },
+  locationRowAddress: { fontSize: 11, color: colors.textMuted, marginTop: 2 },
+  locationRowDates: { fontSize: 10, color: colors.teal, marginTop: 2, fontFamily: fonts.semibold },
   locationEditBtn: {
     paddingHorizontal: spacing.sm, paddingVertical: 6,
     borderRadius: radius.md, backgroundColor: colors.primaryLight,
   },
-  locationEditBtnText: { fontSize: 12, fontWeight: '700', color: colors.primary },
+  locationEditBtnText: { fontSize: 11, fontFamily: fonts.bold, color: colors.primary },
   locationDeleteBtn: {
     paddingHorizontal: spacing.sm, paddingVertical: 6,
     borderRadius: radius.md, backgroundColor: '#fee2e2',
   },
-  locationDeleteBtnText: { fontSize: 12, fontWeight: '700', color: '#ef4444' },
+  locationDeleteBtnText: { fontSize: 11, fontFamily: fonts.bold, color: '#ef4444' },
   locationActiveBadge: { backgroundColor: '#dcfce7', borderRadius: 99, paddingHorizontal: 8, paddingVertical: 2, alignSelf: 'flex-start', marginTop: 4 },
-  locationActiveBadgeText: { fontSize: 10, fontWeight: '700', color: '#16a34a' },
+  locationActiveBadgeText: { fontSize: 9, fontFamily: fonts.bold, color: '#16a34a' },
   locationInactiveBadge: { backgroundColor: '#f1f5f9', borderRadius: 99, paddingHorizontal: 8, paddingVertical: 2, alignSelf: 'flex-start', marginTop: 4 },
-  locationInactiveBadgeText: { fontSize: 10, fontWeight: '700', color: colors.textMuted },
+  locationInactiveBadgeText: { fontSize: 9, fontFamily: fonts.bold, color: colors.textMuted },
 });

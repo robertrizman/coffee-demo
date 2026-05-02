@@ -360,15 +360,29 @@ export async function flushPrintQueue() {
     console.log(`[PrintQueue] 📋 Found ${unprintedOrders.length} unprinted orders`);
     for (const row of unprintedOrders) {
       const order = rowToOrder(row);
+      // Claim atomically — if the realtime path already claimed it, skip
+      const { data: claimed } = await supabase
+        .from('orders')
+        .update({ printed: true, printed_at: new Date().toISOString() })
+        .eq('id', order.id)
+        .eq('printed', false)
+        .select('id');
+      if (!claimed?.length) {
+        console.log(`[PrintQueue] Order ${order.id} already claimed — skipping`);
+        continue;
+      }
       console.log(`[PrintQueue] Printing ${order.id}...`);
-      const result = await printOrderReceipt(order, '', { silent: true });
-      if (result?.ok) {
-        console.log(`[PrintQueue] ✓ ${order.id} printed`);
-        await supabase.from('orders')
-          .update({ printed: true, printed_at: new Date().toISOString() })
-          .eq('id', order.id);
-      } else {
-        console.log(`[PrintQueue] ✗ ${order.id} failed, will retry on next wake`);
+      try {
+        const result = await printOrderReceipt(order, '', { silent: true });
+        if (result?.ok) {
+          console.log(`[PrintQueue] ✓ ${order.id} printed`);
+        } else {
+          console.log(`[PrintQueue] ✗ ${order.id} failed, releasing claim`);
+          await supabase.from('orders').update({ printed: false }).eq('id', order.id);
+        }
+      } catch (printErr) {
+        console.log(`[PrintQueue] ✗ ${order.id} threw, releasing claim:`, printErr.message);
+        await supabase.from('orders').update({ printed: false }).eq('id', order.id);
       }
       await new Promise(resolve => setTimeout(resolve, 500));
     }
@@ -431,22 +445,35 @@ export function AppProvider({ children }) {
           const hasPrinter = defaultPrinter?.ip || bluetoothPrinter?.bluetoothAddress;
           if (autoPrintEnabled && hasPrinter) {
             enqueuePrint(async () => {
-              console.log('[AutoPrint] Printing order', order.id, bluetoothPrinter?.bluetoothAddress ? 'via Bluetooth' : 'to ' + defaultPrinter?.ip);
+              console.log('[AutoPrint] Claiming order', order.id, bluetoothPrinter?.bluetoothAddress ? 'via Bluetooth' : 'to ' + defaultPrinter?.ip);
+              // Claim the order atomically before printing — prevents flushPrintQueue or a
+              // second realtime event from printing the same label concurrently or on app resume.
+              const { data: claimed } = await supabase
+                .from('orders')
+                .update({ printed: true, printed_at: new Date().toISOString() })
+                .eq('id', order.id)
+                .eq('printed', false)
+                .select('id');
+              if (!claimed?.length) {
+                console.log('[AutoPrint] Order', order.id, 'already claimed by another path — skipping');
+                return;
+              }
               // Skip warmup here — checkPrinterConnectivity already warms the link on screen focus,
               // and doing another open/close cycle right before printing causes RFCOMM socket
               // exhaustion on Samsung/Android 9 devices (S9+), making the real print fail silently.
               // The flushPrintQueue path (sleep→wake) handles its own warmup separately.
-              const result = await printOrderReceipt(order, '', { silent: true });
-
-              // Mark as printed if successful
-              if (result && result.ok) {
-                console.log('[AutoPrint] ✓ Print successful, marking as printed');
-                await supabase
-                  .from('orders')
-                  .update({ printed: true, printed_at: new Date().toISOString() })
-                  .eq('id', order.id);
-              } else {
-                console.log('[AutoPrint] ✗ Print failed, leaving printed=false');
+              try {
+                const result = await printOrderReceipt(order, '', { silent: true });
+                if (result?.ok) {
+                  console.log('[AutoPrint] ✓ Print successful');
+                } else {
+                  console.log('[AutoPrint] ✗ Print failed, releasing claim');
+                  await supabase.from('orders').update({ printed: false }).eq('id', order.id);
+                }
+              } catch (printErr) {
+                console.log('[AutoPrint] ✗ Print threw, releasing claim:', printErr.message);
+                await supabase.from('orders').update({ printed: false }).eq('id', order.id);
+                throw printErr;
               }
             });
           }

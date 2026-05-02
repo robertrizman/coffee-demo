@@ -9,7 +9,7 @@ import { MENU, CATEGORIES } from './menu';
 import { useApp } from './AppContext';
 import { useAuth } from './AuthContext';
 import { trackMenuView, trackItemView, queryMomentsAPI, trackAIPairingOpened, trackAIPairingResult, trackAIPairingCarousel } from './tealium';
-import { colors, typography, spacing, radius, shadow } from './theme';
+import { colors, typography, spacing, radius, shadow, fonts } from './theme';
 import { EspressoIcon, LatteIcon, IcedCupIcon, HotChocIcon, ChaiIcon, TeaIcon, ChevronIcon, AiSparkIcon, MorningTeaIcon, LunchIcon, SnacksIcon } from './CoffeeIcons';
 import { buildRecommendation } from './recommendations';
 import { getAIPairing, getExpectedAIProvider, getThinkingLabel } from './foodPairingAI';
@@ -125,9 +125,8 @@ export default function MenuScreen() {
   const fadeAnim = useRef(new Animated.Value(0)).current;
 
   const goToSlide = (index) => {
+    if (index < 0 || index >= slides.length) return;
     setCurrentSlide(index);
-    isProgrammaticScroll.current = true;
-    carouselRef.current?.scrollTo({ x: index * slideWidth, animated: true });
     trackAIPairingCarousel(index);
   };
 
@@ -392,15 +391,31 @@ export default function MenuScreen() {
 
       {/* AI Pairing Modal — customers only */}
       <Modal visible={aiOpen && !isAdmin} transparent animationType="fade" onRequestClose={closeAi}>
-        <TouchableOpacity
-          style={[styles.modalOverlay, { paddingTop: insets.top + spacing.lg, paddingBottom: Math.max(insets.bottom, Platform.OS === 'android' ? 24 : 0) + spacing.lg }]}
-          activeOpacity={1}
-          onPress={closeAi}
-        >
+        {/*
+          Outer View fills the screen and centres the card.
+          It does NOT handle touches itself — that would fight the inner ScrollView.
+        */}
+        <View style={styles.modalOverlay}>
+
+          {/*
+            Backdrop tap-to-close sits as an absolute-fill layer BEHIND the card.
+            Keeping it separate from the card means its gesture recogniser
+            never competes with the ScrollView inside the card.
+          */}
           <TouchableOpacity
-            style={[styles.aiModal, { maxHeight: screenHeight - insets.top - Math.max(insets.bottom, Platform.OS === 'android' ? 24 : 0) - spacing.lg * 4 }]}
+            style={StyleSheet.absoluteFillObject}
             activeOpacity={1}
-            onPress={() => {}}
+            onPress={closeAi}
+          />
+
+          {/*
+            Card: plain View — no TouchableOpacity, no responder override.
+            height: 75% of screen gives the ScrollView a concrete measured height
+            so React Native knows exactly how much space it has to scroll within.
+            overflow: hidden clips content to the rounded corners.
+          */}
+          <View
+            style={[styles.aiModal, { height: Math.max(screenHeight * 0.75, 300) }]}
           >
 
             {/* Header */}
@@ -414,6 +429,9 @@ export default function MenuScreen() {
                 <Text style={styles.closeBtnText}>✕</Text>
               </TouchableOpacity>
             </View>
+
+            {/* Scrollable content area */}
+            <View style={{ flex: 1, overflow: 'hidden' }}>
 
             {/* No orders state */}
             {aiPhase === 'no-orders' && (
@@ -458,170 +476,146 @@ export default function MenuScreen() {
 
             {/* Insights + Recommendation with Carousel */}
             {(aiPhase === 'insights' || aiPhase === 'recommendation') && recommendation && slides.length > 0 && (
-              <Animated.View style={{ opacity: fadeAnim }}>
+              <Animated.View style={{ opacity: fadeAnim, flex: 1 }}>
                 <ScrollView
-                  ref={carouselRef}
-                  horizontal
-                  pagingEnabled
-                  showsHorizontalScrollIndicator={false}
-                  scrollEventThrottle={16}
-                  onMomentumScrollEnd={(e) => {
-                    const index = Math.round(e.nativeEvent.contentOffset.x / slideWidth);
-                    setCurrentSlide(index);
-                    if (isProgrammaticScroll.current) {
-                      isProgrammaticScroll.current = false;
-                    } else {
-                      trackAIPairingCarousel(index);
-                    }
-                  }}
-                  style={{ width: slideWidth }}
-                  contentContainerStyle={{ flexDirection: 'row' }}
+                  style={{ flex: 1 }}
+                  contentContainerStyle={{ paddingHorizontal: 4, paddingBottom: 16 }}
+                  showsVerticalScrollIndicator={false}
                 >
-                  {slides.map((slide, index) => (
-                    <ScrollView
-                      key={index}
-                      style={{ width: slideWidth }}
-                      contentContainerStyle={{ paddingHorizontal: 4, paddingBottom: 12 }}
-                      showsVerticalScrollIndicator={false}
-                      nestedScrollEnabled
-                      bounces={false}
-                    >
-                        {slide.type === 'standard' && (
-                          <>
-                            {/* Badges from AudienceStream — top of card */}
-                            {recommendation.badges?.length > 0 && (
-                              <View style={styles.badgesRow}>
-                                {recommendation.badges.map((badge, i) => (
-                                  <View key={i} style={styles.badge}>
-                                    <Text style={styles.badgeText}>🏅 {badge}</Text>
-                                  </View>
-                                ))}
-                              </View>
-                            )}
-
-                            {/* Visitor insights strip */}
-                            <View style={styles.insightsRow}>
-                              <View style={styles.insightChip}>
-                                <Text style={styles.insightChipLabel}>Orders</Text>
-                                <Text style={styles.insightChipValue}>{recommendation.totalOrders}</Text>
-                              </View>
-                              <View style={styles.insightChip}>
-                                <Text style={styles.insightChipLabel}>Pickup</Text>
-                                <Text style={styles.insightChipValue}>{recommendation.pickupOrders ?? '—'}</Text>
-                              </View>
-                              <View style={styles.insightChip}>
-                                <Text style={styles.insightChipLabel}>Usage</Text>
-                                <Text style={styles.insightChipValue} numberOfLines={1}>
-                                  {recommendation.timeOnSite != null
-                                    ? recommendation.timeOnSite >= 60
-                                      ? `${(recommendation.timeOnSite / 60).toFixed(1)}hr`
-                                      : `${Math.round(recommendation.timeOnSite)}m`
-                                    : '—'}
-                                </Text>
-                              </View>
+                  {slides[currentSlide]?.type === 'standard' && (
+                    <>
+                      {/* Badges from AudienceStream — top of card */}
+                      {recommendation.badges?.length > 0 && (
+                        <View style={styles.badgesRow}>
+                          {recommendation.badges.map((badge, i) => (
+                            <View key={i} style={styles.badge}>
+                              <Text style={styles.badgeText}>🏅 {badge}</Text>
                             </View>
+                          ))}
+                        </View>
+                      )}
 
-                            {/* Favourite drink statement */}
-                            {recommendation.favouriteDrink && (
-                              <View style={styles.favouriteStatement}>
-                                <Text style={styles.favouriteStatementText}>
-                                  ☕ Based on your favourite drink,{' '}
-                                  <Text style={styles.favouriteStatementDrink}>{recommendation.favouriteDrink}</Text>
-                                  , here's what we recommend:
-                                </Text>
-                              </View>
-                            )}
+                      {/* Visitor insights strip */}
+                      <View style={styles.insightsRow}>
+                        <View style={styles.insightChip}>
+                          <Text style={styles.insightChipLabel}>Orders</Text>
+                          <Text style={styles.insightChipValue}>{recommendation.totalOrders}</Text>
+                        </View>
+                        <View style={styles.insightChip}>
+                          <Text style={styles.insightChipLabel}>Pickup</Text>
+                          <Text style={styles.insightChipValue}>{recommendation.pickupOrders ?? '—'}</Text>
+                        </View>
+                        <View style={styles.insightChip}>
+                          <Text style={styles.insightChipLabel}>Usage</Text>
+                          <Text style={styles.insightChipValue} numberOfLines={1}>
+                            {recommendation.timeOnSite != null
+                              ? recommendation.timeOnSite >= 60
+                                ? `${(recommendation.timeOnSite / 60).toFixed(1)}hr`
+                                : `${Math.round(recommendation.timeOnSite)}m`
+                              : '—'}
+                          </Text>
+                        </View>
+                      </View>
 
-                            {/* Recommendation */}
-                            {aiPhase === 'recommendation' && (
-                              <View style={styles.recSection}>
-                                {recommendation.suggestions?.length > 0 ? (
-                                  <>
-                                    {recommendation.suggestions.map((item, i) => (
-                                      <View key={i} style={styles.recItem}>
-                                        <Text style={styles.recItemEmoji}>🍽️</Text>
-                                        <View style={{ flex: 1 }}>
-                                          <Text style={styles.recItemName}>{item.name}</Text>
-                                          {item.cat && <Text style={styles.recItemCat}>{item.cat}</Text>}
-                                        </View>
-                                      </View>
-                                    ))}
-                                    <TypingText text={recommendation.reason} speed={20} />
-                                    {(recommendation.aiSource === 'openai' || recommendation.aiSource === 'on-device-llm') && recommendation.aiEngine && (
-                                      <View style={styles.openAIBadge}>
-                                        <Text style={styles.openAIBadgeText}>✦ Generated by {recommendation.aiEngine}</Text>
-                                      </View>
-                                    )}
-                                  </>
-                                ) : (
-                                  <View style={styles.aiEmptyState}>
-                                    <Text style={styles.aiEmptySubtitle}>No food items available yet. Ask the barista to add items to the menu.</Text>
+                      {/* Favourite drink statement */}
+                      {recommendation.favouriteDrink && (
+                        <View style={styles.favouriteStatement}>
+                          <Text style={styles.favouriteStatementText}>
+                            ☕ Based on your favourite drink,{' '}
+                            <Text style={styles.favouriteStatementDrink}>{recommendation.favouriteDrink}</Text>
+                            , here's what we recommend from the food menu:
+                          </Text>
+                        </View>
+                      )}
+
+                      {/* Recommendation */}
+                      {aiPhase === 'recommendation' && (
+                        <View style={styles.recSection}>
+                          {recommendation.suggestions?.length > 0 ? (
+                            <>
+                              {recommendation.suggestions.map((item, i) => (
+                                <View key={i} style={styles.recItem}>
+                                  <Text style={styles.recItemEmoji}>🍽️</Text>
+                                  <View style={{ flex: 1 }}>
+                                    <Text style={styles.recItemName}>{item.name}</Text>
+                                    {item.cat && <Text style={styles.recItemCat}>{item.cat}</Text>}
                                   </View>
-                                )}
-                              </View>
-                            )}
-
-                          </>
-                        )}
-
-                        {slide.type === 'bedrock' && (
-                          <View style={styles.bedrockSlide}>
-                            <View style={styles.bedrockHeader}>
-                              <Image
-                                source={{ uri: 'https://miro.medium.com/v2/0*jxBA7rdI57KJZ-Jr.png' }}
-                                style={styles.bedrockImage}
-                                resizeMode="contain"
-                              />
-                              <Text style={styles.bedrockTitle}>Amazon Bedrock Insights</Text>
-                            </View>
-
-                            <View style={styles.bedrockContent}>
-                              {slide.data.sentiment && (
-                                <View style={styles.bedrockMetric}>
-                                  <Text style={styles.bedrockMetricLabel}>Sentiment Analysis</Text>
-                                  <Text style={styles.bedrockMetricValue}>{slide.data.sentiment}</Text>
+                                </View>
+                              ))}
+                              <TypingText text={recommendation.reason} speed={20} />
+                              {(recommendation.aiSource === 'openai' || recommendation.aiSource === 'on-device-llm') && recommendation.aiEngine && (
+                                <View style={styles.openAIBadge}>
+                                  <Text style={styles.openAIBadgeText}>✦ Generated by {recommendation.aiEngine}</Text>
                                 </View>
                               )}
-
-                              <View style={styles.bedrockExplainer}>
-                                <Text style={styles.bedrockExplainerText}>
-                                  Triggered via Tealium Connector. Data sent to Moments API on first purchase.
-                                </Text>
-                              </View>
+                            </>
+                          ) : (
+                            <View style={styles.aiEmptyState}>
+                              <Text style={styles.aiEmptySubtitle}>No food items available yet. Ask the barista to add items to the menu.</Text>
                             </View>
+                          )}
+                        </View>
+                      )}
+                    </>
+                  )}
+
+                  {slides[currentSlide]?.type === 'bedrock' && (
+                    <View style={styles.bedrockSlide}>
+                      <View style={styles.bedrockHeader}>
+                        <Image
+                          source={{ uri: 'https://miro.medium.com/v2/0*jxBA7rdI57KJZ-Jr.png' }}
+                          style={styles.bedrockImage}
+                          resizeMode="contain"
+                        />
+                        <Text style={styles.bedrockTitle}>Amazon Bedrock Insights</Text>
+                      </View>
+                      <View style={styles.bedrockContent}>
+                        {slides[currentSlide].data.sentiment && (
+                          <View style={styles.bedrockMetric}>
+                            <Text style={styles.bedrockMetricLabel}>Sentiment Analysis</Text>
+                            <Text style={styles.bedrockMetricValue}>{slides[currentSlide].data.sentiment}</Text>
                           </View>
                         )}
-                      </ScrollView>
-                    ))}
-                  </ScrollView>
-
-                {/* Navigation arrows if multiple slides */}
-                {slides.length > 1 && (
-                  <View style={styles.carouselNav}>
-                    <TouchableOpacity
-                      style={[styles.carouselNavBtn, currentSlide === 0 && styles.carouselNavBtnDisabled]}
-                      onPress={() => goToSlide(currentSlide - 1)}
-                      disabled={currentSlide === 0}
-                    >
-                      <Text style={[styles.carouselNavText, currentSlide === 0 && styles.carouselNavTextDisabled]}>‹</Text>
-                    </TouchableOpacity>
-                    <Text style={styles.carouselNavLabel}>
-                      {currentSlide + 1} / {slides.length}
-                    </Text>
-                    <TouchableOpacity
-                      style={[styles.carouselNavBtn, currentSlide === slides.length - 1 && styles.carouselNavBtnDisabled]}
-                      onPress={() => goToSlide(currentSlide + 1)}
-                      disabled={currentSlide === slides.length - 1}
-                    >
-                      <Text style={[styles.carouselNavText, currentSlide === slides.length - 1 && styles.carouselNavTextDisabled]}>›</Text>
-                    </TouchableOpacity>
-                  </View>
-                )}
+                        <View style={styles.bedrockExplainer}>
+                          <Text style={styles.bedrockExplainerText}>
+                            Triggered via Tealium Connector. Data sent to Moments API on first purchase.
+                          </Text>
+                        </View>
+                      </View>
+                    </View>
+                  )}
+                </ScrollView>
               </Animated.View>
             )}
 
-          </TouchableOpacity>
-        </TouchableOpacity>
+            </View>
+
+            {/* CarouselNav — fixed at bottom */}
+            {(aiPhase === 'insights' || aiPhase === 'recommendation') && recommendation && slides.length > 1 && (
+              <View style={styles.carouselNav}>
+                <TouchableOpacity
+                  style={[styles.carouselNavBtn, currentSlide === 0 && styles.carouselNavBtnDisabled]}
+                  onPress={() => goToSlide(currentSlide - 1)}
+                  disabled={currentSlide === 0}
+                >
+                  <Text style={[styles.carouselNavText, currentSlide === 0 && styles.carouselNavTextDisabled]}>‹</Text>
+                </TouchableOpacity>
+                <Text style={styles.carouselNavLabel}>
+                  {currentSlide + 1} / {slides.length}
+                </Text>
+                <TouchableOpacity
+                  style={[styles.carouselNavBtn, currentSlide === slides.length - 1 && styles.carouselNavBtnDisabled]}
+                  onPress={() => goToSlide(currentSlide + 1)}
+                  disabled={currentSlide === slides.length - 1}
+                >
+                  <Text style={[styles.carouselNavText, currentSlide === slides.length - 1 && styles.carouselNavTextDisabled]}>›</Text>
+                </TouchableOpacity>
+              </View>
+            )}
+
+          </View>
+
+        </View>
       </Modal>
 
     </SafeAreaView>
@@ -635,17 +629,17 @@ const styles = StyleSheet.create({
     padding: spacing.xl, gap: 16,
   },
   closedIcon: { fontSize: 64 },
-  closedTitle: { fontSize: 32, fontWeight: '800', color: '#fff' },
-  closedMsg: { fontSize: 16, color: 'rgba(255,255,255,0.7)', textAlign: 'center', lineHeight: 24 },
+  closedTitle: { fontSize: 31, fontFamily: fonts.extrabold, color: '#fff' },
+  closedMsg: { fontSize: 15, color: 'rgba(255,255,255,0.7)', textAlign: 'center', lineHeight: 24 },
   closedBreaks: {
     width: '100%', backgroundColor: 'rgba(255,255,255,0.1)',
     borderRadius: radius.lg, padding: spacing.md, gap: 8, marginTop: 8,
   },
-  closedBreaksTitle: { fontSize: 11, fontWeight: '700', color: 'rgba(255,255,255,0.5)', letterSpacing: 1, textTransform: 'uppercase' },
+  closedBreaksTitle: { fontSize: 10, fontFamily: fonts.bold, color: 'rgba(255,255,255,0.5)', letterSpacing: 1, textTransform: 'uppercase' },
   closedBreakRow: { flexDirection: 'row', justifyContent: 'space-between' },
-  closedBreakLabel: { fontSize: 14, fontWeight: '600', color: '#fff' },
-  closedBreakTime: { fontSize: 14, color: colors.teal, fontWeight: '600' },
-  closedBrand: { fontSize: 11, color: 'rgba(255,255,255,0.3)', letterSpacing: 1, marginTop: 16 },
+  closedBreakLabel: { fontSize: 13, fontFamily: fonts.semibold, color: '#fff' },
+  closedBreakTime: { fontSize: 13, color: colors.teal, fontFamily: fonts.semibold },
+  closedBrand: { fontSize: 10, color: 'rgba(255,255,255,0.3)', letterSpacing: 1, marginTop: 16 },
   closedBanner: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -655,10 +649,10 @@ const styles = StyleSheet.create({
     gap: 10,
   },
   closedBannerIcon: { fontSize: 20 },
-  closedBannerText: { flex: 1, color: '#fff', fontSize: 14, fontWeight: '600' },
+  closedBannerText: { flex: 1, color: '#fff', fontSize: 13, fontFamily: fonts.semibold },
   header: { paddingHorizontal: spacing.lg, paddingTop: spacing.lg, paddingBottom: spacing.md },
   headerRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
-  title: { ...typography.heading1 },
+  title: { ...typography.heading1, fontSize: 24 },
   subtitle: { ...typography.subtitle, marginTop: 2 },
 
   aiButton: {
@@ -668,13 +662,13 @@ const styles = StyleSheet.create({
     ...shadow.card,
   },
   aiButtonIcon: { fontSize: 14, color: colors.teal },
-  aiButtonLabel: { fontSize: 13, fontWeight: '700', color: '#fff', letterSpacing: 0.3 },
+  aiButtonLabel: { fontSize: 12, fontFamily: fonts.bold, color: '#fff', letterSpacing: 0.3 },
 
   tabsWrapper: { height: 48 },
   tabsContent: { paddingHorizontal: spacing.lg, gap: spacing.sm, alignItems: 'center', height: 48 },
   tab: { paddingHorizontal: spacing.md, paddingVertical: 7, borderRadius: radius.full, borderWidth: 1.5, borderColor: colors.border, backgroundColor: colors.background },
   tabActive: { backgroundColor: colors.primary, borderColor: colors.primary },
-  tabText: { fontSize: 14, fontWeight: '600', color: colors.textMid },
+  tabText: { fontSize: 13, fontFamily: fonts.semibold, color: colors.textMid },
   tabTextActive: { color: '#fff' },
   tabFood: { borderColor: colors.teal, backgroundColor: colors.tealLight },
   tabTextFood: { color: colors.primary },
@@ -684,10 +678,10 @@ const styles = StyleSheet.create({
   card: { flexDirection: 'row', alignItems: 'center', backgroundColor: colors.surface, borderRadius: radius.lg, padding: spacing.md, borderWidth: 1, borderColor: colors.borderLight, ...shadow.card },
   iconCircle: { width: 52, height: 52, borderRadius: radius.full, backgroundColor: colors.primaryLight, alignItems: 'center', justifyContent: 'center', marginRight: spacing.md, borderWidth: 1, borderColor: colors.primaryMid },
   cardText: { flex: 1 },
-  cardName: { ...typography.heading3, fontSize: 16 },
+  cardName: { ...typography.heading3, fontSize: 15 },
   cardDesc: { ...typography.caption, marginTop: 2 },
   foodBanner: { backgroundColor: colors.tealLight, borderRadius: radius.md, padding: spacing.md, borderWidth: 1, borderColor: colors.tealMid },
-  foodBannerText: { fontSize: 13, fontWeight: '600', color: colors.primary },
+  foodBannerText: { fontSize: 12, fontFamily: fonts.semibold, color: colors.primary },
   foodCard: { flexDirection: 'row', alignItems: 'center', backgroundColor: colors.surface, borderRadius: radius.lg, padding: spacing.md, borderWidth: 1, borderColor: colors.borderLight },
   foodIconWrap: { width: 40, height: 40, borderRadius: radius.md, backgroundColor: colors.tealLight, alignItems: 'center', justifyContent: 'center', marginRight: spacing.md },
   foodDisclaimer: {
@@ -698,65 +692,66 @@ const styles = StyleSheet.create({
     borderColor: colors.borderLight,
     gap: 4,
   },
-  foodDisclaimerTitle: { fontSize: 11, fontWeight: '700', color: colors.textMuted, letterSpacing: 0.5, textTransform: 'uppercase' },
-  foodDisclaimerText: { fontSize: 12, color: colors.textMuted, lineHeight: 18 },
+  foodDisclaimerTitle: { fontSize: 10, fontFamily: fonts.bold, color: colors.textMuted, letterSpacing: 0.5, textTransform: 'uppercase' },
+  foodDisclaimerText: { fontSize: 11, color: colors.textMuted, lineHeight: 18 },
 
   // AI Modal
+  // flex:1 fills screen; justify/alignItems centre the card; padding = gutters from edges
   modalOverlay: { flex: 1, backgroundColor: 'rgba(5,24,56,0.6)', justifyContent: 'center', alignItems: 'center', paddingHorizontal: 16, paddingVertical: spacing.lg },
-  aiModal: { backgroundColor: colors.surface, borderRadius: 24, width: '100%', padding: spacing.md, ...shadow.modal },
+  aiModal: { backgroundColor: colors.surface, borderRadius: 24, width: '100%', padding: spacing.md, overflow: 'hidden', ...shadow.modal },
 
   aiModalHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: spacing.md },
   aiModalTitleRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
   aiIconBadge: { width: 32, height: 32, borderRadius: radius.full, backgroundColor: colors.midnight, alignItems: 'center', justifyContent: 'center' },
   aiIconBadgeText: { fontSize: 14, color: colors.teal },
-  aiModalTitle: { fontSize: 17, fontWeight: '800', color: colors.midnight },
+  aiModalTitle: { fontSize: 16, fontFamily: fonts.extrabold, color: colors.midnight },
   prismBadge: { backgroundColor: colors.primaryLight, borderRadius: radius.full, paddingHorizontal: 8, paddingVertical: 2, borderWidth: 1, borderColor: colors.primaryMid },
-  prismBadgeText: { fontSize: 9, fontWeight: '800', color: colors.primary, letterSpacing: 1 },
+  prismBadgeText: { fontSize: 8, fontFamily: fonts.extrabold, color: colors.primary, letterSpacing: 1 },
   closeBtn: { width: 32, height: 32, borderRadius: radius.full, backgroundColor: colors.surfaceAlt, alignItems: 'center', justifyContent: 'center' },
-  closeBtnText: { fontSize: 14, color: colors.textMid, fontWeight: '600' },
+  closeBtnText: { fontSize: 13, color: colors.textMid, fontFamily: fonts.semibold },
 
   aiEmptyState: { alignItems: 'center', paddingVertical: spacing.lg, gap: spacing.md },
   aiEmptyIcon: { fontSize: 40 },
-  aiEmptyTitle: { fontSize: 16, fontWeight: '700', color: colors.midnight },
-  aiEmptySubtitle: { fontSize: 14, color: colors.textMid, textAlign: 'center', lineHeight: 20 },
+  aiEmptyTitle: { fontSize: 15, fontFamily: fonts.bold, color: colors.midnight },
+  aiEmptySubtitle: { fontSize: 13, fontFamily: fonts.regular, color: colors.textMid, textAlign: 'center', lineHeight: 20 },
 
   aiThinking: { alignItems: 'center', paddingVertical: spacing.xl, gap: spacing.md },
-  aiThinkingLabel: { fontSize: 14, color: colors.textMid, fontWeight: '600' },
-  aiThinkingEngine: { fontSize: 10, color: colors.textMuted, letterSpacing: 0.5, marginTop: 4 },
+  aiThinkingLabel: { fontSize: 13, color: colors.textMid, fontFamily: fonts.semibold },
+  aiThinkingEngine: { fontSize: 9, color: colors.textMuted, letterSpacing: 0.5, marginTop: 4 },
   dotsRow: { flexDirection: 'row', gap: 8 },
-  dot: { fontSize: 10, color: colors.primary },
+  dot: { fontSize: 9, color: colors.primary },
 
-  insightsRow: { flexDirection: 'row', gap: spacing.sm, marginBottom: spacing.md },
+  insightsRow: { flexDirection: 'row', gap: spacing.sm, marginBottom: spacing.sm },
   insightChip: { flex: 1, backgroundColor: colors.surfaceAlt, borderRadius: radius.md, padding: spacing.sm, alignItems: 'center', borderWidth: 1, borderColor: colors.borderLight },
-  insightChipLabel: { fontSize: 9, fontWeight: '700', color: colors.textMuted, textTransform: 'uppercase', letterSpacing: 0.5 },
-  insightChipValue: { fontSize: 12, fontWeight: '700', color: colors.midnight, marginTop: 2 },
+  insightChipLabel: { fontSize: 8, fontFamily: fonts.bold, color: colors.textMuted, textTransform: 'uppercase', letterSpacing: 0.5 },
+  insightChipValue: { fontSize: 11, fontFamily: fonts.bold, color: colors.midnight, marginTop: 2 },
 
   recSection: { gap: spacing.xs, marginBottom: spacing.sm },
-  recSectionTitle: { fontSize: 14, fontWeight: '800', color: colors.midnight, marginBottom: 4 },
+  recSectionTitle: { fontSize: 13, fontFamily: fonts.extrabold, color: colors.midnight, marginBottom: 4 },
   recCatLabel: { backgroundColor: colors.primaryLight, borderRadius: radius.full, paddingHorizontal: spacing.sm, paddingVertical: 3, alignSelf: 'flex-start', borderWidth: 1, borderColor: colors.primaryMid },
-  recCatText: { fontSize: 11, fontWeight: '700', color: colors.primary },
+  recCatText: { fontSize: 10, fontFamily: fonts.bold, color: colors.primary },
   recItem: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm, backgroundColor: colors.surfaceAlt, borderRadius: radius.md, padding: spacing.sm, borderWidth: 1, borderColor: colors.borderLight },
-  recItemEmoji: { fontSize: 16 },
-  recItemName: { fontSize: 13, fontWeight: '600', color: colors.midnight },
-  recItemCat: { fontSize: 10, color: colors.textMuted, marginTop: 1 },
-  aiReasonText: { fontSize: 13, color: colors.textMid, lineHeight: 19, fontStyle: 'italic', marginTop: spacing.sm },
+  recItemEmoji: { fontSize: 15 },
+  recItemName: { fontSize: 12, fontFamily: fonts.semibold, color: colors.midnight },
+  recItemCat: { fontSize: 9, color: colors.textMuted, marginTop: 1 },
+  aiReasonText: { fontSize: 11, fontFamily: fonts.regular, color: colors.textMid, lineHeight: 19, marginTop: spacing.sm },
 
   favouriteStatement: {
     backgroundColor: colors.primaryLight,
     borderRadius: radius.lg,
-    padding: spacing.md,
+    padding: spacing.sm,
     marginBottom: spacing.sm,
     borderWidth: 1,
     borderColor: colors.primaryMid,
   },
-  favouriteStatementText: { fontSize: 13, color: colors.textMid, lineHeight: 19 },
-  favouriteStatementDrink: { fontWeight: '700', color: colors.primary },
+  favouriteStatementText: { fontSize: 11, fontFamily: fonts.regular, color: colors.textMid, lineHeight: 19 },
+  favouriteStatementDrink: { fontFamily: fonts.bold, color: colors.primary },
 
   badgesRow: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm, marginBottom: spacing.sm },
   badge: { backgroundColor: '#fff8e8', borderRadius: radius.full, paddingHorizontal: spacing.sm, paddingVertical: 4, borderWidth: 1, borderColor: '#f0d080' },
-  badgeText: { fontSize: 11, fontWeight: '600', color: '#8a6000' },
+  badgeText: { fontSize: 10, fontFamily: fonts.semibold, color: '#8a6000' },
   aiBrandNote: { alignItems: 'center', marginTop: spacing.md },
-  aiBrandNoteText: { fontSize: 10, color: colors.textMuted, letterSpacing: 0.5 },
+  aiBrandNoteText: { fontSize: 9, color: colors.textMuted, letterSpacing: 0.5 },
   aiBrandNoteCloud: { backgroundColor: '#f0fdf4', borderRadius: 8, paddingHorizontal: spacing.sm, paddingVertical: 4, borderWidth: 1, borderColor: '#bbf7d0' },
   openAIBadge: {
     flexDirection: 'row', alignItems: 'center', alignSelf: 'flex-start',
@@ -764,7 +759,7 @@ const styles = StyleSheet.create({
     backgroundColor: '#f0fdf4', borderRadius: radius.full,
     borderWidth: 1, borderColor: '#86efac',
   },
-  openAIBadgeText: { fontSize: 11, fontWeight: '700', color: '#16a34a', letterSpacing: 0.3 },
+  openAIBadgeText: { fontSize: 10, fontFamily: fonts.bold, color: '#16a34a', letterSpacing: 0.3 },
 
   // Carousel
   carouselNav: {
@@ -778,9 +773,9 @@ const styles = StyleSheet.create({
     alignItems: 'center', justifyContent: 'center',
   },
   carouselNavBtnDisabled: { backgroundColor: colors.borderLight },
-  carouselNavText: { fontSize: 22, color: '#fff', fontWeight: '700', lineHeight: 28 },
+  carouselNavText: { fontSize: 21, color: '#fff', fontFamily: fonts.bold, lineHeight: 28 },
   carouselNavTextDisabled: { color: colors.textMuted },
-  carouselNavLabel: { fontSize: 13, color: colors.textMuted, fontWeight: '600' },
+  carouselNavLabel: { fontSize: 12, color: colors.textMuted, fontFamily: fonts.semibold },
   carouselNav: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -802,13 +797,13 @@ const styles = StyleSheet.create({
     backgroundColor: colors.surfaceAlt,
   },
   carouselNavText: {
-    fontSize: 18,
-    fontWeight: '700',
+    fontSize: 17,
+    fontFamily: fonts.bold,
     color: '#fff',
   },
   carouselNavLabel: {
-    fontSize: 13,
-    fontWeight: '600',
+    fontSize: 12,
+    fontFamily: fonts.semibold,
     color: colors.textMid,
   },
 
@@ -828,8 +823,8 @@ const styles = StyleSheet.create({
     height: 60,
   },
   bedrockTitle: {
-    fontSize: 17,
-    fontWeight: '700',
+    fontSize: 16,
+    fontFamily: fonts.bold,
     color: colors.midnight,
   },
   bedrockContent: {
@@ -843,16 +838,16 @@ const styles = StyleSheet.create({
     borderColor: colors.borderLight,
   },
   bedrockMetricLabel: {
-    fontSize: 11,
-    fontWeight: '700',
+    fontSize: 12,
+    fontFamily: fonts.bold,
     color: colors.textMuted,
     textTransform: 'uppercase',
     letterSpacing: 0.5,
     marginBottom: 4,
   },
   bedrockMetricValue: {
-    fontSize: 16,
-    fontWeight: '700',
+    fontSize: 13,
+    fontFamily: fonts.regular,
     color: colors.primary,
   },
   bedrockExplainer: {
@@ -863,7 +858,7 @@ const styles = StyleSheet.create({
     borderColor: colors.primaryMid,
   },
   bedrockExplainerText: {
-    fontSize: 13,
+    fontSize: 12,
     color: colors.textMid,
     lineHeight: 19,
     fontStyle: 'italic',

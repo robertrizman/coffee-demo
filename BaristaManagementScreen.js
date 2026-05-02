@@ -8,7 +8,7 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useNavigation } from '@react-navigation/native';
 import { supabase } from './supabase';
-import { colors, typography, spacing, radius, shadow } from './theme';
+import { colors, typography, spacing, radius, shadow, fonts } from './theme';
 import { UserIcon, AddIcon, TrashIcon, LockIcon, PrinterIcon } from './CoffeeIcons';
 
 export default function BaristaManagementScreen() {
@@ -305,7 +305,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: spacing.lg, paddingTop: spacing.lg, paddingBottom: spacing.md,
   },
   backBtn: { width: 40, height: 40, alignItems: 'center', justifyContent: 'center' },
-  backIcon: { fontSize: 28, color: colors.textDark, fontWeight: '300' },
+  backIcon: { fontSize: 27, color: colors.textDark, fontFamily: fonts.regular },
   title: { ...typography.heading2 },
   addBtn: { width: 40, height: 40, alignItems: 'center', justifyContent: 'center' },
   divider: { height: 1, backgroundColor: colors.border },
@@ -329,27 +329,27 @@ const styles = StyleSheet.create({
 
   avatar: { width: 44, height: 44, borderRadius: radius.full, backgroundColor: colors.primary, alignItems: 'center', justifyContent: 'center', marginTop: 2 },
   avatarInactive: { backgroundColor: colors.border },
-  avatarText: { fontSize: 18, fontWeight: '700', color: '#fff' },
+  avatarText: { fontSize: 17, fontFamily: fonts.bold, color: '#fff' },
 
   rowInfo: { flex: 1 },
   rowNameRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm, flexWrap: 'wrap' },
-  rowName: { fontSize: 15, fontWeight: '700', color: colors.textDark },
+  rowName: { fontSize: 14, fontFamily: fonts.bold, color: colors.textDark },
   rowNameInactive: { color: colors.textMuted },
   rowUsername: { ...typography.caption, marginTop: 2 },
-  rowStation: { fontSize: 11, color: colors.primary, marginTop: 2 },
+  rowStation: { fontSize: 10, color: colors.primary, marginTop: 2 },
 
   printerRow: { flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 6 },
-  printerLabel: { fontSize: 12, color: colors.primary, fontWeight: '600' },
-  printerLabelEmpty: { color: colors.textMuted, fontWeight: '400' },
+  printerLabel: { fontSize: 11, color: colors.primary, fontFamily: fonts.semibold },
+  printerLabelEmpty: { color: colors.textMuted, fontFamily: fonts.regular },
 
   ownerBadge: { backgroundColor: colors.primaryLight, borderRadius: radius.full, paddingHorizontal: 8, paddingVertical: 2, borderWidth: 1, borderColor: colors.primaryMid },
-  ownerBadgeText: { fontSize: 10, fontWeight: '700', color: colors.primary },
+  ownerBadgeText: { fontSize: 9, fontFamily: fonts.bold, color: colors.primary },
   inactiveBadge: { backgroundColor: '#f5f5f5', borderRadius: radius.full, paddingHorizontal: 8, paddingVertical: 2, borderWidth: 1, borderColor: colors.border },
-  inactiveBadgeText: { fontSize: 10, fontWeight: '700', color: colors.textMuted },
+  inactiveBadgeText: { fontSize: 9, fontFamily: fonts.bold, color: colors.textMuted },
 
   rowActions: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
   actionBtn: { paddingHorizontal: spacing.sm, paddingVertical: 4, borderRadius: radius.full, borderWidth: 1, borderColor: colors.border },
-  actionBtnText: { fontSize: 11, fontWeight: '600', color: colors.primary },
+  actionBtnText: { fontSize: 10, fontFamily: fonts.semibold, color: colors.primary },
   actionBtnDeactivate: { color: colors.pending },
   deleteBtn: { width: 32, height: 32, borderRadius: radius.full, backgroundColor: '#fef0ee', alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: '#f0c0b8' },
 
@@ -360,17 +360,17 @@ const styles = StyleSheet.create({
   modalSubtitle: { ...typography.caption, marginTop: -8 },
   fieldLabel: { ...typography.label, marginBottom: -4 },
   inputRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm, backgroundColor: colors.surfaceAlt, borderRadius: radius.lg, borderWidth: 1.5, borderColor: colors.border, paddingHorizontal: spacing.md },
-  atSign: { fontSize: 16, color: colors.textMuted, fontWeight: '600' },
-  input: { flex: 1, height: 48, fontSize: 16, color: colors.textDark },
-  defaultPrinterNote: { fontSize: 12, color: colors.primary, backgroundColor: colors.primaryLight, padding: spacing.sm, borderRadius: radius.md },
+  atSign: { fontSize: 15, color: colors.textMuted, fontFamily: fonts.semibold },
+  input: { flex: 1, height: 48, fontSize: 15, color: colors.textDark },
+  defaultPrinterNote: { fontSize: 11, color: colors.primary, backgroundColor: colors.primaryLight, padding: spacing.sm, borderRadius: radius.md },
   errorBox: { backgroundColor: '#fef0ee', borderRadius: radius.md, padding: spacing.md, borderWidth: 1, borderColor: '#f0c0b8' },
-  errorText: { fontSize: 13, color: '#c0392b' },
+  errorText: { fontSize: 12, color: '#c0392b' },
   modalActions: { flexDirection: 'row', gap: spacing.md, marginTop: spacing.sm },
   cancelBtn: { flex: 1, paddingVertical: 12, borderRadius: radius.lg, borderWidth: 1.5, borderColor: colors.border, alignItems: 'center' },
-  cancelBtnText: { fontSize: 15, fontWeight: '600', color: colors.textMid },
+  cancelBtnText: { fontSize: 14, fontFamily: fonts.semibold, color: colors.textMid },
   confirmBtn: { flex: 1, paddingVertical: 12, borderRadius: radius.lg, backgroundColor: colors.primary, alignItems: 'center' },
   confirmBtnDisabled: { opacity: 0.5 },
-  confirmBtnText: { fontSize: 15, fontWeight: '700', color: '#fff' },
+  confirmBtnText: { fontSize: 14, fontFamily: fonts.bold, color: '#fff' },
 
   // Action sheet / printer assignment
   sheetOverlay: {
@@ -423,9 +423,9 @@ const styles = StyleSheet.create({
   },
   actionSheetRowBorder: { borderBottomWidth: 1, borderBottomColor: '#ededf0' },
   actionSheetRowLeft: { flexDirection: 'row', alignItems: 'center', gap: spacing.md, flex: 1, paddingRight: spacing.sm },
-  actionSheetRowTitle: { fontSize: 16, fontWeight: '600', color: colors.textDark },
-  actionSheetRowMeta: { fontSize: 13, color: colors.textMuted, marginTop: 2 },
-  actionSheetCheck: { fontSize: 22, color: colors.primary, fontWeight: '700', marginLeft: spacing.sm },
+  actionSheetRowTitle: { fontSize: 15, fontFamily: fonts.semibold, color: colors.textDark },
+  actionSheetRowMeta: { fontSize: 12, color: colors.textMuted, marginTop: 2 },
+  actionSheetCheck: { fontSize: 21, color: colors.primary, fontFamily: fonts.bold, marginLeft: spacing.sm },
   destructiveSheetBtn: {
     backgroundColor: '#fff',
     borderRadius: 14,
@@ -436,7 +436,7 @@ const styles = StyleSheet.create({
     borderColor: '#e5e5ea',
     marginTop: spacing.xs,
   },
-  destructiveSheetBtnText: { fontSize: 16, fontWeight: '600', color: '#d70015' },
+  destructiveSheetBtnText: { fontSize: 15, fontFamily: fonts.semibold, color: '#d70015' },
   sheetCancelBtn: {
     backgroundColor: '#fff',
     borderRadius: 14,
@@ -447,5 +447,5 @@ const styles = StyleSheet.create({
     borderColor: '#e5e5ea',
     marginTop: spacing.xs,
   },
-  sheetCancelBtnText: { fontSize: 17, fontWeight: '700', color: colors.textDark },
+  sheetCancelBtnText: { fontSize: 16, fontFamily: fonts.bold, color: colors.textDark },
 });

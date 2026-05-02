@@ -3,7 +3,7 @@ import {
   View, Text, StyleSheet, TouchableOpacity, Switch,
   TextInput, Alert,
 } from 'react-native';
-import { colors, spacing, radius } from './theme';
+import { colors, spacing, radius, fonts } from './theme';
 import { supabase } from './supabase';
 import { useApp } from './AppContext';
 import { formatTime } from './storeUtils';
@@ -273,9 +273,9 @@ const styles = StyleSheet.create({
   container: { gap: spacing.md },
   section: { backgroundColor: '#fff', borderRadius: radius.lg, padding: spacing.md, gap: spacing.sm },
   sectionHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
-  sectionTitle: { fontSize: 13, fontWeight: '700', color: colors.textMuted, letterSpacing: 1, textTransform: 'uppercase' },
+  sectionTitle: { fontSize: 12, fontFamily: fonts.bold, color: colors.textMuted, letterSpacing: 1, textTransform: 'uppercase' },
   toggleRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingVertical: 4 },
-  toggleLabel: { fontSize: 16, fontWeight: '700', color: colors.midnight },
+  toggleLabel: { fontSize: 15, fontFamily: fonts.bold, color: colors.midnight },
   toggleSub: { fontSize: 12, color: colors.textMuted, marginTop: 2 },
 
   editBtn: {
@@ -284,33 +284,33 @@ const styles = StyleSheet.create({
     borderRadius: radius.full, borderWidth: 1, borderColor: colors.primary,
   },
   editBtnActive: { backgroundColor: colors.primary },
-  editBtnText: { fontSize: 12, fontWeight: '700', color: colors.primary },
+  editBtnText: { fontSize: 11, fontFamily: fonts.bold, color: colors.primary },
   editBtnTextActive: { color: '#fff' },
 
   divider: { height: 1, backgroundColor: colors.borderLight },
   messageEditor: { gap: spacing.sm },
   messageFieldRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
   saveIndicator: { fontSize: 11, color: colors.textMuted },
-  saveIndicatorDone: { color: colors.primary, fontWeight: '600' },
+  saveIndicatorDone: { color: colors.primary, fontFamily: fonts.semibold },
 
-  formLabel: { fontSize: 12, fontWeight: '600', color: colors.textMuted },
-  input: { borderWidth: 1, borderColor: colors.border, borderRadius: radius.md, padding: 10, fontSize: 14, color: colors.midnight, backgroundColor: colors.surface },
+  formLabel: { fontSize: 11, fontFamily: fonts.semibold, color: colors.textMuted },
+  input: { borderWidth: 1, borderColor: colors.border, borderRadius: radius.md, padding: 10, fontSize: 13, color: colors.midnight, backgroundColor: colors.surface },
   inputMultiline: { minHeight: 72, textAlignVertical: 'top' },
 
   addBtn: { backgroundColor: colors.primary, paddingHorizontal: 12, paddingVertical: 6, borderRadius: radius.full },
-  addBtnText: { color: '#fff', fontWeight: '700', fontSize: 13 },
-  empty: { fontSize: 14, color: colors.textMuted, textAlign: 'center', paddingVertical: 8 },
+  addBtnText: { color: '#fff', fontFamily: fonts.bold, fontSize: 12 },
+  empty: { fontSize: 13, color: colors.textMuted, textAlign: 'center', paddingVertical: 8 },
   breakCard: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingVertical: 10, borderBottomWidth: 1, borderBottomColor: colors.borderLight },
   breakInfo: { gap: 2 },
-  breakLabel: { fontSize: 15, fontWeight: '600', color: colors.midnight },
-  breakTime: { fontSize: 13, color: colors.primary },
+  breakLabel: { fontSize: 14, fontFamily: fonts.semibold, color: colors.midnight },
+  breakTime: { fontSize: 12, color: colors.primary },
   breakActions: { flexDirection: 'row', alignItems: 'center', gap: 8 },
   deleteBtn: { width: 28, height: 28, borderRadius: 14, backgroundColor: '#fee', alignItems: 'center', justifyContent: 'center' },
-  deleteBtnText: { fontSize: 12, color: '#e74c3c', fontWeight: '700' },
+  deleteBtnText: { fontSize: 11, color: '#e74c3c', fontFamily: fonts.bold },
   addForm: { gap: spacing.sm, paddingTop: spacing.sm },
   timeRow: { flexDirection: 'row', alignItems: 'flex-end', gap: 8 },
   timeField: { flex: 1, gap: 4 },
-  timeSep: { fontSize: 18, color: colors.textMuted, marginBottom: 10 },
+  timeSep: { fontSize: 17, color: colors.textMuted, marginBottom: 10 },
   saveBtn: { backgroundColor: colors.primary, padding: 12, borderRadius: radius.full, alignItems: 'center' },
-  saveBtnText: { color: '#fff', fontWeight: '700', fontSize: 15 },
+  saveBtnText: { color: '#fff', fontFamily: fonts.bold, fontSize: 14 },
 });

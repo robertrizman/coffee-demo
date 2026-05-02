@@ -11,11 +11,12 @@ import { registerPushToken } from './push';
 import { getDeviceId } from './deviceId';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useApp } from './AppContext';
+import { useNavigation } from '@react-navigation/native';
 import { useAuth } from './AuthContext';
 import { supabase } from './supabase';
 import { getOrderPersonality } from './foodPairingAI';
 import { trackProfileTab, trackEditProfile, trackProfileUpdated, trackUuidCopy, trackDietaryRequirementsUpdated, joinTrace, leaveTrace, getCanonicalDeviceId } from './tealium';
-import { colors, typography, spacing, radius, shadow } from './theme';
+import { colors, typography, spacing, radius, shadow, fonts } from './theme';
 import { UserIcon, EmailIcon, LocationPinIcon, TakeawayCupIcon, CheckIcon, CopyIcon, EditIcon, AiSparkIcon, LightbulbIcon, MagnifyIcon, LightningBoltIcon, LeafIcon, ShieldIcon } from './CoffeeIcons';
 
 function timeAgo(ts) {
@@ -58,6 +59,7 @@ export default function OrdersProfileScreen() {
   const { state, dispatch } = useApp();
   const { isAdmin } = useAuth();
   const { deviceId, profile } = state;
+  const navigation = useNavigation();
 
 
   // Profile edit state
@@ -113,27 +115,71 @@ export default function OrdersProfileScreen() {
 
   useEffect(() => {
     checkPermissions();
-    const sub = AppState.addEventListener('change', (s) => {
+    // Re-check when app comes to foreground from background
+    const appStateSub = AppState.addEventListener('change', (s) => {
       if (s === 'active') checkPermissions();
     });
-    return () => sub.remove();
-  }, [checkPermissions]);
+    // Re-check every time this screen gets focus (e.g. navigating from order page)
+    const focusSub = navigation.addListener('focus', checkPermissions);
+    return () => {
+      appStateSub.remove();
+      focusSub();
+    };
+  }, [checkPermissions, navigation]);
 
   const handleNotifToggle = async () => {
     if (notifPermission === 'granted' && hasPushToken) {
-      // Both OS permission and token present — open Settings to disable
-      Linking.openSettings();
-    } else {
-      // Either OS permission not granted, or token missing — (re-)register
-      const { status } = await Notifications.requestPermissionsAsync();
-      setNotifPermission(status);
-      if (status === 'granted') {
-        const ok = await registerPushToken(profile?.arc_location_id || null);
-        if (ok) setHasPushToken(true);
-        else Linking.openSettings();
+      // Currently ON — send to Settings to disable
+      Alert.alert(
+        'Turn off notifications',
+        'To disable push notifications, turn them off in your device settings.',
+        [
+          { text: 'Cancel', style: 'cancel' },
+          { text: 'Open Settings', onPress: () => Linking.openSettings() },
+        ]
+      );
+      return;
+    }
+
+    // Check current OS permission before requesting
+    const { status: currentStatus } = await Notifications.getPermissionsAsync();
+
+    if (currentStatus === 'denied') {
+      // Android won't re-prompt after denial — must go to Settings
+      Alert.alert(
+        'Notifications blocked',
+        'Notifications were previously denied. To enable them, open your device settings and turn on notifications for this app.',
+        [
+          { text: 'Cancel', style: 'cancel' },
+          { text: 'Open Settings', onPress: () => Linking.openSettings() },
+        ]
+      );
+      return;
+    }
+
+    // Undetermined or granted-but-no-token — request/re-register
+    const { status } = await Notifications.requestPermissionsAsync();
+    setNotifPermission(status);
+    if (status === 'granted') {
+      const ok = await registerPushToken(profile?.arc_location_id || null);
+      if (ok) {
+        setHasPushToken(true);
       } else {
-        Linking.openSettings();
+        Alert.alert(
+          'Registration failed',
+          'Notifications are allowed but we could not register this device. Please try again.',
+          [{ text: 'OK' }]
+        );
       }
+    } else {
+      Alert.alert(
+        'Notifications blocked',
+        'To receive order updates, open your device settings and enable notifications for this app.',
+        [
+          { text: 'Cancel', style: 'cancel' },
+          { text: 'Open Settings', onPress: () => Linking.openSettings() },
+        ]
+      );
     }
   };
 
@@ -720,16 +766,6 @@ export default function OrdersProfileScreen() {
             )}
           </View>
 
-          <View style={styles.infoCard}>
-            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-              <ShieldIcon size={15} color={colors.primary} />
-              <Text style={styles.infoTitle}>Privacy</Text>
-            </View>
-            <Text style={styles.infoText}>
-              Your name and email are stored securely on this device and used only to link your orders. We don't share your details with anyone.
-            </Text>
-          </View>
-
           <View style={styles.permissionsCard}>
             <Text style={styles.permissionsTitle}>PERMISSIONS</Text>
             <View style={styles.permissionRow}>
@@ -747,7 +783,7 @@ export default function OrdersProfileScreen() {
             <View style={styles.permissionDivider} />
             <View style={styles.permissionRow}>
               <View style={styles.permissionInfo}>
-                <Text style={styles.permissionLabel}>Location</Text>
+                <Text style={styles.permissionLabel}>Location Services</Text>
                 <Text style={styles.permissionSub}>Confirms you're at the venue to order</Text>
               </View>
               <Switch
@@ -783,6 +819,16 @@ export default function OrdersProfileScreen() {
                 <CopyIcon size={16} color={colors.primary} />
               </TouchableOpacity>
             </View>
+          </View>
+
+          <View style={styles.infoCard}>
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+              <ShieldIcon size={15} color={colors.primary} />
+              <Text style={styles.infoTitle}>Privacy</Text>
+            </View>
+            <Text style={styles.infoText}>
+              Your name and email are stored securely on this device and used only to link your orders. We don't share your details with anyone.
+            </Text>
           </View>
 
           <View style={{ height: 40 }} />
@@ -832,7 +878,7 @@ export default function OrdersProfileScreen() {
                       </Text>
                     )}
                   </View>
-                  {isSelected && <Text style={{ fontSize: 18, color: colors.primary, fontWeight: '700' }}>✓</Text>}
+                  {isSelected && <Text style={{ fontSize: 17, color: colors.primary, fontFamily: fonts.bold }}>✓</Text>}
                 </TouchableOpacity>
               );
             })}
@@ -962,8 +1008,8 @@ const styles = StyleSheet.create({
 
   tabRow: { flexDirection: 'row', paddingHorizontal: spacing.lg, gap: spacing.lg, marginTop: spacing.sm },
   tabWrap: { paddingBottom: spacing.sm },
-  tabText: { fontSize: 15, fontWeight: '500', color: colors.textLight },
-  tabTextActive: { fontWeight: '700', color: colors.primary },
+  tabText: { fontSize: 14, fontFamily: fonts.medium, color: colors.textLight },
+  tabTextActive: { fontFamily: fonts.bold, color: colors.primary },
   tabUnderline: { height: 2, backgroundColor: colors.primary, borderRadius: 2, marginTop: 4 },
   divider: { height: 1, backgroundColor: colors.border },
 
@@ -988,7 +1034,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start',
     padding: spacing.md, paddingBottom: spacing.sm,
   },
-  orderId: { fontSize: 18, fontWeight: '800', color: colors.textDark },
+  orderId: { fontSize: 17, fontFamily: fonts.extrabold, color: colors.textDark },
   orderTime: { ...typography.caption, marginTop: 2 },
 
   badge: {
@@ -1002,7 +1048,7 @@ const styles = StyleSheet.create({
   badgeDot: { width: 7, height: 7, borderRadius: 4 },
   badgeDotPending: { backgroundColor: colors.pending },
   badgeDotDone: { backgroundColor: colors.primary },
-  badgeText: { fontSize: 12, fontWeight: '700' },
+  badgeText: { fontSize: 11, fontFamily: fonts.bold },
   badgeTextPending: { color: colors.pending },
   badgeTextDone: { color: colors.primary },
   badgeTextCancelled: { color: '#dc2626' },
@@ -1012,7 +1058,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: spacing.md, alignItems: 'center',
     borderTopWidth: 1, borderTopColor: '#fca5a5',
   },
-  cancelledBannerText: { fontSize: 14, fontWeight: '700', color: '#dc2626' },
+  cancelledBannerText: { fontSize: 13, fontFamily: fonts.bold, color: '#dc2626' },
 
   orderItems: {
     paddingHorizontal: spacing.md, paddingBottom: spacing.md,
@@ -1021,14 +1067,14 @@ const styles = StyleSheet.create({
   },
   orderItem: { flexDirection: 'row', alignItems: 'flex-start', gap: spacing.sm },
   itemBullet: { width: 7, height: 7, borderRadius: 4, backgroundColor: colors.primary, marginTop: 6, flexShrink: 0 },
-  itemName: { fontSize: 15, fontWeight: '600', color: colors.textDark },
+  itemName: { fontSize: 14, fontFamily: fonts.semibold, color: colors.textDark },
   itemMods: { ...typography.caption, marginTop: 2 },
   readyBanner: {
     backgroundColor: colors.primaryLight, paddingVertical: spacing.sm,
     paddingHorizontal: spacing.md, flexDirection: 'row', alignItems: 'center',
     gap: spacing.xs, borderTopWidth: 1, borderTopColor: colors.primaryMid,
   },
-  readyText: { fontSize: 14, fontWeight: '700', color: colors.primary },
+  readyText: { fontSize: 13, fontFamily: fonts.bold, color: colors.primary },
 
   // Profile tab
   profileCard: {
@@ -1040,14 +1086,14 @@ const styles = StyleSheet.create({
   profileDivider: { height: 1, backgroundColor: colors.borderLight, marginHorizontal: spacing.lg },
   profileIcon: { fontSize: 22 },
   profileInfo: { flex: 1 },
-  profileLabel: { ...typography.label, marginBottom: 2 },
-  profileValue: { fontSize: 16, color: colors.textDark, fontWeight: '600' },
+  profileLabel: { ...typography.label, fontSize: 12, marginBottom: 2 },
+  profileValue: { fontSize: 13, color: colors.textDark, fontFamily: fonts.semibold },
   editBtn: {
     margin: spacing.lg, marginTop: spacing.md,
     borderWidth: 1.5, borderColor: colors.border,
     borderRadius: radius.lg, paddingVertical: 10, alignItems: 'center',
   },
-  editBtnText: { fontSize: 15, fontWeight: '600', color: colors.textMid },
+  editBtnText: { fontSize: 14, fontFamily: fonts.semibold, color: colors.textMid },
 
   cardTitle: { ...typography.heading3, padding: spacing.lg, paddingBottom: 0 },
   fieldLabel: { ...typography.label, marginBottom: 6, marginTop: 12, marginHorizontal: spacing.lg },
@@ -1059,28 +1105,28 @@ const styles = StyleSheet.create({
     marginHorizontal: spacing.lg,
   },
   inputIcon: { fontSize: 16, marginRight: spacing.sm, color: colors.textMuted },
-  input: { flex: 1, height: 52, fontSize: 16, color: colors.textDark },
+  input: { flex: 1, height: 52, fontSize: 15, color: colors.textDark },
   editActions: { flexDirection: 'row', gap: spacing.md, padding: spacing.lg, paddingTop: spacing.sm },
   cancelBtn: {
     flex: 1, paddingVertical: 10, borderRadius: radius.lg,
     borderWidth: 1.5, borderColor: colors.border, alignItems: 'center',
   },
-  cancelBtnText: { fontSize: 15, fontWeight: '600', color: colors.textMid },
+  cancelBtnText: { fontSize: 14, fontFamily: fonts.semibold, color: colors.textMid },
   saveBtn: { flex: 1, paddingVertical: 10, borderRadius: radius.lg, backgroundColor: colors.primary, alignItems: 'center' },
-  saveBtnText: { fontSize: 15, fontWeight: '700', color: '#fff' },
+  saveBtnText: { fontSize: 14, fontFamily: fonts.bold, color: '#fff' },
 
   infoCard: {
     backgroundColor: colors.primaryLight, borderRadius: radius.lg,
     padding: spacing.md, borderWidth: 1, borderColor: colors.primaryMid, gap: spacing.sm,
   },
-  infoTitle: { fontSize: 13, fontWeight: '700', color: colors.primary },
-  infoText: { fontSize: 12, color: colors.textMid, lineHeight: 18 },
+  infoTitle: { fontSize: 12, fontFamily: fonts.bold, color: colors.primary },
+  infoText: { fontSize: 11, color: colors.textMid, lineHeight: 18 },
   permissionsCard: {
     backgroundColor: colors.surface, borderRadius: radius.lg,
     borderWidth: 1, borderColor: colors.border, ...shadow.card,
   },
   permissionsTitle: {
-    fontSize: 11, fontWeight: '700', color: colors.textMuted,
+    fontSize: 10, fontFamily: fonts.bold, color: colors.textMuted,
     letterSpacing: 0.8, paddingHorizontal: spacing.md, paddingTop: spacing.md, paddingBottom: spacing.sm,
   },
   permissionRow: {
@@ -1088,8 +1134,8 @@ const styles = StyleSheet.create({
     paddingHorizontal: spacing.md, paddingVertical: spacing.sm,
   },
   permissionInfo: { flex: 1, gap: 2 },
-  permissionLabel: { fontSize: 15, fontWeight: '600', color: colors.textDark },
-  permissionSub: { fontSize: 12, color: colors.textMuted },
+  permissionLabel: { fontSize: 14, fontFamily: fonts.semibold, color: colors.textDark },
+  permissionSub: { fontSize: 11, color: colors.textMuted },
   permissionDivider: { height: 1, backgroundColor: colors.border, marginHorizontal: spacing.md },
   insightCard: {
     backgroundColor: colors.surface, borderRadius: radius.xl,
@@ -1099,24 +1145,24 @@ const styles = StyleSheet.create({
   insightLoading: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm, paddingVertical: spacing.sm },
   insightLoadingText: { ...typography.caption, color: colors.primary },
   insightHeader: { flexDirection: 'column', alignItems: 'flex-start', gap: 6 },
-  insightTitle: { fontSize: 15, fontWeight: '700', color: colors.midnight },
+  insightTitle: { fontSize: 14, fontFamily: fonts.bold, color: colors.midnight },
   insightAiBadge: {
     backgroundColor: colors.midnight, borderRadius: radius.full,
     paddingHorizontal: 8, paddingVertical: 3,
   },
-  insightAiBadgeText: { fontSize: 10, fontWeight: '800', color: '#fff', letterSpacing: 0.5 },
-  insightChevron: { fontSize: 11, color: colors.textMuted, fontWeight: '600' },
-  insightEngine: { fontSize: 11, fontWeight: '600', color: colors.textMid },
+  insightAiBadgeText: { fontSize: 9, fontFamily: fonts.extrabold, color: '#fff', letterSpacing: 0.5 },
+  insightChevron: { fontSize: 10, color: colors.textMuted, fontFamily: fonts.semibold },
+  insightEngine: { fontSize: 10, fontFamily: fonts.semibold, color: colors.textMid },
   insightKjRow: { flexDirection: 'row', gap: spacing.sm },
   insightKjChip: {
     flex: 1, backgroundColor: colors.primaryLight, borderRadius: radius.lg,
     padding: spacing.sm, alignItems: 'center', borderWidth: 1, borderColor: colors.primaryMid,
   },
-  insightKjValue: { fontSize: 22, fontWeight: '800', color: colors.primary },
-  insightKjLabel: { fontSize: 11, color: colors.textMid, fontWeight: '600', marginTop: 2 },
-  insightText: { fontSize: 13, color: colors.textMid, lineHeight: 20 },
+  insightKjValue: { fontSize: 21, fontFamily: fonts.extrabold, color: colors.primary },
+  insightKjLabel: { fontSize: 10, color: colors.textMid, fontFamily: fonts.semibold, marginTop: 2 },
+  insightText: { fontSize: 12, fontFamily: fonts.regular, color: colors.textMid, lineHeight: 20 },
   insightTipRow: { flexDirection: 'row', alignItems: 'flex-start', gap: 6, backgroundColor: colors.tealLight, borderRadius: radius.md, padding: spacing.sm, borderWidth: 1, borderColor: colors.tealMid },
-  insightTip: { flex: 1, fontSize: 12, color: colors.textMid, fontWeight: '600', lineHeight: 18 },
+  insightTip: { flex: 1, fontSize: 11, color: colors.textMid, fontFamily: fonts.semibold, lineHeight: 18 },
   uuidCard: {
     backgroundColor: colors.surface, borderRadius: radius.lg,
     padding: spacing.md, gap: 6,
@@ -1124,7 +1170,7 @@ const styles = StyleSheet.create({
   },
   uuidLabel: { ...typography.label },
   uuidRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
-  uuidValue: { flex: 1, fontSize: 12, color: colors.textMuted },
+  uuidValue: { flex: 1, fontSize: 11, color: colors.textMuted },
   copyBtn: {
     width: 32, height: 32, borderRadius: radius.sm,
     backgroundColor: colors.primaryLight, alignItems: 'center', justifyContent: 'center',
@@ -1139,18 +1185,18 @@ const styles = StyleSheet.create({
   locationInactiveBadge: {
     backgroundColor: '#fef3c7', borderRadius: 99, paddingHorizontal: 8, paddingVertical: 2,
   },
-  locationInactiveBadgeText: { fontSize: 10, fontWeight: '700', color: '#92400e' },
+  locationInactiveBadgeText: { fontSize: 9, fontFamily: fonts.bold, color: '#92400e' },
   locationWarning: {
     backgroundColor: '#fef3c7', borderRadius: radius.md,
     padding: spacing.md, gap: spacing.sm,
     borderWidth: 1, borderColor: '#fcd34d',
   },
-  locationWarningText: { fontSize: 13, color: '#92400e', lineHeight: 18 },
+  locationWarningText: { fontSize: 12, color: '#92400e', lineHeight: 18 },
   locationUpdateBtn: {
     backgroundColor: colors.primary, borderRadius: radius.md,
     paddingVertical: 8, alignItems: 'center',
   },
-  locationUpdateBtnText: { color: '#fff', fontSize: 13, fontWeight: '700' },
+  locationUpdateBtnText: { color: '#fff', fontSize: 12, fontFamily: fonts.bold },
   modalHeader: {
     flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
     paddingHorizontal: spacing.lg, paddingVertical: spacing.md,
@@ -1162,7 +1208,7 @@ const styles = StyleSheet.create({
     width: 32, height: 32, borderRadius: 16,
     backgroundColor: colors.surfaceAlt, alignItems: 'center', justifyContent: 'center',
   },
-  modalCloseBtnText: { fontSize: 14, color: colors.textDark, fontWeight: '600' },
+  modalCloseBtnText: { fontSize: 13, color: colors.textDark, fontFamily: fonts.semibold },
   locationItem: {
     flexDirection: 'row', alignItems: 'center',
     backgroundColor: colors.surface, borderRadius: radius.lg,
@@ -1170,13 +1216,13 @@ const styles = StyleSheet.create({
   },
   locationItemSelected: { borderColor: colors.primary },
   locationItemDisabled: { opacity: 0.5 },
-  locationItemName: { fontSize: 15, fontWeight: '700', color: colors.textDark },
-  locationItemAddress: { fontSize: 13, color: colors.textMuted, marginTop: 2 },
-  locationItemDates: { fontSize: 11, color: colors.teal, marginTop: 3, fontWeight: '600' },
+  locationItemName: { fontSize: 14, fontFamily: fonts.bold, color: colors.textDark },
+  locationItemAddress: { fontSize: 12, color: colors.textMuted, marginTop: 2 },
+  locationItemDates: { fontSize: 10, color: colors.teal, marginTop: 3, fontFamily: fonts.semibold },
   locationBadgeActive: { backgroundColor: '#dcfce7', borderRadius: 99, paddingHorizontal: 8, paddingVertical: 2 },
-  locationBadgeActiveText: { fontSize: 10, fontWeight: '700', color: '#16a34a' },
+  locationBadgeActiveText: { fontSize: 9, fontFamily: fonts.bold, color: '#16a34a' },
   locationBadgeInactive: { backgroundColor: '#f1f5f9', borderRadius: 99, paddingHorizontal: 8, paddingVertical: 2 },
-  locationBadgeInactiveText: { fontSize: 10, fontWeight: '700', color: colors.textMuted },
+  locationBadgeInactiveText: { fontSize: 9, fontFamily: fonts.bold, color: colors.textMuted },
   toast: {
     position: 'absolute', bottom: 32, alignSelf: 'center',
     backgroundColor: colors.midnight, borderRadius: radius.full,
@@ -1184,7 +1230,7 @@ const styles = StyleSheet.create({
     zIndex: 999, shadowColor: '#000', shadowOpacity: 0.2,
     shadowRadius: 8, elevation: 8,
   },
-  toastText: { color: '#fff', fontSize: 14, fontWeight: '600' },
+  toastText: { color: '#fff', fontSize: 13, fontFamily: fonts.semibold },
 
   // ── Debug tab ──
   debugContent: { padding: spacing.lg, gap: spacing.md },
@@ -1193,15 +1239,15 @@ const styles = StyleSheet.create({
     padding: spacing.lg, gap: spacing.sm,
     borderWidth: 1, borderColor: colors.borderLight,
   },
-  debugCardTitle: { fontSize: 16, fontWeight: '700', color: colors.midnight },
-  debugCardDesc: { fontSize: 13, color: colors.textMuted, lineHeight: 18 },
-  debugLabel: { fontSize: 11, fontWeight: '700', color: colors.textMuted, letterSpacing: 1, textTransform: 'uppercase', marginTop: spacing.sm },
+  debugCardTitle: { fontSize: 15, fontFamily: fonts.bold, color: colors.midnight },
+  debugCardDesc: { fontSize: 12, color: colors.textMuted, lineHeight: 18 },
+  debugLabel: { fontSize: 10, fontFamily: fonts.bold, color: colors.textMuted, letterSpacing: 1, textTransform: 'uppercase', marginTop: spacing.sm },
   debugInputRow: {
     flexDirection: 'row', alignItems: 'center',
     backgroundColor: colors.surfaceAlt, borderRadius: radius.lg,
     borderWidth: 1.5, borderColor: colors.border, paddingHorizontal: spacing.md,
   },
-  debugInput: { flex: 1, height: 44, fontSize: 15, color: colors.textDark, fontFamily: 'monospace' },
+  debugInput: { flex: 1, height: 44, fontSize: 14, color: colors.textDark, fontFamily: 'monospace' },
   debugBtnRow: { flexDirection: 'row', gap: spacing.sm, marginTop: spacing.xs },
   debugBtn: {
     flex: 1, paddingVertical: 10, borderRadius: radius.lg,
@@ -1210,17 +1256,17 @@ const styles = StyleSheet.create({
   debugBtnPrimary: { backgroundColor: colors.primary },
   debugBtnDanger: { backgroundColor: '#dc2626' },
   debugBtnDisabled: { opacity: 0.35 },
-  debugBtnText: { color: '#fff', fontSize: 14, fontWeight: '700' },
+  debugBtnText: { color: '#fff', fontSize: 13, fontFamily: fonts.bold },
   debugStatusBadge: {
     backgroundColor: colors.surfaceAlt, borderRadius: radius.md,
     padding: spacing.sm, marginTop: spacing.xs,
     borderWidth: 1, borderColor: colors.border,
   },
   debugStatusBadgeActive: { backgroundColor: '#dcfce7', borderColor: '#16a34a' },
-  debugStatusText: { fontSize: 13, color: colors.textMid, fontWeight: '600' },
+  debugStatusText: { fontSize: 12, color: colors.textMid, fontFamily: fonts.semibold },
   debugStatusTextActive: { color: '#16a34a' },
   debugMono: {
-    fontSize: 11, color: colors.textMid, fontFamily: 'monospace',
+    fontSize: 10, color: colors.textMid, fontFamily: 'monospace',
     backgroundColor: colors.surfaceAlt, borderRadius: radius.sm,
     padding: spacing.sm, lineHeight: 16,
   },

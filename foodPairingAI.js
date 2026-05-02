@@ -463,8 +463,8 @@ export async function getAIPairing({ orders, customItems, dietaryRequirements = 
         if (r1 && r2 && r1.name === r2.name) {
           const FOOD_CATS = ['Morning Tea', 'Lunch', 'Snacks'];
           for (const cat of FOOD_CATS) {
-            const alt = (customItems?.[cat] || []).find(i => i !== r1.name);
-            if (alt) { r2 = { name: alt, cat }; break; }
+            const alt = (customItems?.[cat] || []).find(i => (i.name || i) !== r1.name);
+            if (alt) { r2 = { name: alt.name || alt, cat }; break; }
           }
         }
         if (r1 && r2) {

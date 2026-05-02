@@ -10,7 +10,7 @@ import { MENU, CATEGORIES, EXTRAS, SIZES, MILK_OPTIONS } from './menu';
 import { useApp } from './AppContext';
 import { useAuth } from './AuthContext';
 import { trackMenuToggle } from './tealium';
-import { colors, typography, spacing, radius } from './theme';
+import { colors, typography, spacing, radius, fonts } from './theme';
 import { SettingsIcon, LogoutIcon } from './CoffeeIcons';
 
 const ALL_CATEGORIES = [...CATEGORIES, 'Extras'];
@@ -302,8 +302,8 @@ const styles = StyleSheet.create({
 
   tabRow: { flexDirection: 'row', paddingHorizontal: spacing.lg, gap: spacing.lg },
   tabWrap: { paddingBottom: spacing.sm },
-  tabText: { fontSize: 15, fontWeight: '500', color: colors.textLight },
-  tabTextActive: { fontWeight: '700', color: colors.primary },
+  tabText: { fontSize: 14, fontFamily: fonts.medium, color: colors.textLight },
+  tabTextActive: { fontFamily: fonts.bold, color: colors.primary },
   tabUnderline: { height: 2, backgroundColor: colors.primary, borderRadius: 2, marginTop: 4 },
   divider: { height: 1, backgroundColor: colors.border },
   hint: { ...typography.caption, color: colors.primary, paddingHorizontal: spacing.lg, paddingVertical: spacing.sm },
@@ -311,7 +311,7 @@ const styles = StyleSheet.create({
   body: { paddingHorizontal: spacing.lg, paddingTop: spacing.sm, gap: spacing.md },
   sectionHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: spacing.xs },
   sectionLabel: { ...typography.label, color: colors.primary },
-  sectionHint: { fontSize: 12, color: colors.textMuted, fontStyle: 'italic', flexShrink: 1, textAlign: 'right' },
+  sectionHint: { fontSize: 11, color: colors.textMuted, fontStyle: 'italic', flexShrink: 1, textAlign: 'right' },
   foodHeader: { paddingTop: spacing.sm, borderTopWidth: 1, borderTopColor: colors.border, paddingBottom: spacing.xs },
   foodSectionTitle: { ...typography.label, color: colors.midnight || colors.textDark, marginBottom: 2 },
   emptyFood: {
@@ -320,18 +320,18 @@ const styles = StyleSheet.create({
     paddingVertical: spacing.md, alignItems: 'center',
   },
   emptyFoodText: { ...typography.caption, color: colors.textMuted },
-  addBtnText: { fontSize: 12, fontWeight: '700', color: colors.primary },
+  addBtnText: { fontSize: 11, fontFamily: fonts.bold, color: colors.primary },
 
   group: { backgroundColor: colors.surface, borderRadius: radius.lg, borderWidth: 1, borderColor: colors.borderLight, overflow: 'hidden' },
   row: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: spacing.md, paddingVertical: 10 },
   rowBorder: { borderBottomWidth: 1, borderBottomColor: colors.borderLight },
   rowLeft: { flex: 1, flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
   rowRight: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
-  rowText: { fontSize: 15, color: colors.textDark },
+  rowText: { fontSize: 14, color: colors.textDark },
   rowTextOff: { color: colors.textMuted },
-  customBadge: { fontSize: 10, fontWeight: '700', color: colors.primary, backgroundColor: colors.primaryLight, paddingHorizontal: 6, paddingVertical: 2, borderRadius: radius.full, overflow: 'hidden' },
+  customBadge: { fontSize: 9, fontFamily: fonts.bold, color: colors.primary, backgroundColor: colors.primaryLight, paddingHorizontal: 6, paddingVertical: 2, borderRadius: radius.full, overflow: 'hidden' },
   deleteBtn: { width: 28, height: 28, borderRadius: radius.full, backgroundColor: '#fef0ee', alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: '#f0c0b8' },
-  deleteBtnText: { fontSize: 11, fontWeight: '700', color: '#c0392b' },
+  deleteBtnText: { fontSize: 10, fontFamily: fonts.bold, color: '#c0392b' },
 
   modalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.4)', justifyContent: 'flex-end' },
   modalCard: { backgroundColor: colors.surface, borderTopLeftRadius: 24, borderTopRightRadius: 24, padding: spacing.lg, gap: spacing.md, paddingBottom: 40 },
@@ -339,13 +339,13 @@ const styles = StyleSheet.create({
   fieldLabel: { ...typography.label, marginBottom: -4 },
   catChip: { paddingHorizontal: spacing.md, paddingVertical: spacing.sm, borderRadius: radius.full, borderWidth: 1.5, borderColor: colors.border, backgroundColor: colors.surfaceAlt },
   catChipActive: { backgroundColor: colors.primary, borderColor: colors.primary },
-  catChipText: { fontSize: 13, fontWeight: '600', color: colors.textMid },
+  catChipText: { fontSize: 12, fontFamily: fonts.semibold, color: colors.textMid },
   catChipTextActive: { color: '#fff' },
   modalInput: { backgroundColor: colors.surfaceAlt, borderRadius: radius.lg, borderWidth: 1.5, borderColor: colors.border, paddingHorizontal: spacing.md, height: 52, fontSize: 15, color: colors.textDark },
   modalActions: { flexDirection: 'row', gap: spacing.md, marginTop: spacing.sm },
   cancelBtn: { flex: 1, paddingVertical: 11, borderRadius: radius.lg, borderWidth: 1.5, borderColor: colors.border, alignItems: 'center' },
-  cancelBtnText: { fontSize: 15, fontWeight: '600', color: colors.textMid },
+  cancelBtnText: { fontSize: 14, fontFamily: fonts.semibold, color: colors.textMid },
   confirmBtn: { flex: 1, paddingVertical: 11, borderRadius: radius.lg, backgroundColor: colors.primary, alignItems: 'center' },
   confirmBtnDisabled: { opacity: 0.4 },
-  confirmBtnText: { fontSize: 15, fontWeight: '700', color: '#fff' },
+  confirmBtnText: { fontSize: 14, fontFamily: fonts.bold, color: '#fff' },
 });

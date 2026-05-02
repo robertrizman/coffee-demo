@@ -9,7 +9,9 @@ import { useNavigation } from '@react-navigation/native';
 import { useApp, generateOrderId } from './AppContext';
 import { getCanonicalDeviceId } from './tealium';
 import { trackRemoveFromOrder, trackEmailEntered, trackOrderPlaced, track } from './tealium';
-import { colors, typography, spacing, radius, shadow } from './theme';
+import * as Notifications from 'expo-notifications';
+import { registerPushToken } from './push';
+import { colors, typography, spacing, radius, shadow, fonts } from './theme';
 import { LocationPinIcon, UserIcon, EmailIcon, TrashIcon, TakeawayCupIcon } from './CoffeeIcons';
 import { supabase } from './supabase';
 import Geolocation from '@react-native-community/geolocation';
@@ -39,6 +41,8 @@ export default function OrderSummaryScreen() {
   const [etaMinutes, setEtaMinutes] = useState(null);
   const [etaLoading, setEtaLoading] = useState(false);
   const [etaPendingCount, setEtaPendingCount] = useState(0);
+  const [pushOptIn, setPushOptIn] = useState(true);
+  const [showPushOptIn, setShowPushOptIn] = useState(false);
   const runGeoCheck = async (locationId, customerLoc) => {
     if (!locationId) return;
     try {
@@ -100,6 +104,15 @@ export default function OrderSummaryScreen() {
     runGeoCheck(locationId, customerLoc);
   }, [state.customerLocation, state.profile?.arc_location_id]);
 
+  // Show toggle when this device has no token in DB — that's the only condition.
+  useEffect(() => {
+    if (currentOrder.items.length === 0) { setShowPushOptIn(false); return; }
+    const deviceId = getCanonicalDeviceId() || state.deviceId;
+    if (!deviceId) return;
+    supabase
+      .from('push_tokens').select('device_id').eq('device_id', deviceId).maybeSingle()
+      .then(({ data }) => setShowPushOptIn(!data));
+  }, [currentOrder.items.length, state.deviceId]);
 
   // Animation values
   const fillAnim = useRef(new Animated.Value(0)).current;   // coffee fill 0→1
@@ -245,10 +258,16 @@ export default function OrderSummaryScreen() {
   };
 
   // Validate then open confirmation sheet
-  const handlePlaceOrderPress = () => {
+  const handlePlaceOrderPress = async () => {
     if (!name) { Alert.alert('Name required', 'Please enter your name.'); return; }
     if (!email || !email.includes('@')) { Alert.alert('Email required', 'Please enter your email address.'); return; }
     if (currentOrder.items.length === 0) { Alert.alert('No items', 'Please add at least one drink.'); return; }
+
+    // Register for push now — screen is clear, no modals covering it
+    if (pushOptIn && showPushOptIn) {
+      await registerPushToken(state.profile?.arc_location_id || null).catch(() => {});
+      setShowPushOptIn(false);
+    }
 
     // Log and track customer location on review
     const loc = state.customerLocation;
@@ -413,6 +432,15 @@ export default function OrderSummaryScreen() {
           <TouchableOpacity style={styles.addMoreBtn} onPress={() => navigation.navigate('Menu')}>
             <Text style={styles.addMoreText}>+  Add another drink</Text>
           </TouchableOpacity>
+
+          {showPushOptIn && (
+            <TouchableOpacity style={styles.pushOptInRow} onPress={() => setPushOptIn(v => !v)} activeOpacity={0.7}>
+              <View style={[styles.pushCheckbox, pushOptIn && styles.pushCheckboxChecked]}>
+                {pushOptIn && <Text style={styles.pushCheckmark}>✓</Text>}
+              </View>
+              <Text style={styles.pushOptInText}>Notify me when my order is ready</Text>
+            </TouchableOpacity>
+          )}
 
           <TouchableOpacity
             style={[styles.placeBtn, (currentOrder.items.length === 0 || !name || !email) && styles.placeBtnDisabled]}
@@ -641,7 +669,7 @@ const styles = StyleSheet.create({
     borderRadius: radius.full, borderWidth: 1, borderColor: colors.border,
     backgroundColor: colors.surface, marginLeft: spacing.md, marginTop: 6,
   },
-  backText: { fontSize: 14, fontWeight: '600', color: colors.textMid },
+  backText: { fontSize: 13, fontFamily: fonts.semibold, color: colors.textMid },
   divider: { height: 1, backgroundColor: colors.border },
 
   body: { padding: spacing.lg, gap: spacing.md },
@@ -652,7 +680,7 @@ const styles = StyleSheet.create({
     backgroundColor: colors.surface, borderRadius: radius.lg,
     borderWidth: 1.5, borderColor: colors.border, paddingHorizontal: spacing.md,
   },
-  input: { flex: 1, height: 52, fontSize: 16, color: colors.textDark },
+  input: { flex: 1, height: 52, fontSize: 15, color: colors.textDark },
 
   itemCard: {
     flexDirection: 'row', alignItems: 'center',
@@ -664,9 +692,9 @@ const styles = StyleSheet.create({
     backgroundColor: colors.primary, alignItems: 'center', justifyContent: 'center',
     marginRight: spacing.md,
   },
-  itemBadgeText: { color: '#fff', fontWeight: '800', fontSize: 14 },
+  itemBadgeText: { color: '#fff', fontFamily: fonts.extrabold, fontSize: 13 },
   itemText: { flex: 1 },
-  itemName: { ...typography.heading3, fontSize: 15 },
+  itemName: { ...typography.heading3, fontSize: 14 },
   itemDetail: { ...typography.caption, marginTop: 2 },
   itemSpecial: { ...typography.caption, fontStyle: 'italic', color: colors.textLight, marginTop: 2 },
   deleteBtn: { padding: spacing.sm },
@@ -676,14 +704,30 @@ const styles = StyleSheet.create({
     borderRadius: radius.lg, paddingVertical: 12, alignItems: 'center',
     backgroundColor: colors.surfaceAlt,
   },
-  addMoreText: { fontSize: 15, fontWeight: '600', color: colors.textMid },
+  addMoreText: { fontSize: 14, fontFamily: fonts.semibold, color: colors.textMid },
+
+  pushOptInRow: {
+    flexDirection: 'row', alignItems: 'center', gap: spacing.md,
+    backgroundColor: colors.primaryLight, borderRadius: radius.lg,
+    paddingHorizontal: spacing.md, paddingVertical: 12,
+    borderWidth: 1, borderColor: colors.primaryMid,
+  },
+  pushCheckbox: {
+    width: 22, height: 22, borderRadius: 6,
+    borderWidth: 2, borderColor: colors.primary,
+    alignItems: 'center', justifyContent: 'center',
+    backgroundColor: colors.surface,
+  },
+  pushCheckboxChecked: { backgroundColor: colors.primary, borderColor: colors.primary },
+  pushCheckmark: { color: '#fff', fontSize: 12, fontFamily: fonts.extrabold, lineHeight: 16 },
+  pushOptInText: { flex: 1, fontSize: 13, fontFamily: fonts.medium, color: colors.textMid },
 
   placeBtn: {
     backgroundColor: colors.primary, borderRadius: radius.lg,
     paddingVertical: 12, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8,
   },
   placeBtnDisabled: { opacity: 0.4 },
-  placeBtnText: { color: '#fff', fontSize: 17, fontWeight: '700', letterSpacing: 0.3 },
+  placeBtnText: { color: '#fff', fontSize: 16, fontFamily: fonts.bold, letterSpacing: 0.3 },
 
   emptyState: {
     padding: spacing.lg, alignItems: 'center',
@@ -730,14 +774,14 @@ const styles = StyleSheet.create({
   confirmDivider: { height: 1, backgroundColor: colors.borderLight },
 
   confirmDetailRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
-  confirmDetailText: { fontSize: 15, color: colors.textDark, fontWeight: '500' },
+  confirmDetailText: { fontSize: 14, color: colors.textDark, fontFamily: fonts.medium },
 
   confirmItem: { flexDirection: 'row', alignItems: 'flex-start', gap: spacing.sm },
   confirmItemBullet: {
     width: 7, height: 7, borderRadius: 4,
     backgroundColor: colors.primary, marginTop: 6, flexShrink: 0,
   },
-  confirmItemName: { fontSize: 15, fontWeight: '600', color: colors.textDark },
+  confirmItemName: { fontSize: 14, fontFamily: fonts.semibold, color: colors.textDark },
   confirmItemDetail: { ...typography.caption, marginTop: 2 },
   confirmItemSpecial: { ...typography.caption, fontStyle: 'italic', color: colors.textLight, marginTop: 2 },
 
@@ -763,8 +807,8 @@ const styles = StyleSheet.create({
     borderRadius: 5,
     backgroundColor: '#22c55e',
   },
-  etaText: { fontSize: 13, color: '#166534', fontWeight: '500', flex: 1, flexWrap: 'wrap' },
-  etaHighlight: { fontWeight: '800', color: '#15803d' },
+  etaText: { fontSize: 12, color: '#166534', fontFamily: fonts.medium, flex: 1, flexWrap: 'wrap' },
+  etaHighlight: { fontFamily: fonts.extrabold, color: '#15803d' },
   etaWrapAmber: { backgroundColor: '#fffbeb', borderColor: '#fcd34d' },
   etaDotAmber: { backgroundColor: '#f59e0b' },
   etaTextAmber: { color: '#92400e' },
@@ -779,7 +823,7 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: colors.primaryMid,
   },
-  confirmNoteText: { fontSize: 13, color: colors.textMid, lineHeight: 20 },
+  confirmNoteText: { fontSize: 12, color: colors.textMid, lineHeight: 20 },
 
   modalActions: {
     flexDirection: 'row', gap: spacing.md,
@@ -791,22 +835,22 @@ const styles = StyleSheet.create({
     flex: 1, paddingVertical: 11, borderRadius: radius.lg,
     borderWidth: 1.5, borderColor: colors.border, alignItems: 'center',
   },
-  editBtnText: { fontSize: 15, fontWeight: '600', color: colors.textMid },
+  editBtnText: { fontSize: 14, fontFamily: fonts.semibold, color: colors.textMid },
   confirmBtn: {
     flex: 2, paddingVertical: 11, borderRadius: radius.lg,
     backgroundColor: colors.primary, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6,
   },
   confirmBtnDisabled: { backgroundColor: colors.textMuted, opacity: 0.6 },
-  confirmBtnText: { color: '#fff', fontSize: 16, fontWeight: '700', letterSpacing: 0.3 },
+  confirmBtnText: { color: '#fff', fontSize: 15, fontFamily: fonts.bold, letterSpacing: 0.3 },
   geoWarning: {
     flexDirection: 'row', alignItems: 'flex-start', gap: spacing.sm,
     backgroundColor: '#fef3c7', borderRadius: radius.md,
     padding: spacing.md, borderWidth: 1, borderColor: '#fcd34d',
     marginHorizontal: spacing.lg, marginBottom: spacing.sm,
   },
-  geoWarningTitle: { fontSize: 14, fontWeight: '700', color: '#92400e', marginBottom: 4 },
-  geoWarningText: { fontSize: 13, color: '#92400e', lineHeight: 18 },
-  geoWarningLink: { fontWeight: '700', textDecorationLine: 'underline' },
+  geoWarningTitle: { fontSize: 13, fontFamily: fonts.bold, color: '#92400e', marginBottom: 4 },
+  geoWarningText: { fontSize: 12, color: '#92400e', lineHeight: 18 },
+  geoWarningLink: { fontFamily: fonts.bold, textDecorationLine: 'underline' },
 
   // ── Brewing modal ──────────────────────────────────────
   brewOverlay: {
@@ -867,8 +911,8 @@ const styles = StyleSheet.create({
     borderRadius: 8,
   },
 
-  brewTitle: { fontSize: 24, fontWeight: '800', color: colors.textDark, textAlign: 'center' },
-  brewSubtitle: { fontSize: 15, color: colors.textLight, textAlign: 'center', lineHeight: 24 },
+  brewTitle: { fontSize: 23, fontFamily: fonts.extrabold, color: colors.textDark, textAlign: 'center' },
+  brewSubtitle: { fontSize: 14, color: colors.textLight, textAlign: 'center', lineHeight: 24 },
 
   dotsRow: { flexDirection: 'row', gap: 8, marginVertical: spacing.sm },
   dot: { width: 9, height: 9, borderRadius: 5, backgroundColor: colors.primary },
@@ -884,5 +928,5 @@ const styles = StyleSheet.create({
     alignSelf: 'center',
     maxWidth: 300,
   },
-  notifyPillText: { fontSize: 13, fontWeight: '700', color: colors.primary, textAlign: 'center' },
+  notifyPillText: { fontSize: 12, fontFamily: fonts.bold, color: colors.primary, textAlign: 'center' },
 });

@@ -8,7 +8,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { useNavigation } from '@react-navigation/native';
 import { supabase } from './supabase';
 import { useApp } from './AppContext';
-import { colors, typography, spacing, radius, shadow } from './theme';
+import { colors, typography, spacing, radius, shadow, fonts } from './theme';
 
 const HOURS = ['1','2','3','4','5','6','7','8','9','10','11','12'];
 const MINUTES = ['00','05','10','15','20','25','30','35','40','45','50','55'];
@@ -457,7 +457,7 @@ const styles = StyleSheet.create({
     backgroundColor: colors.surface,
   },
   backBtn: { width: 60 },
-  backText: { fontSize: 17, color: colors.primary, fontWeight: '600' },
+  backText: { fontSize: 16, color: colors.primary, fontFamily: fonts.semibold },
   headerTitle: { flex: 1, textAlign: 'center', ...typography.heading3 },
   scroll: { padding: spacing.md, paddingBottom: 48 },
 
@@ -483,7 +483,7 @@ const styles = StyleSheet.create({
     borderRadius: radius.sm,
     paddingHorizontal: 12,
     paddingVertical: 10,
-    fontSize: 15,
+    fontSize: 14,
     color: colors.textDark,
     backgroundColor: colors.background,
     minHeight: 44,
@@ -503,9 +503,9 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     minHeight: 44,
   },
-  timeBtnText: { fontSize: 15, color: colors.textDark },
+  timeBtnText: { fontSize: 14, color: colors.textDark },
   timeBtnPlaceholder: { color: colors.textMuted },
-  timeBtnChevron: { fontSize: 12, color: colors.textMuted },
+  timeBtnChevron: { fontSize: 11, color: colors.textMuted },
   pickerContainer: {
     flexDirection: 'row',
     borderWidth: 1,
@@ -536,8 +536,8 @@ const styles = StyleSheet.create({
     borderBottomColor: colors.borderLight,
   },
   pickerItemSelected: { backgroundColor: colors.primaryLight },
-  pickerItemText: { fontSize: 15, color: colors.textDark },
-  pickerItemTextSelected: { color: colors.primary, fontWeight: '700' },
+  pickerItemText: { fontSize: 14, color: colors.textDark },
+  pickerItemTextSelected: { color: colors.primary, fontFamily: fonts.bold },
 
   primaryBtn: {
     backgroundColor: colors.primary,
@@ -546,7 +546,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     marginTop: 10,
   },
-  primaryBtnText: { color: '#fff', fontWeight: '700', fontSize: 15 },
+  primaryBtnText: { color: '#fff', fontFamily: fonts.bold, fontSize: 14 },
 
   addBtn: {
     backgroundColor: colors.primaryLight,
@@ -554,7 +554,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 14,
     paddingVertical: 7,
   },
-  addBtnText: { color: colors.primary, fontWeight: '700', fontSize: 14 },
+  addBtnText: { color: colors.primary, fontFamily: fonts.bold, fontSize: 13 },
 
   empty: { ...typography.caption, textAlign: 'center', paddingVertical: 24 },
 
@@ -568,13 +568,13 @@ const styles = StyleSheet.create({
   arrows: { marginRight: 6 },
   arrowBtn: { padding: 4 },
   arrowDisabled: { opacity: 0.25 },
-  arrow: { fontSize: 18, color: colors.textMuted, lineHeight: 22 },
+  arrow: { fontSize: 17, color: colors.textMuted, lineHeight: 22 },
   itemInfo: { flex: 1, minWidth: 0 },
-  itemTime: { fontSize: 12, color: colors.textLight, marginBottom: 2 },
-  itemTitle: { fontSize: 14, color: colors.textDark, lineHeight: 19, flexShrink: 1 },
-  itemTitleBold: { fontWeight: '700', color: colors.primary },
-  itemDesc: { fontSize: 12, color: colors.textMuted, marginTop: 2, lineHeight: 16, flexShrink: 1 },
-  optionalLabel: { fontWeight: '400', color: colors.textMuted },
+  itemTime: { fontSize: 11, color: colors.textLight, marginBottom: 2 },
+  itemTitle: { fontSize: 13, color: colors.textDark, lineHeight: 19, flexShrink: 1 },
+  itemTitleBold: { fontFamily: fonts.bold, color: colors.primary },
+  itemDesc: { fontSize: 11, color: colors.textMuted, marginTop: 2, lineHeight: 16, flexShrink: 1 },
+  optionalLabel: { fontFamily: fonts.regular, color: colors.textMuted },
   itemActions: { flexDirection: 'row', gap: 6 },
   editBtn: {
     backgroundColor: colors.primaryLight,
@@ -582,14 +582,14 @@ const styles = StyleSheet.create({
     paddingHorizontal: 10,
     paddingVertical: 6,
   },
-  editBtnText: { color: colors.primary, fontWeight: '600', fontSize: 13 },
+  editBtnText: { color: colors.primary, fontFamily: fonts.semibold, fontSize: 12 },
   deleteBtn: {
     backgroundColor: '#fee2e2',
     borderRadius: radius.sm,
     paddingHorizontal: 10,
     paddingVertical: 6,
   },
-  deleteBtnText: { color: colors.error, fontWeight: '700', fontSize: 13 },
+  deleteBtnText: { color: colors.error, fontFamily: fonts.bold, fontSize: 12 },
 
   toggleBlock: {
     flexDirection: 'row',
@@ -597,7 +597,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   toggleInfo: { flex: 1, marginRight: 12 },
-  toggleTitle: { ...typography.body, fontWeight: '700' },
+  toggleTitle: { ...typography.body, fontFamily: fonts.bold },
   toggleSub: { ...typography.caption, marginTop: 2 },
 
   toggleRow: {
@@ -607,7 +607,7 @@ const styles = StyleSheet.create({
     marginTop: 14,
     paddingVertical: 2,
   },
-  errorText: { color: colors.error, fontSize: 13, marginTop: 8 },
+  errorText: { color: colors.error, fontSize: 12, marginTop: 8 },
 
   overlay: {
     flex: 1,
@@ -638,5 +638,5 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: colors.border,
   },
-  cancelBtnText: { color: colors.textDark, fontWeight: '600', fontSize: 15 },
+  cancelBtnText: { color: colors.textDark, fontFamily: fonts.semibold, fontSize: 14 },
 });

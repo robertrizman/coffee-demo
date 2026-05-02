@@ -9,7 +9,7 @@ import { useNavigation, useRoute } from '@react-navigation/native';
 import { SIZES, MILK_OPTIONS, EXTRAS } from './menu';
 import { useApp } from './AppContext';
 import { trackAddToOrder, trackCustomisation } from './tealium';
-import { colors, typography, spacing, radius, shadow } from './theme';
+import { colors, typography, spacing, radius, shadow, fonts } from './theme';
 
 export default function ItemDetailScreen() {
   const navigation = useNavigation();
@@ -214,7 +214,7 @@ const styles = StyleSheet.create({
     gap: spacing.md,
   },
   headerLeft: { flex: 1 },
-  title: { ...typography.heading1, fontSize: 26 },
+  title: { ...typography.heading1, fontSize: 25 },
   subtitle: { ...typography.subtitle, marginTop: 4 },
   backBtn: {
     flexShrink: 0,
@@ -225,11 +225,11 @@ const styles = StyleSheet.create({
     borderColor: colors.border,
     backgroundColor: colors.surface,
   },
-  backText: { fontSize: 14, fontWeight: '600', color: colors.textMid },
+  backText: { fontSize: 13, fontFamily: fonts.semibold, color: colors.textMid },
   divider: { height: 1, backgroundColor: colors.border },
 
   body: { padding: spacing.lg, gap: spacing.md },
-  sectionLabel: { ...typography.label, marginBottom: -4 },
+  sectionLabel: { ...typography.label, fontSize: 14, marginBottom: -4 },
 
   sizeRow: { flexDirection: 'row', gap: spacing.sm },
   sizeBtn: {
@@ -242,7 +242,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   sizeBtnActive: { backgroundColor: colors.primary, borderColor: colors.primary },
-  sizeBtnText: { fontSize: 15, fontWeight: '600', color: colors.textMid },
+  sizeBtnText: { fontSize: 14, fontFamily: fonts.semibold, color: colors.textMid },
   sizeBtnTextActive: { color: '#fff' },
 
   chipWrap: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm },
@@ -255,7 +255,7 @@ const styles = StyleSheet.create({
     backgroundColor: colors.surface,
   },
   chipActive: { backgroundColor: colors.primary, borderColor: colors.primary },
-  chipText: { fontSize: 14, fontWeight: '500', color: colors.textMid },
+  chipText: { fontSize: 12, fontFamily: fonts.medium, color: colors.textMid },
   chipTextActive: { color: '#fff' },
 
   textInput: {
@@ -264,7 +264,7 @@ const styles = StyleSheet.create({
     borderWidth: 1.5,
     borderColor: colors.border,
     padding: spacing.md,
-    fontSize: 15,
+    fontSize: 14,
     color: colors.textDark,
     minHeight: 80,
     textAlignVertical: 'top',
@@ -290,7 +290,7 @@ const styles = StyleSheet.create({
   addBtnDisabled: {
     backgroundColor: colors.border,
   },
-  addBtnText: { color: '#fff', fontSize: 17, fontWeight: '700', letterSpacing: 0.3 },
+  addBtnText: { color: '#fff', fontSize: 16, fontFamily: fonts.bold, letterSpacing: 0.3 },
   closedBanner: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -300,5 +300,5 @@ const styles = StyleSheet.create({
     gap: 10,
   },
   closedBannerIcon: { fontSize: 20 },
-  closedBannerText: { flex: 1, color: '#fff', fontSize: 14, fontWeight: '600' },
+  closedBannerText: { flex: 1, color: '#fff', fontSize: 13, fontFamily: fonts.semibold },
 });

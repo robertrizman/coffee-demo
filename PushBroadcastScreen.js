@@ -6,7 +6,7 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { supabase } from './supabase';
-import { colors, spacing, radius, typography } from './theme';
+import { colors, spacing, radius, typography, fonts } from './theme';
 
 const SUPABASE_URL = 'https://zdgmqmamohrybxwhgwby.supabase.co';
 const ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InpkZ21xbWFtb2hyeWJ4d2hnd2J5Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzUzNzUyODgsImV4cCI6MjA5MDk1MTI4OH0.imhhaa0OBB69u_igWA52b1Hx0Hhyv4do6YLENifAXRo';
@@ -375,17 +375,17 @@ const styles = StyleSheet.create({
   input: {
     borderWidth: 1.5, borderColor: colors.border, borderRadius: radius.md,
     paddingHorizontal: spacing.md, paddingVertical: 12,
-    fontSize: 15, color: colors.textDark, backgroundColor: colors.surface,
+    fontSize: 14, color: colors.textDark, backgroundColor: colors.surface,
   },
   inputMulti: { height: 90, textAlignVertical: 'top', paddingTop: 12 },
-  charCount: { fontSize: 11, color: colors.textMuted, textAlign: 'right' },
+  charCount: { fontSize: 10, color: colors.textMuted, textAlign: 'right' },
   toggleRow: {
     flexDirection: 'row', alignItems: 'center',
     justifyContent: 'space-between', marginTop: spacing.sm,
     paddingTop: spacing.sm, borderTopWidth: 1, borderTopColor: colors.borderLight,
   },
-  toggleLabel: { fontSize: 15, fontWeight: '600', color: colors.textDark },
-  toggleSub: { fontSize: 12, color: colors.textMuted },
+  toggleLabel: { fontSize: 14, fontFamily: fonts.semibold, color: colors.textDark },
+  toggleSub: { fontSize: 11, color: colors.textMuted },
   scheduleRow: { flexDirection: 'row', gap: spacing.sm },
   scheduleField: { flex: 1 },
   sendBtn: {
@@ -393,7 +393,7 @@ const styles = StyleSheet.create({
     padding: 14, alignItems: 'center', marginTop: spacing.sm,
   },
   sendBtnDisabled: { opacity: 0.6 },
-  sendBtnText: { color: '#fff', fontSize: 16, fontWeight: '700' },
+  sendBtnText: { color: '#fff', fontSize: 15, fontFamily: fonts.bold },
   emptyText: { color: colors.textMuted, textAlign: 'center', paddingVertical: spacing.md },
   historyScroll: { maxHeight: 400 },
   historyRow: {
@@ -403,23 +403,23 @@ const styles = StyleSheet.create({
   },
   historyLeft: { flex: 1, gap: 3 },
   historyTitleRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
-  historyTitle: { fontSize: 14, fontWeight: '700', color: colors.textDark, flex: 1 },
-  historyMsg: { fontSize: 13, color: colors.textMuted, lineHeight: 18 },
-  historyTime: { fontSize: 11, color: colors.textMuted },
+  historyTitle: { fontSize: 13, fontFamily: fonts.bold, color: colors.textDark, flex: 1 },
+  historyMsg: { fontSize: 12, color: colors.textMuted, lineHeight: 18 },
+  historyTime: { fontSize: 10, color: colors.textMuted },
   statusBadge: { borderRadius: radius.full, paddingHorizontal: 8, paddingVertical: 2 },
-  statusText: { fontSize: 11, fontWeight: '700' },
+  statusText: { fontSize: 10, fontFamily: fonts.bold },
   cancelBtn: {
     width: 28, height: 28, borderRadius: 14,
     backgroundColor: '#fee2e2', alignItems: 'center', justifyContent: 'center',
   },
-  cancelBtnText: { color: '#ef4444', fontSize: 12, fontWeight: '700' },
+  cancelBtnText: { color: '#ef4444', fontSize: 11, fontFamily: fonts.bold },
   locationPickerBtn: {
     flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
     borderWidth: 1.5, borderColor: colors.border, borderRadius: radius.md,
     paddingHorizontal: spacing.md, paddingVertical: 12,
     backgroundColor: colors.surface,
   },
-  locationPickerBtnText: { fontSize: 14, fontWeight: '600', color: colors.textDark },
+  locationPickerBtnText: { fontSize: 13, fontFamily: fonts.semibold, color: colors.textDark },
   modalSafe: { flex: 1, backgroundColor: colors.background },
   modalHeader: {
     flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
@@ -431,7 +431,7 @@ const styles = StyleSheet.create({
     width: 32, height: 32, borderRadius: 16,
     backgroundColor: colors.surfaceAlt, alignItems: 'center', justifyContent: 'center',
   },
-  modalCloseText: { fontSize: 14, color: colors.textDark, fontWeight: '600' },
+  modalCloseText: { fontSize: 13, color: colors.textDark, fontFamily: fonts.semibold },
   locationItem: {
     flexDirection: 'row', alignItems: 'center',
     backgroundColor: colors.surface, borderRadius: radius.lg,
@@ -440,11 +440,11 @@ const styles = StyleSheet.create({
   },
   locationItemSelected: { borderColor: colors.primary },
   locationItemDisabled: { opacity: 0.5 },
-  locationItemName: { fontSize: 15, fontWeight: '700', color: colors.textDark },
-  locationItemAddress: { fontSize: 13, color: colors.textMuted, marginTop: 2 },
-  locationItemCheck: { fontSize: 18, color: colors.primary, fontWeight: '700', marginLeft: spacing.sm },
+  locationItemName: { fontSize: 14, fontFamily: fonts.bold, color: colors.textDark },
+  locationItemAddress: { fontSize: 12, color: colors.textMuted, marginTop: 2 },
+  locationItemCheck: { fontSize: 17, color: colors.primary, fontFamily: fonts.bold, marginLeft: spacing.sm },
   locationBadgeActive: { backgroundColor: '#dcfce7', borderRadius: 99, paddingHorizontal: 8, paddingVertical: 2 },
-  locationBadgeActiveText: { fontSize: 10, fontWeight: '700', color: '#16a34a' },
+  locationBadgeActiveText: { fontSize: 9, fontFamily: fonts.bold, color: '#16a34a' },
   locationBadgeInactive: { backgroundColor: '#f1f5f9', borderRadius: 99, paddingHorizontal: 8, paddingVertical: 2 },
-  locationBadgeInactiveText: { fontSize: 10, fontWeight: '700', color: colors.textMuted },
+  locationBadgeInactiveText: { fontSize: 9, fontFamily: fonts.bold, color: colors.textMuted },
 });
