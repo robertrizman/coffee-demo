@@ -145,16 +145,32 @@ class TealiumPrismModule: NSObject {
   @objc
   func getAppUuid(_ resolver: @escaping RCTPromiseResolveBlock,
                   rejecter: @escaping RCTPromiseRejectBlock) {
-    
+
     guard let tealium = tealium else {
       rejecter("NOT_INITIALIZED", "Tealium not initialized", nil)
       return
     }
-    
+
     if let uuid = tealium.dataLayer.all["app_uuid"] as? String {
       resolver(uuid.lowercased())
     } else {
       rejecter("NO_UUID", "app_uuid not available", nil)
+    }
+  }
+
+  @objc
+  func getVisitorId(_ resolver: @escaping RCTPromiseResolveBlock,
+                    rejecter: @escaping RCTPromiseRejectBlock) {
+
+    guard let tealium = tealium else {
+      rejecter("NOT_INITIALIZED", "Tealium not initialized", nil)
+      return
+    }
+
+    if let vid = tealium.dataLayer.all["tealium_visitor_id"] as? String, !vid.isEmpty {
+      resolver(vid)
+    } else {
+      rejecter("NO_VISITOR_ID", "tealium_visitor_id not available", nil)
     }
   }
 }

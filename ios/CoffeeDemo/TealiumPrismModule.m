@@ -33,4 +33,7 @@ RCT_EXTERN_METHOD(leaveTrace:(RCTPromiseResolveBlock)resolver
 RCT_EXTERN_METHOD(getAppUuid:(RCTPromiseResolveBlock)resolver
                   rejecter:(RCTPromiseRejectBlock)rejecter)
 
+RCT_EXTERN_METHOD(getVisitorId:(RCTPromiseResolveBlock)resolver
+                  rejecter:(RCTPromiseRejectBlock)rejecter)
+
 @end

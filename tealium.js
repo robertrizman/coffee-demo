@@ -74,6 +74,23 @@ export async function initTealium() {
   setDeviceIdForMoments(lowerUuid);
   setCanonicalDeviceId(lowerUuid);
   console.log('[Tealium] ✅ customer_uuid set to:', lowerUuid);
+
+  // Fetch tealium_visitor_id from PRISM data layer — may not be set immediately
+  // after init so retry a few times with a short delay
+  if (PrismModule) {
+    const tryFetchVisitorId = async (attemptsLeft) => {
+      try {
+        const vid = await PrismModule.getVisitorId();
+        if (vid) {
+          _visitorId = vid;
+          console.log('[Tealium] ✅ tealium_visitor_id:', vid);
+          return;
+        }
+      } catch {}
+      if (attemptsLeft > 0) setTimeout(() => tryFetchVisitorId(attemptsLeft - 1), 3000);
+    };
+    setTimeout(() => tryFetchVisitorId(7), 2000);
+  }
 }
 
 /**
@@ -150,6 +167,7 @@ async function trackView(screenName, data = {}) {
 
 export async function setUserDataLayer(profile) {
   if (!profile) return;
+  if (profile.email) setEmailForMoments(profile.email);
   const data = {
     customer_name: profile.name || '',
     customer_email: profile.email || '',
@@ -446,13 +464,14 @@ const MOMENTS_ENGINE =
   'https://personalization-api.ap-southeast-2.prod.tealiumapis.com/personalization/accounts/success-robert-rizman/profiles/coffee-demo/engines/aaa7abe0-9023-49c8-8858-5fe2dbb18c39';
 
 export async function queryMomentsAPI() {
-  const deviceId = _deviceId;
-  if (!deviceId) {
-    console.warn('[Moments] No device ID available');
+  const email = _email;
+  console.log('[Moments] email:', email);
+  if (!email) {
+    console.warn('[Moments] No email — cannot query Moments API');
     return null;
   }
   try {
-    const url = `${MOMENTS_ENGINE}?attributeId=5120&attributeValue=${encodeURIComponent(deviceId.toLowerCase())}`;
+    const url = `${MOMENTS_ENGINE}?attributeId=5549&attributeValue=${encodeURIComponent(email)}`;
     console.log('[Moments] Querying:', url);
 
     const controller = new AbortController();
@@ -487,6 +506,12 @@ export function setVisitorId(id) {
     PrismModule.setDataLayer({ tealium_visitor_id: id }).catch(() => {});
   }
 }
+
+// ── Email (used as Moments API attribute value) ───────────
+
+let _email = null;
+export function setEmailForMoments(email) { _email = email ? email.trim().toLowerCase() : null; }
+export function getEmailForMoments() { return _email; }
 
 // ── Device ID (canonical — matches PRISM app_uuid) ────────
 

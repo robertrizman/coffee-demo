@@ -15,7 +15,7 @@ import { useNavigation } from '@react-navigation/native';
 import { useAuth } from './AuthContext';
 import { supabase } from './supabase';
 import { getOrderPersonality } from './foodPairingAI';
-import { trackProfileTab, trackEditProfile, trackProfileUpdated, trackUuidCopy, trackDietaryRequirementsUpdated, joinTrace, leaveTrace, getCanonicalDeviceId } from './tealium';
+import { trackProfileTab, trackEditProfile, trackProfileUpdated, trackUuidCopy, trackDietaryRequirementsUpdated, joinTrace, leaveTrace, getCanonicalDeviceId, getVisitorId, setEmailForMoments } from './tealium';
 import { colors, typography, spacing, radius, shadow, fonts } from './theme';
 import { UserIcon, EmailIcon, LocationPinIcon, TakeawayCupIcon, CheckIcon, CopyIcon, EditIcon, AiSparkIcon, LightbulbIcon, MagnifyIcon, LightningBoltIcon, LeafIcon, ShieldIcon } from './CoffeeIcons';
 
@@ -312,9 +312,10 @@ export default function OrdersProfileScreen() {
 
   useEffect(() => {
     if (activeTab !== 'profile' || momentsData) return;
-    const deviceIdForMoments = getCanonicalDeviceId() || state.deviceId;
-    if (!deviceIdForMoments) return;
-    const url = `https://personalization-api.ap-southeast-2.prod.tealiumapis.com/personalization/accounts/success-robert-rizman/profiles/coffee-demo/engines/aaa7abe0-9023-49c8-8858-5fe2dbb18c39?attributeId=5120&attributeValue=${encodeURIComponent(deviceIdForMoments.toLowerCase())}`;
+    const email = profile?.email;
+    if (!email) return;
+    if (email) setEmailForMoments(email);
+    const url = `https://personalization-api.ap-southeast-2.prod.tealiumapis.com/personalization/accounts/success-robert-rizman/profiles/coffee-demo/engines/aaa7abe0-9023-49c8-8858-5fe2dbb18c39?attributeId=5549&attributeValue=${encodeURIComponent(email.trim().toLowerCase())}`;
     fetch(url, { headers: { 'Content-Type': 'application/json' } })
       .then(r => r.json())
       .then(data => {
@@ -448,9 +449,9 @@ export default function OrdersProfileScreen() {
   };
 
   const handleQueryMoments = async ({ isRefresh = false } = {}) => {
-    const deviceId = getCanonicalDeviceId() || state.deviceId;
-    if (!deviceId) { setTraceStatus('No device ID available'); return; }
-    const url = `https://personalization-api.ap-southeast-2.prod.tealiumapis.com/personalization/accounts/success-robert-rizman/profiles/coffee-demo/engines/aaa7abe0-9023-49c8-8858-5fe2dbb18c39?attributeId=5120&attributeValue=${encodeURIComponent(deviceId.toLowerCase())}`;
+    const email = profile?.email;
+    if (!email) { setTraceStatus('No email available'); return; }
+    const url = `https://personalization-api.ap-southeast-2.prod.tealiumapis.com/personalization/accounts/success-robert-rizman/profiles/coffee-demo/engines/aaa7abe0-9023-49c8-8858-5fe2dbb18c39?attributeId=5549&attributeValue=${encodeURIComponent(email.trim().toLowerCase())}`;
     setMomentsUrl(url);
     if (isRefresh) setMomentsRefreshing(true); else setMomentsLoading(true);
     try {
@@ -716,12 +717,12 @@ export default function OrdersProfileScreen() {
                   />
                 </View>
                 <Text style={styles.fieldLabel}>EMAIL</Text>
-                <View style={styles.inputRow}>
+                <View style={[styles.inputRow, { backgroundColor: colors.surfaceAlt, opacity: 0.6 }]}>
                   <EmailIcon size={16} color={colors.textMuted} />
                   <TextInput
-                    style={styles.input}
+                    style={[styles.input, { color: colors.textMuted }]}
                     value={editEmail}
-                    onChangeText={setEditEmail}
+                    editable={false}
                     placeholder="your@email.com"
                     placeholderTextColor={colors.textMuted}
                     keyboardType="email-address"
@@ -962,9 +963,12 @@ export default function OrdersProfileScreen() {
               <Text style={styles.debugLabel}>CUSTOMER UUID (TEALIUM)</Text>
               <Text style={styles.debugMono}>{(tealiumUuid || state.deviceId || '—').toLowerCase()}</Text>
 
+              <Text style={styles.debugLabel}>EMAIL (ATTRIBUTE VALUE)</Text>
+              <Text style={styles.debugMono}>{profile?.email || '—'}</Text>
+
               <Text style={styles.debugLabel}>ENDPOINT</Text>
               <Text style={styles.debugMono} numberOfLines={3}>
-                {`https://personalization-api.ap-southeast-2.prod.tealiumapis.com/personalization/accounts/success-robert-rizman/profiles/coffee-demo/engines/aaa7abe0-9023-49c8-8858-5fe2dbb18c39?attributeId=5120&attributeValue=${(tealiumUuid || state.deviceId || '').toLowerCase()}`}
+                {`https://personalization-api.ap-southeast-2.prod.tealiumapis.com/personalization/accounts/success-robert-rizman/profiles/coffee-demo/engines/aaa7abe0-9023-49c8-8858-5fe2dbb18c39?attributeId=5549&attributeValue=${encodeURIComponent((profile?.email || '').trim().toLowerCase())}`}
               </Text>
 
               <TouchableOpacity

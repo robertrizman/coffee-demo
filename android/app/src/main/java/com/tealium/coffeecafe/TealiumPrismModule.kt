@@ -127,4 +127,22 @@ class TealiumPrismModule(reactContext: ReactApplicationContext) :
             promise.reject("UUID_ERROR", e.message, e)
         }
     }
+
+    @ReactMethod
+    fun getVisitorId(promise: Promise) {
+        val t = tealium ?: run { promise.reject("NOT_INITIALIZED", "PRISM not initialized"); return }
+        try {
+            t.dataLayer.getString("tealium_visitor_id").subscribe { result ->
+                val vid = result.getOrNull()
+                if (!vid.isNullOrEmpty()) {
+                    println("[TealiumPrism] tealium_visitor_id: $vid")
+                    promise.resolve(vid)
+                } else {
+                    promise.reject("NO_VISITOR_ID", "tealium_visitor_id not available")
+                }
+            }
+        } catch (e: Exception) {
+            promise.reject("VISITOR_ID_ERROR", e.message, e)
+        }
+    }
 }

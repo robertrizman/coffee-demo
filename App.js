@@ -16,7 +16,7 @@ import { AuthProvider } from './AuthContext';
 import AppNavigator from './AppNavigator';
 import OnboardingScreen from './OnboardingScreen';
 import SplashLoadingScreen from './SplashLoadingScreen';
-import { trackAppOpen, initTealium, getCanonicalDeviceId } from './tealium';
+import { trackAppOpen, initTealium, getCanonicalDeviceId, setEmailForMoments } from './tealium';
 import { registerPushToken } from './push';
 import { useFonts, Montserrat_400Regular, Montserrat_500Medium, Montserrat_600SemiBold, Montserrat_700Bold, Montserrat_800ExtraBold } from '@expo-google-fonts/montserrat';
 import { LogBox, Text, TextInput } from 'react-native';
@@ -63,6 +63,8 @@ function Root() {
       console.log('📊 [Tealium] Initialized');
       tealiumReady = true;
       trackAppOpen();
+      // Seed email so Moments API queries work on first open for returning users
+      if (profile?.email) setEmailForMoments(profile.email);
     }).catch((e) => {
       console.error('❌ [Tealium] Init failed:', e);
       tealiumReady = true; // Continue even if Tealium fails

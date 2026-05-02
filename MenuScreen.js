@@ -256,16 +256,22 @@ export default function MenuScreen() {
         data: rec,
       });
 
-      // Check if we have Bedrock rank/sentiment from Moments API
-      const hasBedrockData = momentsData?.properties &&
-        (momentsData.properties['Bedrock - Rank'] || momentsData.properties['Bedrock - Sentiment']);
+      // Check if we have Bedrock rank/sentiment from Moments API.
+      // Key lookup is case-insensitive so 'Bedrock - Rank', 'bedrock_rank', 'Bedrock Rank' etc. all match.
+      const props = momentsData?.properties || {};
+      const propKeys = Object.keys(props);
+      console.log('[AI Modal] Moments property keys:', propKeys);
+      const rankKey = propKeys.find(k => k.toLowerCase().replace(/[\s_-]/g, '').includes('bedrockrank'));
+      const sentimentKey = propKeys.find(k => k.toLowerCase().replace(/[\s_-]/g, '').includes('bedrocksentiment'));
+      const hasBedrockData = !!(rankKey || sentimentKey);
+      console.log('[AI Modal] Bedrock found:', hasBedrockData, '| rank key:', rankKey, '| sentiment key:', sentimentKey);
 
       if (hasBedrockData) {
         builtSlides.push({
           type: 'bedrock',
           data: {
-            rank: momentsData.properties['Bedrock - Rank'],
-            sentiment: momentsData.properties['Bedrock - Sentiment'],
+            rank: rankKey ? props[rankKey] : null,
+            sentiment: sentimentKey ? props[sentimentKey] : null,
             ...rec
           },
         });
@@ -430,8 +436,17 @@ export default function MenuScreen() {
               </TouchableOpacity>
             </View>
 
-            {/* Scrollable content area */}
-            <View style={{ flex: 1, overflow: 'hidden' }}>
+            {/*
+              ScrollView is a direct child of the card with flex:1.
+              The card has a fixed height so this gets a concrete measured height —
+              no intermediate wrapper Views that confuse Android's flex resolution.
+              Content taller than this height will scroll.
+            */}
+            <ScrollView
+              style={{ flex: 1 }}
+              contentContainerStyle={{ paddingHorizontal: 4, paddingBottom: 16 }}
+              showsVerticalScrollIndicator={false}
+            >
 
             {/* No orders state */}
             {aiPhase === 'no-orders' && (
@@ -474,14 +489,9 @@ export default function MenuScreen() {
               </View>
             )}
 
-            {/* Insights + Recommendation with Carousel */}
+            {/* Insights + Recommendation */}
             {(aiPhase === 'insights' || aiPhase === 'recommendation') && recommendation && slides.length > 0 && (
-              <Animated.View style={{ opacity: fadeAnim, flex: 1 }}>
-                <ScrollView
-                  style={{ flex: 1 }}
-                  contentContainerStyle={{ paddingHorizontal: 4, paddingBottom: 16 }}
-                  showsVerticalScrollIndicator={false}
-                >
+              <Animated.View style={{ opacity: fadeAnim }}>
                   {slides[currentSlide]?.type === 'standard' && (
                     <>
                       {/* Badges from AudienceStream — top of card */}
@@ -584,13 +594,12 @@ export default function MenuScreen() {
                       </View>
                     </View>
                   )}
-                </ScrollView>
               </Animated.View>
             )}
 
-            </View>
+            </ScrollView>
 
-            {/* CarouselNav — fixed at bottom */}
+            {/* CarouselNav — direct card child, always below the ScrollView */}
             {(aiPhase === 'insights' || aiPhase === 'recommendation') && recommendation && slides.length > 1 && (
               <View style={styles.carouselNav}>
                 <TouchableOpacity
