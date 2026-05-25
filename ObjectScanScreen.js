@@ -15,7 +15,7 @@
 import React, { useState, useRef, useEffect } from 'react';
 import {
   View, Text, StyleSheet, TouchableOpacity, Image,
-  ScrollView, Dimensions, Animated, Easing, Platform,
+  ScrollView, Dimensions, Animated, Easing, Platform, NativeModules,
 } from 'react-native';
 import { CameraView, useCameraPermissions } from 'expo-camera';
 import * as FileSystem from 'expo-file-system/legacy';
@@ -23,18 +23,11 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { useNavigation } from '@react-navigation/native';
 import { colors, fonts, spacing, radius } from './theme';
 
-// ── TF.js (graceful import — won't crash if not yet installed) ────────────────
-let tf = null;
-let cocoSsd = null;
-let decodeJpeg = null;
-try {
-  tf = require('@tensorflow/tfjs');
-  require('@tensorflow/tfjs-react-native'); // registers RN backend (CoreML / NNAPI)
-  decodeJpeg = require('@tensorflow/tfjs-react-native').decodeJpeg;
-  cocoSsd = require('@tensorflow-models/coco-ssd');
-} catch (_) {
-  // Packages not yet installed — falls back to GPT-only mode
-}
+// ── Native on-device classifier ───────────────────────────────────────────────
+// iOS: VNClassifyImageRequest → Apple Neural Engine (A12+)
+// Android: ML Kit Image Labeling → NNAPI/NPU (Snapdragon, Tensor, Dimensity)
+// Android devices without NPU: module resolves null → JS falls back to GPT-4o-mini
+const { ObjectClassifierModule } = NativeModules;
 
 const { width: W, height: H } = Dimensions.get('window');
 const PHOTO_W = W - spacing.lg * 2;
@@ -52,57 +45,14 @@ function looksLikePerson(name = '') {
   return PERSON_TERMS.some(t => l.includes(t));
 }
 
-// ── Module-level model cache (survives tab navigation) ────────────────────────
-let _model = null;
-let _modelPromise = null;
+// ── On-device detection — available when native module is registered ──────────
+const nativeClassifierAvailable = !!ObjectClassifierModule;
 
-async function ensureModel() {
-  if (_model) return _model;
-  if (_modelPromise) return _modelPromise;
-  if (!tf || !cocoSsd) return null;
-  _modelPromise = (async () => {
-    await tf.ready();
-    _model = await cocoSsd.load({ base: 'mobilenet_v2' });
-    return _model;
-  })();
-  return _modelPromise;
-}
-
-// ── On-device detection ───────────────────────────────────────────────────────
-async function runOnDevice(uri, photoW, photoH) {
-  const model = await ensureModel();
-  if (!model || !decodeJpeg) return null;
-
+async function runOnDevice(uri) {
+  if (!nativeClassifierAvailable) return null;
   const b64 = await FileSystem.readAsStringAsync(uri, { encoding: 'base64' });
-  // atob is available in Expo SDK 54 / RN 0.75+
-  const bStr = atob(b64);
-  const bytes = new Uint8Array(bStr.length);
-  for (let i = 0; i < bStr.length; i++) bytes[i] = bStr.charCodeAt(i);
-
-  const tensor = decodeJpeg(bytes, 3);
-  let preds;
-  try {
-    preds = await model.detect(tensor);
-  } finally {
-    tensor.dispose();
-  }
-
-  if (!preds?.length) return null;
-  const top = preds.sort((a, b) => b.score - a.score)[0];
-  if (top.score < 0.35) return null;
-
-  const [px, py, pw, ph] = top.bbox;
-  return {
-    label: top.class,
-    confidence: Math.round(top.score * 100),
-    isPerson: top.class === 'person',
-    bbox: {
-      x: Math.max(0, px / photoW),
-      y: Math.max(0, py / photoH),
-      w: Math.min(1, pw / photoW),
-      h: Math.min(1, ph / photoH),
-    },
-  };
+  // Returns { label, confidence, isPerson, engine } or null
+  return await ObjectClassifierModule.classify(b64);
 }
 
 // ── OpenAI key ────────────────────────────────────────────────────────────────
@@ -267,7 +217,6 @@ export default function ObjectScanScreen() {
   const [photoSize, setPhotoSize] = useState(null);
   const [deviceResult, setDeviceResult] = useState(null);
   const [gptResult, setGptResult] = useState(null);
-  const [modelReady, setModelReady] = useState(!!_model);
   const [error, setError] = useState(null);
 
   const bboxOpacity = useRef(new Animated.Value(0)).current;
@@ -275,14 +224,7 @@ export default function ObjectScanScreen() {
   const scanLineY = useRef(new Animated.Value(0)).current;
   const scanLoopRef = useRef(null);
 
-  // Pre-load the on-device model in background as soon as screen mounts
-  useEffect(() => {
-    if (!_model && tf) {
-      ensureModel()
-        .then(() => setModelReady(true))
-        .catch(e => console.warn('[ObjectScan] model preload failed:', e.message));
-    }
-  }, []);
+  // No pre-loading needed — Vision framework is always available on-device
 
   const startScanLine = () => {
     scanLineY.setValue(0);
@@ -314,10 +256,10 @@ export default function ObjectScanScreen() {
 
       const apiKey = await getOpenAIKey();
 
-      // ── Phase 1: on-device detection (fast — ANE on iOS, NNAPI on Android) ──
+      // ── Phase 1: on-device detection (Apple Vision / ANE) ────────────────────
       let device = null;
       try {
-        device = await runOnDevice(photo.uri, photo.width, photo.height);
+        device = await runOnDevice(photo.uri);
         if (device?.isPerson) {
           scanLoopRef.current?.stop();
           setPhase('rejected');
@@ -461,9 +403,7 @@ export default function ObjectScanScreen() {
             {/* AI model pill — top of image */}
             <Animated.View style={[styles.aiModelPill, { opacity: labelOpacity }]} pointerEvents="none">
               <Text style={styles.onDevicePillText}>
-                {deviceResult
-                  ? (Platform.OS === 'ios' ? 'Apple Neural Engine' : 'TFLite · NNAPI')
-                  : 'GPT-4o-mini'}
+                {deviceResult ? (deviceResult.engine || 'Apple Vision · ANE') : 'GPT-4o-mini'}
               </Text>
             </Animated.View>
 
@@ -577,7 +517,7 @@ export default function ObjectScanScreen() {
         </View>
         <View style={{ alignItems: 'center', paddingVertical: spacing.md }}>
           <Text style={styles.scanningLabel}>
-            {tf && !modelReady ? 'Loading AI model...' : deviceResult ? 'Adding details...' : 'Detecting object...'}
+            {deviceResult ? 'Adding details...' : 'Detecting object...'}
           </Text>
         </View>
       </SafeAreaView>
@@ -596,11 +536,11 @@ export default function ObjectScanScreen() {
         </TouchableOpacity>
         <View style={{ alignItems: 'center' }}>
           <Text style={styles.camTitle}>Object Scanner</Text>
-          {tf ? (
-            <Text style={styles.camSubtitle}>{modelReady ? '⚡ On-device AI ready' : '⏳ Loading model...'}</Text>
-          ) : (
-            <Text style={styles.camSubtitle}>Cloud AI</Text>
-          )}
+          <Text style={styles.camSubtitle}>
+            {nativeClassifierAvailable
+              ? (Platform.OS === 'ios' ? '⚡ Apple Vision · ANE' : '⚡ ML Kit · NNAPI')
+              : 'Cloud AI'}
+          </Text>
         </View>
         <TouchableOpacity onPress={() => setFacing(f => f === 'back' ? 'front' : 'back')} style={styles.iconBtn}>
           <Text style={styles.iconBtnText}>⇄</Text>

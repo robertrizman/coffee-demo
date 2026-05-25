@@ -45,8 +45,8 @@ android {
         applicationId 'com.tealium.coffeecafe'
         minSdkVersion rootProject.ext.minSdkVersion
         targetSdkVersion rootProject.ext.targetSdkVersion
-        versionCode 6
-        versionName "1.0.6"
+        versionCode 7
+        versionName "1.0.8"
 
         buildConfigField "String", "REACT_NATIVE_RELEASE_LEVEL", "\"${findProperty('reactNativeReleaseLevel') ?: 'stable'}\""
     }
@@ -104,6 +104,7 @@ dependencies {
     implementation("com.facebook.react:react-android")
     implementation(fileTree(dir: "libs", include: ["*.aar"]))
     implementation("com.squareup.okhttp3:okhttp:4.12.0")
+    implementation("com.android.installreferrer:installreferrer:2.2")
     
     // Tealium PRISM SDK - using BOM
     implementation(platform("com.tealium.prism:prism-bom:0.4.0"))
@@ -113,6 +114,9 @@ dependencies {
 
     // MediaPipe LLM Inference (Gemini Nano — Pixel 8+, Samsung S24+/S25+/Z Fold6+/Z Flip6, Motorola Razr 50 Ultra/Edge 50 Ultra, Xiaomi 14T/MIX Flip, Realme GT 6; fails silently on unsupported devices)
     implementation("com.google.mediapipe:tasks-genai:0.10.14")
+
+    // ML Kit Image Labeling — on-device object classification via NNAPI (NPU/DSP on Snapdragon, Tensor, Dimensity)
+    implementation("com.google.mlkit:image-labeling:17.0.9")
 
     def isGifEnabled = (findProperty('expo.gif.enabled') ?: "") == "true";
     def isWebpEnabled = (findProperty('expo.webp.enabled') ?: "") == "true";

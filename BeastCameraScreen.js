@@ -10,6 +10,7 @@ import * as FileSystem from 'expo-file-system/legacy';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useNavigation } from '@react-navigation/native';
 import { colors, fonts, spacing, radius } from './theme';
+import { trackFunZonePhotoBombResult } from './tealium';
 
 const AnimatedCircle = Animated.createAnimatedComponent(Circle);
 
@@ -775,7 +776,24 @@ export default function BeastCameraScreen() {
     }
   };
 
+  const PHOTOBOMB_LIMIT = 6;
+  const PHOTOBOMB_COUNT_FILE = FileSystem.documentDirectory + 'photobomb_count';
+
   const handleProcess = async () => {
+    const info = await FileSystem.getInfoAsync(PHOTOBOMB_COUNT_FILE);
+    const count = info.exists
+      ? parseInt(await FileSystem.readAsStringAsync(PHOTOBOMB_COUNT_FILE), 10) || 0
+      : 0;
+
+    if (count >= PHOTOBOMB_LIMIT) {
+      Alert.alert(
+        "You're all out!",
+        "You've used all 6 of your Truman photos. Come back and see us again!",
+        [{ text: 'OK' }]
+      );
+      return;
+    }
+
     setPhase('generating');
 
     try {
@@ -784,7 +802,10 @@ export default function BeastCameraScreen() {
 
       const url = await generateWithFal(capturedUri, falKey, animateProgress, photoSize);
 
+      await FileSystem.writeAsStringAsync(PHOTOBOMB_COUNT_FILE, String(count + 1));
+
       setResultUri(url);
+      trackFunZonePhotoBombResult(url);
       setStepLabel("Truman's ready!");
 
       Animated.timing(progressAnim, {
@@ -932,7 +953,7 @@ export default function BeastCameraScreen() {
             <Text style={styles.revealBtnText}>Reveal Truman ✦</Text>
           </TouchableOpacity>
         ) : (
-          <Text style={styles.loadSub}>fal.ai · FLUX Kontext + Truman reference</Text>
+          <Text style={styles.loadSub}>Note: Generative image model can behave in different ways</Text>
         )}
       </SafeAreaView>
     );
@@ -1083,7 +1104,7 @@ const styles = StyleSheet.create({
   },
   ringSvg: { position: 'absolute' },
   ringInner: { alignItems: 'center', gap: 2 },
-  ringTruman: { width: 82, height: 82 },
+  ringTruman: { width: 82, height: 82, borderRadius: 50, backgroundColor: '#fff' },
   pctText: { color: '#fff', fontSize: 13, fontFamily: fonts.bold },
 
   loadTitle: { color: '#fff', fontSize: 18, fontFamily: fonts.bold },

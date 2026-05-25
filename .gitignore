@@ -44,3 +44,6 @@ node_modules/
 .DS_Store
 ios/Pods/
 google-play-service-account.json
+supabase/functions/.env
+credentials.json
+push_cert.csr

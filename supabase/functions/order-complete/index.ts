@@ -118,9 +118,7 @@ serve(async (req) => {
     console.log('[EdgeFn] Order completed more than 5s ago, skipping push notification');
   }
 
-  const message = shouldSkip
-    ? `Order ${orderId} was already scanned by the Barista, thanks for trying!`
-    : `Order ${orderId} is now ready! Push notification sent to ${customerName}.`;
+  const message = shouldSkip ? 'Already completed.' : 'Order processed.';
 
   return new Response(message, {
     status: 200,

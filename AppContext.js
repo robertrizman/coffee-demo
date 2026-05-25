@@ -8,7 +8,7 @@ import { printOrderReceipt } from './printing';
 import { AppState } from 'react-native';
 import { loadDefaultPrinter, loadAutoPrint, loadBluetoothPrinter } from './printerConfig';
 import { warmupBluetoothConnection } from './brotherPrinter';
-import { setDeviceIdForMoments, onPrismDeviceIdReady, getCanonicalDeviceId } from './tealium';
+import { setDeviceIdForMoments, setEmailForMoments, onPrismDeviceIdReady, getCanonicalDeviceId } from './tealium';
 import { loadPairingRules } from './recommendations';
 import { setOpenAIKey } from './foodPairingAI';
 
@@ -57,6 +57,7 @@ const initialState = {
   storeOpen: true,
   offersEnabled: true,
   agendaEnabled: false,
+  funZoneEnabled: true,
   closedTitle: 'Back Soon!',
   closedMessage: "We're taking a short break — check back soon! ☕",
   storeBreaks: [],
@@ -129,6 +130,7 @@ function reducer(state, action) {
         closedMessage: action.payload.closed_message ?? state.closedMessage,
         offersEnabled: action.payload.offers_enabled ?? state.offersEnabled,
         agendaEnabled: action.payload.agenda_enabled ?? state.agendaEnabled,
+        funZoneEnabled: action.payload.fun_zone_enabled ?? state.funZoneEnabled,
       };
 
     case 'SET_STORE_BREAKS':
@@ -406,6 +408,7 @@ export function AppProvider({ children }) {
 
     loadProfile().then((profile) => {
       dispatch({ type: 'SET_PROFILE', payload: profile });
+      if (profile?.email) setEmailForMoments(profile.email);
     });
 
     supabase.from('menu_config').select('*')

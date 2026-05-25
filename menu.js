@@ -15,6 +15,7 @@ export const MENU = [
   { id: 'mocha', name: 'Mocha', description: 'Espresso with chocolate & milk', category: 'Milk-Based', defaultEnabled: true },
   { id: 'vienna', name: 'Vienna', description: 'Espresso topped with whipped cream', category: 'Milk-Based', defaultEnabled: true },
   { id: 'affogato', name: 'Affogato', description: 'Espresso poured over vanilla ice cream', category: 'Milk-Based', defaultEnabled: true },
+  { id: 'melbourne-magic', name: 'Melbourne Magic', description: 'Double ristretto with steamed milk', category: 'Milk-Based', defaultEnabled: true },
 
   // ICED & COLD
   { id: 'iced-latte', name: 'Iced Latte', description: 'Latte over ice, refreshing', category: 'Iced & Cold', defaultEnabled: true },

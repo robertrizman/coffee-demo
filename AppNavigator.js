@@ -21,10 +21,17 @@ import BaristaManagementScreen from './BaristaManagementScreen';
 import AgendaScreen from './AgendaScreen';
 import AgendaManagementScreen from './AgendaManagementScreen';
 import LoginScreen from './LoginScreen';
+import FunZoneScreen from './FunZoneScreen';
+import BeastCameraScreen from './BeastCameraScreen';
+import QuizScreen from './QuizScreen';
+import ObjectScanScreen from './ObjectScanScreen';
+import QuizManagementScreen from './QuizManagementScreen';
+import LeaderboardScreen from './LeaderboardScreen';
 
 import { useAuth } from './AuthContext';
 import { colors, fonts } from './theme';
 import { TakeawayCupIcon, ReceiptIcon, BaristaIcon as BaristaHat, TagIcon, AgendaIcon } from './CoffeeIcons';
+import { MaterialCommunityIcons as MCI } from '@expo/vector-icons';
 
 const Stack = createNativeStackNavigator();
 const Tab = createBottomTabNavigator();
@@ -39,6 +46,22 @@ function CustomerStack() {
   );
 }
 
+function FunZoneStack() {
+  return (
+    <Stack.Navigator screenOptions={{ headerShown: false }}>
+      <Stack.Screen name="FunZoneHome" component={FunZoneScreen} />
+      <Stack.Screen name="BeastCamera" component={BeastCameraScreen} />
+      <Stack.Screen name="Quiz" component={QuizScreen} />
+      <Stack.Screen name="ObjectScan" component={ObjectScanScreen} />
+      <Stack.Screen name="Leaderboard" component={LeaderboardScreen} />
+    </Stack.Navigator>
+  );
+}
+
+function FunZoneIcon({ focused }) {
+  return <MCI name="party-popper" size={24} color={focused ? colors.primary : colors.textMuted} />;
+}
+
 function OperatorStack() {
   return (
     <Stack.Navigator screenOptions={{ headerShown: false }}>
@@ -47,6 +70,8 @@ function OperatorStack() {
       <Stack.Screen name="Settings" component={SettingsScreen} />
       <Stack.Screen name="BaristaManagement" component={BaristaManagementScreen} />
       <Stack.Screen name="AgendaManagement" component={AgendaManagementScreen} />
+      <Stack.Screen name="QuizManagement" component={QuizManagementScreen} />
+      <Stack.Screen name="Leaderboard" component={LeaderboardScreen} />
     </Stack.Navigator>
   );
 }
@@ -108,6 +133,14 @@ export default function AppNavigator() {
           listeners={{ focus: () => trackTabNavigation('My Account') }}
           options={{ tabBarIcon: ({ focused }) => <OrdersIcon focused={focused} /> }}
         />
+        {state.funZoneEnabled !== false && (
+          <Tab.Screen
+            name="Fun Zone"
+            component={FunZoneStack}
+            listeners={{ focus: () => trackTabNavigation('Fun Zone') }}
+            options={{ tabBarIcon: ({ focused }) => <FunZoneIcon focused={focused} /> }}
+          />
+        )}
         {state.offersEnabled !== false && (
           <Tab.Screen
             name="Offers"

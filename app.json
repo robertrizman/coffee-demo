@@ -2,7 +2,7 @@
   "expo": {
     "name": "Tealium Arc Cafe",
     "slug": "tealium-coffee-demo",
-    "version": "1.0.7",
+    "version": "1.1.0",
     "orientation": "portrait",
     "icon": "./assets/images/icon.png",
     "scheme": "coffeedemo",
@@ -23,7 +23,8 @@
         "NSCameraUsageDescription": "Allow Tealium Arc Cafe to access your camera to scan order QR codes.",
         "NSLocationWhenInUseUsageDescription": "We need your location to confirm you are at the venue to place an order.",
         "NSLocationAlwaysAndWhenInUseUsageDescription": "We need your location to confirm you are at the venue to place an order.",
-        "NSUserNotificationsUsageDescription": "We'll notify you when your coffee order is ready for pickup"
+        "NSUserNotificationsUsageDescription": "We'll notify you when your coffee order is ready for pickup",
+        "ITSAppUsesNonExemptEncryption": false
       }
     },
     "android": {

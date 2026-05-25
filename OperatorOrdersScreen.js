@@ -9,7 +9,7 @@ import { WebView } from 'react-native-webview';
 import { useNavigation } from '@react-navigation/native';
 import { CameraView, useCameraPermissions } from 'expo-camera';
 import { useApp } from './AppContext';
-import { supabase } from './supabase';
+import { supabase, SUPABASE_ANON_KEY } from './supabase';
 import { useAuth } from './AuthContext';
 import { trackOrderComplete, trackOrderReady, getVisitorId } from './tealium';
 import { printOrderReceipt, buildQrDeepLink } from './printing';
@@ -240,7 +240,7 @@ export default function OperatorOrdersScreen() {
     console.log('[Push] Calling edge function with order_id:', order.id, 'encoded:', encodedId);
     fetch(`https://zdgmqmamohrybxwhgwby.supabase.co/functions/v1/order-complete?order_id=${encodedId}&source=barista`, {
       headers: {
-        'Authorization': 'Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InpkZ21xbWFtb2hyeWJ4d2hnd2J5Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzUzNzUyODgsImV4cCI6MjA5MDk1MTI4OH0.imhhaa0OBB69u_igWA52b1Hx0Hhyv4do6YLENifAXRo',
+        'Authorization': `Bearer ${SUPABASE_ANON_KEY}`,
       },
     }).then(r => console.log('[Push] Edge function response:', r.status))
       .catch(e => console.error('[Push] Edge function error:', e.message));

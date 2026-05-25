@@ -294,7 +294,7 @@ export default function OrdersProfileScreen() {
       if (ordersForPersonality.length) {
         personalityFetched.current = true;
         setPersonalityLoading(true);
-        getOrderPersonality(ordersForPersonality)
+        getOrderPersonality(ordersForPersonality, profile?.name)
           .then(result => { setPersonalityData(result); setPersonalityLoading(false); })
           .catch(() => setPersonalityLoading(false));
       }
@@ -305,7 +305,7 @@ export default function OrdersProfileScreen() {
     if (isAdmin || !mergedOrders.length || personalityFetched.current) return;
     personalityFetched.current = true;
     setPersonalityLoading(true);
-    getOrderPersonality(mergedOrders)
+    getOrderPersonality(mergedOrders, profile?.name)
       .then(result => { setPersonalityData(result); setPersonalityLoading(false); })
       .catch(() => setPersonalityLoading(false));
   }, [mergedOrders.length, isAdmin]);

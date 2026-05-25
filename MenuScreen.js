@@ -1,16 +1,18 @@
 import React, { useState, useEffect, useRef } from 'react';
 import {
   View, Text, ScrollView, TouchableOpacity,
-  StyleSheet, Modal, Animated, Easing, Image, useWindowDimensions, Platform,
+  StyleSheet, Modal, Animated, Easing, Image, useWindowDimensions, Platform, Alert,
 } from 'react-native';
+
+import DRINK_IMAGES from './drinkImages';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useNavigation } from '@react-navigation/native';
 import { MENU, CATEGORIES } from './menu';
 import { useApp } from './AppContext';
 import { useAuth } from './AuthContext';
-import { trackMenuView, trackItemView, queryMomentsAPI, trackAIPairingOpened, trackAIPairingResult, trackAIPairingCarousel } from './tealium';
+import { trackMenuView, trackItemView, queryMomentsAPI, trackAIPairingOpened, trackAIPairingResult, trackAIPairingCarousel, trackAddToOrder } from './tealium';
 import { colors, typography, spacing, radius, shadow, fonts } from './theme';
-import { EspressoIcon, LatteIcon, IcedCupIcon, HotChocIcon, ChaiIcon, TeaIcon, ChevronIcon, AiSparkIcon, MorningTeaIcon, LunchIcon, SnacksIcon } from './CoffeeIcons';
+import { EspressoIcon, LatteIcon, IcedCupIcon, HotChocIcon, ChaiIcon, TeaIcon, ChevronIcon, AiSparkIcon, MorningTeaIcon, LunchIcon, SnacksIcon, ReorderIcon } from './CoffeeIcons';
 import { buildRecommendation } from './recommendations';
 import { getAIPairing, getExpectedAIProvider, getThinkingLabel } from './foodPairingAI';
 import { formatTime, isCurrentlyInBreak } from './storeUtils';
@@ -26,6 +28,51 @@ const CATEGORY_ICONS = {
   'Snacks': SnacksIcon,
 };
 
+
+// Reverses the drink_summary encoding: Category_Milk?_DrinkName_Size_Extras...
+// e.g. 'Milk-Based_Full_Cream_Cappuccino_Small' → { category, milk, name, size }
+function parseLastDrinkSummary(summary) {
+  if (!summary || typeof summary !== 'string') return null;
+
+  const KNOWN_CATS = ['Milk-Based', 'Espresso', 'Iced & Cold', 'Specialty', 'Tea'];
+  const KNOWN_SIZES = ['Small', 'Medium', 'Large'];
+  // Ordered longest-first so 'Half & Half' (3 tokens) beats 'Oat' (1 token) in prefix matching
+  const KNOWN_MILK = ['Half & Half', 'Full Cream', 'Coconut', 'Macadamia', 'Almond', 'Skim', 'Oat', 'Soy'];
+
+  let tokens = summary.split('_');
+  let category = null;
+  let size = 'Medium';
+  let milk = 'No Milk';
+
+  for (const cat of KNOWN_CATS) {
+    const catTokens = cat.replace(/\s+/g, '_').split('_');
+    if (tokens.slice(0, catTokens.length).join('_') === catTokens.join('_')) {
+      category = cat;
+      tokens = tokens.slice(catTokens.length);
+      break;
+    }
+  }
+
+  for (const milkOpt of KNOWN_MILK) {
+    const milkTokens = milkOpt.replace(/\s+/g, '_').split('_');
+    if (tokens.slice(0, milkTokens.length).join('_') === milkTokens.join('_')) {
+      milk = milkOpt;
+      tokens = tokens.slice(milkTokens.length);
+      break;
+    }
+  }
+
+  // Size comes right after the drink name — find its index and slice there
+  const sizeIdx = tokens.findIndex(t => KNOWN_SIZES.includes(t));
+  if (sizeIdx >= 0) {
+    size = tokens[sizeIdx];
+    tokens = tokens.slice(0, sizeIdx);
+  }
+
+  const name = tokens.join(' ');
+  if (!name) return null;
+  return { category, name, milk, size };
+}
 
 function TypingText({ text, onDone, speed = 18 }) {
   const [displayed, setDisplayed] = useState('');
@@ -104,7 +151,7 @@ function BrewingCup() {
 
 export default function MenuScreen() {
   const navigation = useNavigation();
-  const { state } = useApp();
+  const { state, dispatch } = useApp();
   const { isAdmin } = useAuth();
   const { width: screenWidth, height: screenHeight } = useWindowDimensions();
   const slideWidth = screenWidth - 32 - (spacing.lg * 2);
@@ -123,6 +170,66 @@ export default function MenuScreen() {
   const isProgrammaticScroll = useRef(false);
   const thinkingAnim = useRef(new Animated.Value(0)).current;
   const fadeAnim = useRef(new Animated.Value(0)).current;
+  const scrollRef = useRef(null);
+  const tabScrollRef = useRef(null);
+  const sectionOffsets = useRef({});
+  const tabOffsets = useRef({});
+  const activeCategoryRef = useRef('Milk-Based');
+  useEffect(() => { activeCategoryRef.current = activeCategory; }, [activeCategory]);
+  useEffect(() => {
+    const tab = tabOffsets.current[activeCategory];
+    if (tab) {
+      tabScrollRef.current?.scrollTo({
+        x: Math.max(0, tab.x - screenWidth / 2 + tab.width / 2),
+        animated: true,
+      });
+    }
+  }, [activeCategory]);
+
+  const [lastDrink, setLastDrink] = useState(null);
+
+  // Fetch last drink order from Moments API when profile email is available
+  useEffect(() => {
+    const email = state.profile?.email;
+    if (!email || isAdmin) return;
+    let cancelled = false;
+    queryMomentsAPI().then((data) => {
+      if (cancelled || !data?.properties) return;
+      const props = data.properties;
+      const lastDrinkKey = Object.keys(props).find((k) => {
+        const norm = k.toLowerCase().replace(/[\s_-]/g, '');
+        return norm.includes('lastdrinkorder') || norm.includes('lastdrink');
+      });
+      if (!lastDrinkKey) return;
+      const parsed = parseLastDrinkSummary(props[lastDrinkKey]);
+      if (!parsed?.name) return;
+      const menuItem = MENU.find((m) => m.name.toLowerCase() === parsed.name.toLowerCase());
+      if (!menuItem) return;
+      setLastDrink({ id: menuItem.id, name: menuItem.name, category: menuItem.category, milk: parsed.milk, size: parsed.size });
+    }).catch(() => {});
+    return () => { cancelled = true; };
+  }, [state.profile?.email, isAdmin]);
+
+  const handleReorder = () => {
+    if (!lastDrink) return;
+    if (state.menuEnabled[lastDrink.id] === false) {
+      Alert.alert('Not available', `${lastDrink.name} is not on the menu right now.`);
+      return;
+    }
+    const orderItem = {
+      id: lastDrink.id,
+      name: lastDrink.name,
+      category: lastDrink.category,
+      size: lastDrink.size,
+      milk: lastDrink.milk,
+      extras: [],
+      specialRequest: '',
+    };
+    dispatch({ type: 'ADD_ITEM', payload: orderItem });
+    const menuItem = MENU.find((m) => m.id === lastDrink.id);
+    if (menuItem) trackAddToOrder(menuItem, orderItem);
+    navigation.navigate('OrderSummary');
+  };
 
   const goToSlide = (index) => {
     if (index < 0 || index >= slides.length) return;
@@ -135,9 +242,27 @@ export default function MenuScreen() {
     (cat) => (state.customItems?.[cat] || []).some(item => state.menuEnabled[item.id] !== false)
   );
   const allTabs = [...CATEGORIES, ...foodTabsWithItems];
-  const isFoodCategory = FOOD_CATEGORIES.includes(activeCategory);
 
-  useEffect(() => { trackMenuView(activeCategory); }, [activeCategory]);
+  const handleTabPress = (cat) => {
+    setActiveCategory(cat);
+    trackMenuView(cat);
+    const y = sectionOffsets.current[cat];
+    if (y != null) {
+      isProgrammaticScroll.current = true;
+      scrollRef.current?.scrollTo({ y, animated: true });
+      setTimeout(() => { isProgrammaticScroll.current = false; }, 600);
+    }
+  };
+
+  const handleScroll = (e) => {
+    if (isProgrammaticScroll.current) return;
+    const y = e.nativeEvent.contentOffset.y;
+    let current = allTabs[0];
+    for (const cat of allTabs) {
+      if ((sectionOffsets.current[cat] ?? Infinity) <= y + 100) current = cat;
+    }
+    if (current !== activeCategoryRef.current) setActiveCategory(current);
+  };
 
 
   // Re-render every minute to pick up break schedule changes
@@ -171,20 +296,9 @@ export default function MenuScreen() {
     );
   }
 
-  const staticItems = !isFoodCategory
-    ? MENU.filter((item) => item.category === activeCategory && state.menuEnabled[item.id] !== false)
-    : [];
-  const customDrinkItems = !isFoodCategory
-    ? (state.customItems?.[activeCategory] || []).filter((item) => state.menuEnabled[item.id] !== false)
-    : [];
-  const foodItems = isFoodCategory
-    ? (state.customItems?.[activeCategory] || []).filter(item => state.menuEnabled[item.id] !== false)
-    : [];
-  const visibleItems = [...staticItems, ...customDrinkItems];
-
   const handleItemPress = (item) => {
-    if (isFoodCategory) return;
-    trackItemView(item, activeCategory);
+    if (FOOD_CATEGORIES.includes(item.category)) return;
+    trackItemView(item, item.category);
     navigation.navigate('ItemDetail', { item });
   };
 
@@ -323,14 +437,15 @@ export default function MenuScreen() {
 
       {/* Category Tabs */}
       <View style={styles.tabsWrapper}>
-        <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.tabsContent}>
+        <ScrollView ref={tabScrollRef} horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.tabsContent}>
           {allTabs.map((cat) => {
             const isFood = FOOD_CATEGORIES.includes(cat);
             return (
               <TouchableOpacity
                 key={cat}
                 style={[styles.tab, activeCategory === cat && styles.tabActive, isFood && styles.tabFood]}
-                onPress={() => setActiveCategory(cat)}
+                onPress={() => handleTabPress(cat)}
+                onLayout={e => { tabOffsets.current[cat] = { x: e.nativeEvent.layout.x, width: e.nativeEvent.layout.width }; }}
               >
                 <Text style={[styles.tabText, activeCategory === cat && styles.tabTextActive, isFood && styles.tabTextFood]}>
                   {cat}
@@ -343,55 +458,107 @@ export default function MenuScreen() {
 
       <View style={styles.divider} />
 
-      <ScrollView contentContainerStyle={styles.list} showsVerticalScrollIndicator={false}>
-        {isFoodCategory ? (
-          foodItems.length === 0 ? (
-            <View style={styles.foodBanner}>
-              <Text style={styles.foodBannerText}>No items added yet. Add items in the Operator menu.</Text>
+      {/* Personalised reorder banner — shown when Moments API returns a last drink order */}
+      {lastDrink && state.menuEnabled[lastDrink.id] !== false && !isAdmin && (
+        <TouchableOpacity style={styles.reorderBanner} onPress={handleReorder} activeOpacity={0.85}>
+          <View style={styles.reorderIconCircle}>
+            <ReorderIcon size={18} color={colors.primary} />
+          </View>
+          <View style={styles.reorderLeft}>
+            <View style={styles.reorderLabelRow}>
+              <Text style={styles.reorderLabel}>Your last order</Text>
+              <View style={styles.reorderPill}><Text style={styles.reorderPillText}>Moments API</Text></View>
             </View>
-          ) : (
-            <>
-              {foodItems.map((item, i) => {
-                const FoodIcon = CATEGORY_ICONS[activeCategory];
-                return (
-                <View key={item.id || i} style={styles.foodCard}>
-                  <View style={styles.foodIconWrap}>
-                    {FoodIcon && <FoodIcon size={22} color={colors.primary} />}
-                  </View>
-                  <View style={{ flex: 1 }}>
-                    <Text style={styles.cardName}>{item.name}</Text>
-                    {item.description ? <Text style={styles.cardDesc}>{item.description}</Text> : null}
-                  </View>
-                </View>
-                );
-              })}
-              <View style={styles.foodDisclaimer}>
-                <Text style={styles.foodDisclaimerTitle}>Dietary Legend</Text>
-                <Text style={styles.foodDisclaimerText}>
-                v – vegetarian{"\n"}ve – vegan{"\n"}g – contains gluten{"\n"}m – contains milk{"\n\n"}
-                </Text>
-                <Text style={styles.foodDisclaimerTitle}>Please note</Text>
-                <Text style={styles.foodDisclaimerText}>
-                  Food items are provided directly by the venue and cannot be ordered through this app. For any dietary requirements or allergen information, please speak with a member of our staff.
-                </Text>
+            <Text style={styles.reorderDrink} numberOfLines={1}>
+              {lastDrink.milk !== 'No Milk' ? `${lastDrink.milk} ` : ''}{lastDrink.name}
+              {lastDrink.size ? `, ${lastDrink.size}` : ''}
+            </Text>
+          </View>
+          <View style={styles.reorderBtn}>
+            <Text style={styles.reorderBtnText}>Reorder</Text>
+            <ChevronIcon size={14} color="#fff" />
+          </View>
+        </TouchableOpacity>
+      )}
+
+      <ScrollView
+        ref={scrollRef}
+        contentContainerStyle={styles.list}
+        showsVerticalScrollIndicator={false}
+        onScroll={handleScroll}
+        scrollEventThrottle={100}
+      >
+        {allTabs.map((cat) => {
+          const isFoodCat = FOOD_CATEGORIES.includes(cat);
+          const catStaticItems = !isFoodCat
+            ? MENU.filter(item => item.category === cat && state.menuEnabled[item.id] !== false)
+            : [];
+          const catCustomDrinks = !isFoodCat
+            ? (state.customItems?.[cat] || []).filter(item => state.menuEnabled[item.id] !== false)
+            : [];
+          const catFoodItems = isFoodCat
+            ? (state.customItems?.[cat] || []).filter(item => state.menuEnabled[item.id] !== false)
+            : [];
+          const catItems = [...catStaticItems, ...catCustomDrinks];
+          const IconComp = CATEGORY_ICONS[cat];
+
+          return (
+            <View key={cat} onLayout={e => { sectionOffsets.current[cat] = e.nativeEvent.layout.y; }}>
+              {/* Section header */}
+              <View style={styles.sectionHeader}>
+                <Text style={styles.sectionTitle}>{cat}</Text>
               </View>
-            </>
-          )
-        ) : (
-          visibleItems.map((item) => {
-            const IconComp = CATEGORY_ICONS[item.category] || LatteIcon;
-            return (
-              <TouchableOpacity key={item.id} style={styles.card} onPress={() => handleItemPress(item)} activeOpacity={0.75}>
-                <View style={styles.iconCircle}><IconComp size={28} color={colors.primary} /></View>
-                <View style={styles.cardText}>
-                  <Text style={styles.cardName}>{item.name}</Text>
-                  {item.description ? <Text style={styles.cardDesc}>{item.description}</Text> : null}
-                </View>
-                <ChevronIcon size={20} color={colors.textMuted} />
-              </TouchableOpacity>
-            );
-          })
-        )}
+
+              {isFoodCat ? (
+                catFoodItems.length === 0 ? (
+                  <View style={styles.foodBanner}>
+                    <Text style={styles.foodBannerText}>No items added yet. Add items in the Operator menu.</Text>
+                  </View>
+                ) : (
+                  <>
+                    {catFoodItems.map((item, i) => (
+                      <View key={item.id || i} style={styles.foodCard}>
+                        <View style={styles.foodIconWrap}>
+                          {IconComp && <IconComp size={22} color={colors.primary} />}
+                        </View>
+                        <View style={{ flex: 1 }}>
+                          <Text style={styles.cardName}>{item.name}</Text>
+                          {item.description ? <Text style={styles.cardDesc}>{item.description}</Text> : null}
+                        </View>
+                      </View>
+                    ))}
+                    <View style={styles.foodDisclaimer}>
+                      <Text style={styles.foodDisclaimerTitle}>Dietary Legend</Text>
+                      <Text style={styles.foodDisclaimerText}>
+                        v – vegetarian{"\n"}ve – vegan{"\n"}g – contains gluten{"\n"}m – contains milk{"\n\n"}
+                      </Text>
+                      <Text style={styles.foodDisclaimerTitle}>Please note</Text>
+                      <Text style={styles.foodDisclaimerText}>
+                        Food items are provided directly by the venue and cannot be ordered through this app. For any dietary requirements or allergen information, please speak with a member of our staff.
+                      </Text>
+                    </View>
+                  </>
+                )
+              ) : (
+                catItems.map((item) => (
+                  <TouchableOpacity key={item.id} style={styles.card} onPress={() => handleItemPress(item)} activeOpacity={0.75}>
+                    <View style={styles.iconCircle}>
+                      {DRINK_IMAGES[item.id]
+                        ? <Image source={DRINK_IMAGES[item.id]} style={styles.cardCatImage} resizeMode="contain" />
+                        : <IconComp size={28} color={colors.primary} />
+                      }
+                    </View>
+                    <View style={styles.cardText}>
+                      <Text style={styles.cardName}>{item.name}</Text>
+                      {item.description ? <Text style={styles.cardDesc}>{item.description}</Text> : null}
+                    </View>
+                    <ChevronIcon size={20} color={colors.textMuted} />
+                  </TouchableOpacity>
+                ))
+              )}
+            </View>
+          );
+        })}
         <View style={{ height: 32 }} />
       </ScrollView>
 
@@ -684,8 +851,16 @@ const styles = StyleSheet.create({
   divider: { height: 1, backgroundColor: colors.border, marginTop: spacing.sm },
 
   list: { padding: spacing.md, gap: spacing.sm },
+  sectionHeader: {
+    flexDirection: 'row', alignItems: 'center', gap: spacing.sm,
+    paddingVertical: spacing.sm, paddingHorizontal: 2,
+    marginTop: spacing.md, marginBottom: spacing.xs,
+    borderBottomWidth: 1, borderBottomColor: colors.borderLight,
+  },
+  sectionTitle: { fontSize: 13, fontFamily: fonts.bold, color: colors.textMid, letterSpacing: 0.5, textTransform: 'uppercase' },
+  cardCatImage: { width: 52, height: 52, borderRadius: 26 },
   card: { flexDirection: 'row', alignItems: 'center', backgroundColor: colors.surface, borderRadius: radius.lg, padding: spacing.md, borderWidth: 1, borderColor: colors.borderLight, ...shadow.card },
-  iconCircle: { width: 52, height: 52, borderRadius: radius.full, backgroundColor: colors.primaryLight, alignItems: 'center', justifyContent: 'center', marginRight: spacing.md, borderWidth: 1, borderColor: colors.primaryMid },
+  iconCircle: { width: 52, height: 52, borderRadius: radius.full, backgroundColor: colors.primaryLight, alignItems: 'center', justifyContent: 'center', marginRight: spacing.md, borderWidth: 1, borderColor: colors.primaryMid, overflow: 'hidden' },
   cardText: { flex: 1 },
   cardName: { ...typography.heading3, fontSize: 15 },
   cardDesc: { ...typography.caption, marginTop: 2 },
@@ -814,6 +989,70 @@ const styles = StyleSheet.create({
     fontSize: 12,
     fontFamily: fonts.semibold,
     color: colors.textMid,
+  },
+
+  // Reorder banner
+  reorderBanner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: colors.tealLight,
+    borderBottomWidth: 1,
+    borderBottomColor: colors.tealMid,
+    paddingHorizontal: spacing.lg,
+    paddingVertical: 10,
+    gap: spacing.sm,
+  },
+  reorderIconCircle: {
+    width: 36,
+    height: 36,
+    borderRadius: radius.full,
+    backgroundColor: colors.primaryLight,
+    borderWidth: 1,
+    borderColor: colors.primaryMid,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  reorderLeft: { flex: 1 },
+  reorderLabelRow: { flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 2 },
+  reorderLabel: {
+    fontSize: 10,
+    fontFamily: fonts.bold,
+    color: colors.primary,
+    letterSpacing: 0.5,
+    textTransform: 'uppercase',
+  },
+  reorderPill: {
+    backgroundColor: colors.primaryLight,
+    borderRadius: radius.full,
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderWidth: 1,
+    borderColor: colors.primaryMid,
+  },
+  reorderPillText: {
+    fontSize: 8,
+    fontFamily: fonts.extrabold,
+    color: colors.primary,
+    letterSpacing: 0.8,
+  },
+  reorderDrink: {
+    fontSize: 14,
+    fontFamily: fonts.semibold,
+    color: colors.midnight,
+  },
+  reorderBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    backgroundColor: colors.primary,
+    borderRadius: radius.full,
+    paddingHorizontal: spacing.md,
+    paddingVertical: 7,
+  },
+  reorderBtnText: {
+    fontSize: 12,
+    fontFamily: fonts.bold,
+    color: '#fff',
   },
 
   // Bedrock Slide

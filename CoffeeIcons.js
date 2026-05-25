@@ -237,6 +237,16 @@ export const MagnifyIcon = ({ size = 24, color = '#006D80' }) => (
   <MCI name="magnify" size={size} color={color} />
 );
 
+/** Camera — photo bomb / Beast Camera */
+export const CameraIcon = ({ size = 24, color = '#006D80' }) => (
+  <MCI name="camera-outline" size={size} color={color} />
+);
+
+/** Brain / quiz */
+export const BrainIcon = ({ size = 24, color = '#006D80' }) => (
+  <MCI name="brain" size={size} color={color} />
+);
+
 /** Lightning bolt / API / speed */
 export const LightningBoltIcon = ({ size = 24, color = '#006D80' }) => (
   <MCI name="lightning-bolt" size={size} color={color} />
@@ -245,6 +255,11 @@ export const LightningBoltIcon = ({ size = 24, color = '#006D80' }) => (
 /** Lightbulb — tips and suggestions */
 export const LightbulbIcon = ({ size = 24, color = '#006D80' }) => (
   <MCI name="lightbulb-outline" size={size} color={color} />
+);
+
+/** Reorder / last order history */
+export const ReorderIcon = ({ size = 24, color = '#006D80' }) => (
+  <MCI name="history" size={size} color={color} />
 );
 
 /** Agenda / calendar — used for Agenda tab */

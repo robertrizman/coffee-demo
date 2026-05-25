@@ -26,8 +26,10 @@ class MainApplication : Application(), ReactApplication {
               // Packages that cannot be autolinked yet can be added manually here, for example:
               // add(MyReactNativePackage())
              add(TealiumPrismPackage())
-             add(FoodPairingPackage()) 
+             add(FoodPairingPackage())
              add(BrotherPrinterPackage())
+             add(InstallReferrerPackage())
+             add(ObjectClassifierPackage())
           }
 
           override fun getJSMainModuleName(): String = ".expo/.virtual-metro-entry"

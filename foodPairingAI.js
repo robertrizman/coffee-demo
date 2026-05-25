@@ -378,7 +378,16 @@ export async function getAIPairing({ orders, customItems, dietaryRequirements = 
   const orderCount = orders.length;
   const specialRequests = getSpecialRequests(orders);
 
-  // Build context string for LLM prompt — menu items + optional dietary requirements + special requests
+  const tones = [
+    'warm and conversational, like a friendly barista chatting with a regular',
+    'poetic and sensory, focusing on flavours, textures and aromas',
+    'playful and witty, with a light touch of humour',
+    'confident and direct, like a sommelier making a bold pairing call',
+    'storytelling, painting a brief picture of the moment',
+  ];
+  const tone = tones[Math.floor(Math.random() * tones.length)];
+
+  // Build context string for LLM prompt — full customer profile + menu items
   const menuItemsJson = customItems
     ? Object.entries(customItems)
         .filter(([cat, items]) => ['Morning Tea', 'Lunch', 'Snacks'].includes(cat) && items?.length > 0)
@@ -387,8 +396,11 @@ export async function getAIPairing({ orders, customItems, dietaryRequirements = 
     : '';
   const contextJson = [
     menuItemsJson,
+    favouriteDrink ? `Favourite drink: ${favouriteDrink}` : '',
+    `Past orders: ${orderCount}`,
     dietaryRequirements ? `Dietary requirements: ${dietaryRequirements}` : '',
     specialRequests ? `Customer special requests: ${specialRequests}` : '',
+    `Reason style: ${tone}`,
   ].filter(Boolean).join(' | ');
 
   // Try native module (Gemini Nano on supported Android devices / Apple Intelligence on iOS)
@@ -527,7 +539,7 @@ function getRulesPairing({ drinkCategory, milkType, timeOfDay, orderCount, custo
   };
 }
 
-export async function getOrderPersonality(orders) {
+export async function getOrderPersonality(orders, name = null) {
   if (!orders?.length) return null;
 
   const drinkCounts = {};
@@ -548,7 +560,9 @@ export async function getOrderPersonality(orders) {
     .map(([name, count]) => (count > 1 ? `${name} (${count}x)` : name))
     .join(', ');
 
-  const basePrompt = `Write 2-3 warm, fun, positive sentences describing the personality and vibe of someone who orders these café drinks: ${drinkList}. Be uplifting, specific to each drink, and celebratory. Never be negative, condescending, offensive, harmful, or sexual. Keep it under 60 words.`;
+  const firstName = name ? name.trim().split(' ')[0] : null;
+  const addressee = firstName ? firstName : 'this person';
+  const basePrompt = `Write 2-3 warm, fun, positive sentences describing the personality and vibe of ${addressee}, who orders these café drinks: ${drinkList}. Address ${firstName ? firstName : 'them'} directly by name. Be uplifting, specific to each drink, and celebratory. Never be negative, condescending, offensive, harmful, or sexual. Keep it under 60 words.`;
 
   // Try native LLM (Apple Intelligence / ANE on iOS, Gemini Nano on Android)
   if (FoodPairingModule?.generateText && _nativeTextAvailable !== false) {

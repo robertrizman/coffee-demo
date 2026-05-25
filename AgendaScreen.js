@@ -116,9 +116,11 @@ export default function AgendaScreen() {
               <Text style={styles.wifiRow}>
                 SSID: <Text style={styles.wifiValue}>{wifiSSID}</Text>
               </Text>
-              <Text style={styles.wifiRow}>
-                PASS: <Text style={styles.wifiValue}>{wifiPassword}</Text>
-              </Text>
+              {!!wifiPassword && (
+                <Text style={styles.wifiRow}>
+                  PASS: <Text style={styles.wifiValue}>{wifiPassword}</Text>
+                </Text>
+              )}
             </View>
           )}
         </View>

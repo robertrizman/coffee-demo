@@ -8,11 +8,25 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useNavigation } from '@react-navigation/native';
 import { supabase } from './supabase';
+import { useAuth } from './AuthContext';
 import { colors, typography, spacing, radius, shadow, fonts } from './theme';
 import { UserIcon, AddIcon, TrashIcon, LockIcon, PrinterIcon } from './CoffeeIcons';
 
 export default function BaristaManagementScreen() {
   const navigation = useNavigation();
+  const { isOwner } = useAuth();
+
+  if (!isOwner) {
+    return (
+      <SafeAreaView style={{ flex: 1, backgroundColor: colors.background, alignItems: 'center', justifyContent: 'center', padding: 32 }}>
+        <LockIcon size={40} color={colors.textMuted} />
+        <Text style={{ fontSize: 17, fontFamily: fonts.bold, color: colors.midnight, marginTop: 16, textAlign: 'center' }}>Owner access only</Text>
+        <Text style={{ fontSize: 13, color: colors.textMuted, marginTop: 8, textAlign: 'center', lineHeight: 20 }}>
+          Barista management is restricted to owner accounts.
+        </Text>
+      </SafeAreaView>
+    );
+  }
   const [baristas, setBaristas] = useState([]);
   const [printers, setPrinters] = useState([]);
   const [loading, setLoading] = useState(true);

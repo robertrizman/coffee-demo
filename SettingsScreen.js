@@ -13,6 +13,7 @@ import { trackSettingsOpen, trackPrinterTest, getTealiumConfig, reinitTealium } 
 import { setOpenAIKey } from './foodPairingAI';
 import { buildLabelsHtml, buildQrDebugHtml } from './printing';
 import { useAuth } from './AuthContext';
+import { useApp } from './AppContext';
 import { supabase } from './supabase';
 import { saveDefaultPrinter, loadDefaultPrinter, clearDefaultPrinter, saveAutoPrint, loadAutoPrint, saveShorthand, loadShorthand, saveAutoCut, loadAutoCut, saveBluetoothPrinter, loadBluetoothPrinter, clearBluetoothPrinter, saveConnectionType, loadConnectionType } from './printerConfig';
 import { scanForPrinters, getDeviceIP, deriveSubnet } from './printerScanner';
@@ -56,6 +57,8 @@ function TealiumTabIcon({ active }) {
 export default function SettingsScreen() {
   const navigation = useNavigation();
   const { barista, isOwner, updateBaristaFields } = useAuth();
+  const { state: appState, dispatch } = useApp();
+  const [funZoneEnabled, setFunZoneEnabled] = useState(appState.funZoneEnabled !== false);
 
   const [defaultPrinter, setDefaultPrinter] = useState(null);
   const [bluetoothPrinter, setBluetoothPrinter] = useState(null);
@@ -693,6 +696,7 @@ export default function SettingsScreen() {
     { id: 'printer',   icon: '🖨', label: 'Printer' },
     { id: 'shorthand', icon: '☕', label: 'Shorthand' },
     { id: 'tealium',   icon: null,  label: 'Tealium' },
+    { id: 'quiz',      icon: '🧠',  label: 'Quiz' },
   ];
 
   return (
@@ -1438,6 +1442,60 @@ export default function SettingsScreen() {
                   </Text>
                 </View>
               )}
+            </View>
+          </View>
+        )}
+
+        {/* ── Quiz Management ── */}
+        {activeTab === 'quiz' && (
+          <View style={styles.section}>
+            <View style={[styles.card, { flexDirection: 'row', alignItems: 'center', gap: spacing.sm }]}>
+              <View style={{ flex: 1 }}>
+                <Text style={styles.cardTitle}>Fun Zone Visible</Text>
+                <Text style={styles.cardBody}>Show or hide the Fun Zone tab for all users in real time.</Text>
+              </View>
+              <Switch
+                value={funZoneEnabled}
+                onValueChange={async (val) => {
+                  setFunZoneEnabled(val);
+                  dispatch({ type: 'SET_STORE_CONFIG', payload: { fun_zone_enabled: val } });
+                  await supabase.from('store_config').update({ fun_zone_enabled: val }).eq('id', 'default');
+                }}
+                trackColor={{ false: colors.border, true: colors.primary }}
+                thumbColor="#fff"
+              />
+            </View>
+
+            <View style={styles.card}>
+              <View style={styles.cardHeader}>
+                <Text style={styles.cardIcon}>🧠</Text>
+                <Text style={styles.cardTitle}>Quiz Management</Text>
+              </View>
+              <Text style={styles.cardBody}>
+                Manage quiz questions, set a timer, choose how many questions appear per play.
+              </Text>
+              <TouchableOpacity
+                style={styles.manageBaristasBtn}
+                onPress={() => navigation.navigate('QuizManagement')}
+              >
+                <Text style={styles.manageBaristasText}>⚙️  Manage Quiz →</Text>
+              </TouchableOpacity>
+            </View>
+
+            <View style={styles.card}>
+              <View style={styles.cardHeader}>
+                <Text style={styles.cardIcon}>🏆</Text>
+                <Text style={styles.cardTitle}>Leaderboard</Text>
+              </View>
+              <Text style={styles.cardBody}>
+                View the full leaderboard — scores ranked by correct answers, then by fastest completion time.
+              </Text>
+              <TouchableOpacity
+                style={styles.manageBaristasBtn}
+                onPress={() => navigation.navigate('Leaderboard')}
+              >
+                <Text style={styles.manageBaristasText}>🏆  View Leaderboard →</Text>
+              </TouchableOpacity>
             </View>
           </View>
         )}

@@ -165,14 +165,18 @@ class FoodPairingModule(reactContext: ReactApplicationContext) :
         val llm = llmInference ?: throw Exception("Gemini Nano not available")
 
         val prompt = """<start_of_turn>user
-You are a café food pairing assistant. Suggest the best food pairing for a customer's coffee order.
+You are a barista at a specialty coffee cart. Recommend 2 food items that pair well with the customer's coffee order.
 
-Drink: $drinkCategory${if (milkType != "No Milk") " with $milkType" else ""}
-Time: $timeOfDay on a $dayOfWeek
-Available menu categories and items: $menuItems
+Customer profile:
+- Drink: $drinkCategory${if (milkType != "No Milk") " with $milkType" else ""}
+- Time: $timeOfDay on a $dayOfWeek
+- Context: $menuItems
+
+IMPORTANT: item1 and item2 MUST be real items copied exactly from the available menu in the context above. Do not invent items.
+Write the reason in 1-2 sentences using the Reason style specified in the context above.
 
 Reply ONLY with a valid JSON object, no explanation, no markdown:
-{"category1":"<category>","item1":"<item name>","category2":"<category>","item2":"<item name>","reason":"<one short sentence>"}
+{"category1":"<category>","item1":"<item name>","category2":"<category>","item2":"<item name>","reason":"<1-2 sentences>"}
 <end_of_turn>
 <start_of_turn>model
 """.trimIndent()

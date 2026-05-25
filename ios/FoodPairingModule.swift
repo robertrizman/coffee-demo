@@ -67,6 +67,18 @@ class FoodPairingModule: NSObject {
     #endif
   }
 
+  // Safe JSON extraction using NSString integer ranges — avoids Swift String.Index out-of-bounds crashes
+  private func extractJSONString(from text: String) -> String? {
+    let ns = text as NSString
+    let first = ns.range(of: "{")
+    let last  = ns.range(of: "}", options: .backwards)
+    guard first.location != NSNotFound,
+          last.location  != NSNotFound,
+          first.location  < last.location else { return nil }
+    let length = last.location - first.location + last.length
+    return ns.substring(with: NSRange(location: first.location, length: length))
+  }
+
   // ── Foundation Models inference ──────────────────────────────────────────
   @available(iOS 26.0, *)
   private func predictWithFoundationModels(
@@ -83,37 +95,36 @@ class FoodPairingModule: NSObject {
       : menuItems
 
     let prompt = """
-    You are a cafe food pairing assistant. Suggest the best 2 food categories to pair with a coffee order.
+    You are a barista at a specialty coffee cart. Recommend 2 food items that pair well with the customer's coffee order.
 
-    Drink: \(drink)\(milk != "No Milk" ? " with \(milk)" : "")
-    Time: \(time) on a \(day)
-    Available categories: \(menuContext)
+    Customer profile:
+    - Drink: \(drink)\(milk != "No Milk" ? " with \(milk)" : "")
+    - Time: \(time) (\(day))
+    - Context: \(menuContext)
 
-    Reply ONLY with a JSON object, no explanation, no markdown:
-    {"category1":"<category>","category2":"<category>","reason":"<one short sentence>"}
+    IMPORTANT: item1 and item2 MUST be real items copied exactly from the available menu in the context above. Do not invent items.
+    Write the reason in 1-2 sentences using the Reason style specified in the context above.
+
+    Reply ONLY with a valid JSON object, no explanation, no markdown:
+    {"category1":"<category>","item1":"<item name>","category2":"<category>","item2":"<item name>","reason":"<1-2 sentences>"}
     """
 
     let response = try await session.respond(to: prompt)
     let text = response.content
 
-    guard let startRange = text.range(of: "{"),
-          let endRange = text.range(of: "}", options: .backwards),
-          startRange.lowerBound < endRange.lowerBound else {
-      throw NSError(domain: "FoodPairing", code: 1,
-                    userInfo: [NSLocalizedDescriptionKey: "No JSON in response: \(text)"])
-    }
-
-    let jsonStr = String(text[startRange.lowerBound...endRange.lowerBound])
-    guard let data = jsonStr.data(using: String.Encoding.utf8),
+    guard let jsonStr = extractJSONString(from: text),
+          let data = jsonStr.data(using: .utf8),
           let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any] else {
-      throw NSError(domain: "FoodPairing", code: 2,
-                    userInfo: [NSLocalizedDescriptionKey: "Invalid JSON: \(jsonStr)"])
+      throw NSError(domain: "FoodPairing", code: 1,
+                    userInfo: [NSLocalizedDescriptionKey: "Invalid JSON in response: \(text.prefix(200))"])
     }
 
     return [
       "category1":     json["category1"] as? String ?? "Morning Tea",
+      "item1":         json["item1"]     as? String ?? "",
       "category2":     json["category2"] as? String ?? "Snacks",
-      "reason":        json["reason"] as? String ?? "",
+      "item2":         json["item2"]     as? String ?? "",
+      "reason":        json["reason"]    as? String ?? "",
       "confidence1":   0.97,
       "confidence2":   0.95,
       "avgConfidence": 96,
@@ -212,15 +223,10 @@ class FoodPairingModule: NSObject {
             group.cancelAll()
             return result
           }
-          guard let start = text.range(of: "{"),
-                let end = text.range(of: "}", options: .backwards),
-                start.lowerBound < end.lowerBound else {
-            throw NSError(domain: "Insight", code: 1, userInfo: [NSLocalizedDescriptionKey: "No JSON in response"])
-          }
-          let jsonStr = String(text[start.lowerBound...end.lowerBound])
-          guard let data = jsonStr.data(using: .utf8),
+          guard let jsonStr = extractJSONString(from: text),
+                let data = jsonStr.data(using: .utf8),
                 var json = try? JSONSerialization.jsonObject(with: data) as? [String: Any] else {
-            throw NSError(domain: "Insight", code: 2, userInfo: [NSLocalizedDescriptionKey: "Invalid JSON"])
+            throw NSError(domain: "Insight", code: 1, userInfo: [NSLocalizedDescriptionKey: "Invalid JSON in response: \(text.prefix(200))"])
           }
           json["engine"] = "Apple Intelligence (ANE)"
           resolve(json)

@@ -2,8 +2,10 @@ import React, { useState } from 'react';
 import {
   View, Text, ScrollView, TouchableOpacity,
   StyleSheet, TextInput, Alert, StatusBar, Platform,
-  KeyboardAvoidingView,
+  KeyboardAvoidingView, Image,
 } from 'react-native';
+
+import DRINK_IMAGES from './drinkImages';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useNavigation, useRoute } from '@react-navigation/native';
 import { SIZES, MILK_OPTIONS, EXTRAS } from './menu';
@@ -124,20 +126,25 @@ export default function ItemDetailScreen() {
 
         {/* SIZE — hidden when all sizes are disabled */}
         {availableSizes.length > 0 && (
-          <>
-            <Text style={styles.sectionLabel}>SIZE</Text>
-            <View style={styles.sizeRow}>
-              {availableSizes.map((s) => (
-                <TouchableOpacity
-                  key={s}
-                  style={[styles.sizeBtn, effectiveSize === s && styles.sizeBtnActive]}
-                  onPress={() => handleSize(s)}
-                >
-                  <Text style={[styles.sizeBtnText, effectiveSize === s && styles.sizeBtnTextActive]}>{s}</Text>
-                </TouchableOpacity>
-              ))}
+          <View style={styles.sizeSection}>
+            <View style={styles.sizeSectionLeft}>
+              <Text style={styles.sectionLabel}>SIZE</Text>
+              <View style={styles.sizeRow}>
+                {availableSizes.map((s) => (
+                  <TouchableOpacity
+                    key={s}
+                    style={[styles.sizeBtn, effectiveSize === s && styles.sizeBtnActive]}
+                    onPress={() => handleSize(s)}
+                  >
+                    <Text style={[styles.sizeBtnText, effectiveSize === s && styles.sizeBtnTextActive]}>{s}</Text>
+                  </TouchableOpacity>
+                ))}
+              </View>
             </View>
-          </>
+            {DRINK_IMAGES[item.id] && (
+              <Image source={DRINK_IMAGES[item.id]} style={styles.categoryImg} resizeMode="contain" />
+            )}
+          </View>
         )}
 
         {/* MILK — hidden for black drinks (americano, long black) */}
@@ -231,6 +238,9 @@ const styles = StyleSheet.create({
   body: { padding: spacing.lg, gap: spacing.md },
   sectionLabel: { ...typography.label, fontSize: 14, marginBottom: -4 },
 
+  sizeSection: { flexDirection: 'row', alignItems: 'center', gap: spacing.md },
+  sizeSectionLeft: { flex: 1, gap: spacing.sm },
+  categoryImg: { width: 72, height: 72, borderRadius: 12 },
   sizeRow: { flexDirection: 'row', gap: spacing.sm },
   sizeBtn: {
     flex: 1,

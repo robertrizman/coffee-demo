@@ -513,6 +513,115 @@ let _email = null;
 export function setEmailForMoments(email) { _email = email ? email.trim().toLowerCase() : null; }
 export function getEmailForMoments() { return _email; }
 
+// ── Install Referrer (Android only) ──────────────────────
+
+export async function trackInstallReferrer() {
+  if (Platform.OS !== 'android') return;
+
+  const InstallReferrerModule = NativeModules.InstallReferrerModule;
+  if (!InstallReferrerModule) return;
+
+  try {
+    const referrerString = await InstallReferrerModule.getReferrer();
+    if (!referrerString) return;
+
+    // Referrer is a URL-encoded string: utm_campaign=foo&utm_source=qr_code&ref_uuid=abc123
+    const params = new URLSearchParams(referrerString);
+    const referrerData = {
+      utm_campaign        : params.get('utm_campaign') || '',
+      utm_source          : params.get('utm_source')   || '',
+      utm_medium          : params.get('utm_medium')   || '',
+      utm_content         : params.get('utm_content')  || '',
+      ref_uuid            : params.get('ref_uuid')     || '',
+      install_referrer_raw: referrerString,
+    };
+
+    // Persist UTM params in the PRISM data layer so all subsequent events carry them
+    if (prismReady && PrismModule) {
+      await PrismModule.setDataLayer(referrerData);
+    }
+
+    // Fire a one-time install attribution event
+    await track('install_referrer_captured', {
+      tealium_event: 'install_referrer_captured',
+      ...referrerData,
+    });
+
+    console.log('[Tealium] ✅ Install referrer captured:', referrerData);
+  } catch (err) {
+    console.warn('[Tealium] Install referrer error:', err.message);
+  }
+}
+
+// ── Fun Zone events ───────────────────────────────────────
+
+export function trackFunZoneView() {
+  trackView('fun_zone_view', { screen_name: 'fun_zone' });
+}
+
+export function trackFunZoneQuizTap() {
+  track('fun_zone_quiz_tap', { tealium_event: 'fun_zone_quiz_tap', feature: 'tealium_trivia' });
+}
+
+export function trackFunZoneLeaderboardViewAll() {
+  track('fun_zone_leaderboard_view_all', { tealium_event: 'fun_zone_leaderboard_view_all' });
+}
+
+export function trackFunZoneLeaderboardEmptyTakeQuiz() {
+  track('fun_zone_leaderboard_empty_cta', { tealium_event: 'fun_zone_leaderboard_empty_cta' });
+}
+
+export function trackFunZoneBeastCameraTap({ disclaimerAlreadyAccepted }) {
+  track('fun_zone_photo_bomb_tap', {
+    tealium_event: 'fun_zone_photo_bomb_tap',
+    feature: 'truman_photo_bomb',
+    disclaimer_already_accepted: disclaimerAlreadyAccepted ? 'true' : 'false',
+  });
+}
+
+export function trackFunZoneDisclaimerShown() {
+  track('fun_zone_disclaimer_shown', {
+    tealium_event: 'fun_zone_disclaimer_shown',
+    feature: 'truman_photo_bomb',
+  });
+}
+
+export function trackFunZoneDisclaimerAccepted() {
+  track('fun_zone_disclaimer_accepted', {
+    tealium_event: 'fun_zone_disclaimer_accepted',
+    feature: 'truman_photo_bomb',
+  });
+}
+
+export function trackFunZoneDisclaimerCancelled() {
+  track('fun_zone_disclaimer_cancelled', {
+    tealium_event: 'fun_zone_disclaimer_cancelled',
+    feature: 'truman_photo_bomb',
+  });
+}
+
+export function trackFunZoneObjectScanTap() {
+  track('fun_zone_object_scan_tap', {
+    tealium_event: 'fun_zone_object_scan_tap',
+    feature: 'object_identifier',
+  });
+}
+
+export function trackFunZonePrizeReveal(tileId) {
+  track('fun_zone_prize_reveal', {
+    tealium_event: 'fun_zone_prize_reveal',
+    prize_tile: tileId,
+  });
+}
+
+export function trackFunZonePhotoBombResult(resultUrl) {
+  track('fun_zone_photo_bomb_result', {
+    tealium_event: 'fun_zone_photo_bomb_result',
+    feature: 'truman_photo_bomb',
+    result_photo: resultUrl || '',
+  });
+}
+
 // ── Device ID (canonical — matches PRISM app_uuid) ────────
 
 let _deviceId = null;

@@ -6,7 +6,7 @@ Sentry.init({
 });
 
 import React, { useEffect, useState, useRef } from 'react';
-import { StatusBar, Platform, AppState, PermissionsAndroid } from 'react-native';
+import { StatusBar, Platform, AppState, PermissionsAndroid, Modal, View, Linking } from 'react-native';
 import Geolocation from '@react-native-community/geolocation';
 try { Geolocation.setRNConfiguration({ skipPermissionRequests: false, authorizationLevel: 'whenInUse' }); } catch (e) { console.warn('[Geolocation] setRNConfiguration failed:', e.message); }
 import { SafeAreaProvider } from 'react-native-safe-area-context';
@@ -16,10 +16,27 @@ import { AuthProvider } from './AuthContext';
 import AppNavigator from './AppNavigator';
 import OnboardingScreen from './OnboardingScreen';
 import SplashLoadingScreen from './SplashLoadingScreen';
-import { trackAppOpen, initTealium, getCanonicalDeviceId, setEmailForMoments } from './tealium';
+import { trackAppOpen, initTealium, trackInstallReferrer, getCanonicalDeviceId, setEmailForMoments } from './tealium';
 import { registerPushToken } from './push';
 import { useFonts, Montserrat_400Regular, Montserrat_500Medium, Montserrat_600SemiBold, Montserrat_700Bold, Montserrat_800ExtraBold } from '@expo-google-fonts/montserrat';
-import { LogBox, Text, TextInput } from 'react-native';
+import { LogBox, Text, TextInput, StyleSheet, TouchableOpacity } from 'react-native';
+import Constants from 'expo-constants';
+import { supabase } from './supabase';
+
+// ── App Store URLs — update once the app is live ──────────────────────────────
+// iOS: replace with your App Store URL once the app is published
+// e.g. 'https://apps.apple.com/app/id1234567890'
+const IOS_STORE_URL = 'https://apps.apple.com/au/app/architect-arc-cafe/id6762507451';
+const ANDROID_STORE_URL = 'https://play.google.com/store/apps/details?id=com.tealium.coffeecafe';
+
+function isVersionOutdated(current, minimum) {
+  const parse = v => (v || '0.0.0').split('.').map(n => parseInt(n, 10) || 0);
+  const [cA, cB, cC] = parse(current);
+  const [mA, mB, mC] = parse(minimum);
+  if (cA !== mA) return cA < mA;
+  if (cB !== mB) return cB < mB;
+  return cC < mC;
+}
 LogBox.ignoreAllLogs(false);
 
 // Apply Montserrat globally to every <Text> and <TextInput>.
@@ -46,6 +63,7 @@ function Root() {
   const { state, dispatch } = useApp();
   const { profileLoaded, profile } = state;
   const [ready, setReady] = useState(false);
+  const [updateRequired, setUpdateRequired] = useState(false);
   const [fontsLoaded] = useFonts({
     Montserrat_400Regular,
     Montserrat_500Medium,
@@ -63,6 +81,7 @@ function Root() {
       console.log('📊 [Tealium] Initialized');
       tealiumReady = true;
       trackAppOpen();
+      trackInstallReferrer(); // Android — reads Play Store referrer via Install Referrer API
       // Seed email so Moments API queries work on first open for returning users
       if (profile?.email) setEmailForMoments(profile.email);
     }).catch((e) => {
@@ -110,6 +129,30 @@ function Root() {
       return () => sub.remove();
     }
   }, [ready]);
+
+  // Version gate — runs once on mount
+  useEffect(() => {
+    (async () => {
+      try {
+        const { data } = await supabase
+          .from('menu_config')
+          .select('description')
+          .eq('category', '_config')
+          .eq('name', 'minimum_version')
+          .single();
+        const minimum = data?.description;
+        if (!minimum) return;
+        const current = Constants.expoConfig?.version || '0.0.0';
+        console.log(`[Version] current=${current} minimum=${minimum}`);
+        if (isVersionOutdated(current, minimum)) {
+          console.warn('[Version] App is outdated — showing update modal');
+          setUpdateRequired(true);
+        }
+      } catch (e) {
+        console.warn('[Version] Check failed:', e.message);
+      }
+    })();
+  }, []);
 
   const locationWatchRef = useRef(null);
   const lastLocationRef = useRef(null);
@@ -213,14 +256,15 @@ function Root() {
     );
   };
 
+  const storeUrl = Platform.OS === 'ios' ? IOS_STORE_URL : ANDROID_STORE_URL;
+
+  let mainContent;
   if (!ready || !fontsLoaded) {
     console.log('⏳ [App] Showing splash screen');
-    return <SplashLoadingScreen />;
-  }
-
-  if (!profile) {
+    mainContent = <SplashLoadingScreen />;
+  } else if (!profile) {
     console.log('👤 [App] No profile, showing onboarding');
-    return (
+    mainContent = (
       <OnboardingScreen
         onComplete={(profileData) => {
           console.log('✅ [Onboarding] Complete, updating profile');
@@ -228,11 +272,80 @@ function Root() {
         }}
       />
     );
+  } else {
+    console.log('🏠 [App] Showing main navigator');
+    mainContent = <AppNavigator />;
   }
 
-  console.log('🏠 [App] Showing main navigator');
-  return <AppNavigator />;
+  return (
+    <>
+      {mainContent}
+      <Modal
+        visible={updateRequired}
+        transparent
+        animationType="fade"
+        onRequestClose={() => {}}
+      >
+        <View style={updateStyles.overlay}>
+          <View style={updateStyles.card}>
+            <Text style={updateStyles.emoji}>🚀</Text>
+            <Text style={updateStyles.title}>Update Available</Text>
+            <Text style={updateStyles.body}>
+              A new version of the app is available. Please update to access the latest features.
+            </Text>
+            <TouchableOpacity
+              style={updateStyles.btn}
+              activeOpacity={0.85}
+              onPress={() => Linking.openURL(storeUrl).catch(() => {})}
+            >
+              <Text style={updateStyles.btnText}>Update Now →</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
+    </>
+  );
 }
+
+const updateStyles = StyleSheet.create({
+  overlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.65)',
+    alignItems: 'center',
+    justifyContent: 'center',
+    padding: 32,
+  },
+  card: {
+    backgroundColor: '#fff',
+    borderRadius: 20,
+    padding: 32,
+    alignItems: 'center',
+    gap: 12,
+    width: '100%',
+    maxWidth: 340,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.18,
+    shadowRadius: 24,
+    elevation: 12,
+  },
+  emoji: { fontSize: 52 },
+  title: { fontSize: 22, fontFamily: 'Montserrat_700Bold', color: '#0A1628', textAlign: 'center' },
+  body: {
+    fontSize: 14, fontFamily: 'Montserrat_400Regular', color: '#64748B',
+    textAlign: 'center', lineHeight: 21,
+  },
+  btn: {
+    marginTop: 8,
+    backgroundColor: '#00B2BE',
+    borderRadius: 100,
+    paddingVertical: 14,
+    paddingHorizontal: 36,
+    width: '100%',
+    alignItems: 'center',
+  },
+  btnText: { color: '#fff', fontSize: 16, fontFamily: 'Montserrat_700Bold' },
+});
 
 function App() {
   console.log('🎬 [App] Component START');
