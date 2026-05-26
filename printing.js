@@ -309,8 +309,7 @@ async function printBrotherQL(printer, order, visitorId, useShorthand, autoCutEn
   const html = await buildBrotherQLLabelsHtml(order, visitorId, useShorthand);
 
   if (isBrotherPrinterAvailable()) {
-    const labelCount = order?.items?.length || 1;
-    const pdf = await Print.printToFileAsync({ html, width: 114, height: labelCount * 136, base64: false });
+    const pdf = await Print.printToFileAsync({ html, width: 114, height: 136, base64: false });
 
     const connectionType = printer.connectionType || 'wifi'; // 'wifi' | 'bluetooth'
 
