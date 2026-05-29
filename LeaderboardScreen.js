@@ -42,7 +42,7 @@ export default function LeaderboardScreen() {
       supabase.from('quiz_config').select('quiz_name').eq('id', 'default').single(),
       supabase
         .from('quiz_leaderboard')
-        .select('id, player_name, score, total_questions, time_seconds, created_at')
+        .select('id, player_name, score, total_questions, time_seconds')
         .order('score', { ascending: false })
         .order('time_seconds', { ascending: true })
         .limit(50),
@@ -137,7 +137,7 @@ export default function LeaderboardScreen() {
                         <Text style={styles.listScore}>{computePoints(e.score, e.total_questions, e.time_seconds, scoringMaxSecs)}</Text>
                         <Text style={styles.listPtsLabel}>pts</Text>
                       </View>
-                      <Text style={styles.listDate}>{formatDate(e.completed_at)}</Text>
+                      <Text style={styles.listDate}>{formatDate(e.created_at)}</Text>
                     </View>
                   </View>
                 ))}

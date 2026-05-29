@@ -78,31 +78,41 @@ export default function OrderSummaryScreen() {
     }
   };
 
+  // On iOS, force a fresh location when this screen mounts — prevents stale cached
+  // coordinates (from watchPosition maximumAge) from silently passing the geo check.
+  useEffect(() => {
+    if (Platform.OS !== 'ios') return;
+    Geolocation.getCurrentPosition(
+      (position) => {
+        dispatch({ type: 'SET_CUSTOMER_LOCATION', payload: {
+          latitude: position.coords.latitude,
+          longitude: position.coords.longitude,
+          granted: true,
+          denied: false,
+        }});
+      },
+      (err) => {
+        if (err.code === 1) {
+          dispatch({ type: 'SET_CUSTOMER_LOCATION', payload: { granted: false, denied: true } });
+        }
+      },
+      { enableHighAccuracy: false, timeout: 10000, maximumAge: 0 }
+    );
+  }, []); // mount only
+
   // Re-run geo check whenever customer location or locationId changes
   useEffect(() => {
     const locationId = state.profile?.arc_location_id;
     const customerLoc = state.customerLocation;
-
-    // iOS: trigger location permission prompt if not yet granted
-    if (Platform.OS === 'ios' && (!customerLoc || (!customerLoc.granted && !customerLoc.denied))) {
-      Geolocation.getCurrentPosition(
-        (position) => {
-          dispatch({ type: 'SET_CUSTOMER_LOCATION', payload: {
-            latitude: position.coords.latitude,
-            longitude: position.coords.longitude,
-            granted: true,
-            denied: false,
-          }});
-        },
-        () => {
-          dispatch({ type: 'SET_CUSTOMER_LOCATION', payload: { granted: false, denied: true } });
-        },
-        { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 }
-      );
-    }
-
     runGeoCheck(locationId, customerLoc);
   }, [state.customerLocation, state.profile?.arc_location_id]);
+
+  // Re-run geo check the moment the confirm modal opens — last line of defence
+  // against a stale geoWarning value from before the location was refreshed.
+  useEffect(() => {
+    if (!confirmVisible) return;
+    runGeoCheck(state.profile?.arc_location_id, state.customerLocation);
+  }, [confirmVisible]);
 
   // Show toggle when this device has no token in DB — that's the only condition.
   useEffect(() => {

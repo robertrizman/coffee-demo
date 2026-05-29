@@ -403,13 +403,17 @@ export default function OrdersProfileScreen() {
   };
 
   const handleSelectLocation = (loc) => {
-    setSelectedLocationId(loc?.id || null);
-    setSelectedLocationName(loc ? `${loc.venue_name}, ${loc.state}` : null);
+    const newId = loc?.id || null;
+    const newName = loc ? `${loc.venue_name}, ${loc.state}` : null;
+    setSelectedLocationId(newId);
+    setSelectedLocationName(newName);
     setLocationPickerVisible(false);
-    // Immediately update push token
+    // Persist to SecureStore immediately so the change survives a restart
+    dispatch({ type: 'UPDATE_PROFILE', payload: { ...profile, arc_location_id: newId, arc_location_name: newName } });
+    // Also update push token with new location
     if (deviceId) {
       supabase.from('push_tokens')
-        .update({ arc_location_id: loc?.id || null, updated_at: new Date().toISOString() })
+        .update({ arc_location_id: newId, updated_at: new Date().toISOString() })
         .eq('device_id', deviceId)
         .then(() => console.log('[Profile] Push token location updated to:', loc?.venue_name));
     }

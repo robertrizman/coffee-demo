@@ -60,10 +60,12 @@ export default function QuizScreen() {
   // Question state
   const [idx, setIdx] = useState(0);
   const [selected, setSelected] = useState(null);
+  const [revealed, setRevealed] = useState(false); // true after the reveal delay
   const [score, setScore] = useState(0);
   const [done, setDone] = useState(false);
   const [answers, setAnswers] = useState([]);
   const [quizRound, setQuizRound] = useState(0);
+  const revealTimerRef = useRef(null);
 
   // Timers
   const [timeLeft, setTimeLeft] = useState(300);
@@ -162,14 +164,20 @@ export default function QuizScreen() {
   const handleSelect = (optionIdx) => {
     if (selected !== null) return;
     setSelected(optionIdx);
-    const q = questions[idx];
-    const correct = optionIdx === q.answer_index;
-    if (correct) setScore(s => s + 1);
-    else shake();
-    setAnswers(prev => [...prev, { correct }]);
+    // Delay before revealing correct/wrong result
+    revealTimerRef.current = setTimeout(() => {
+      const q = questions[idx];
+      const correct = optionIdx === q.answer_index;
+      if (correct) setScore(s => s + 1);
+      else shake();
+      setAnswers(prev => [...prev, { correct }]);
+      setRevealed(true);
+    }, 500);
   };
 
   const handleNext = () => {
+    clearTimeout(revealTimerRef.current);
+    setRevealed(false);
     if (idx + 1 >= questions.length) {
       stopTimers();
       const elapsed = startTimeRef.current
@@ -184,12 +192,14 @@ export default function QuizScreen() {
   };
 
   const handleRestart = async () => {
+    clearTimeout(revealTimerRef.current);
     stopTimers();
     setStarted(false);
     setDone(false);
     setSubmitted(false);
     setIdx(0);
     setSelected(null);
+    setRevealed(false);
     setScore(0);
     setAnswers([]);
     setElapsedSeconds(0);
@@ -410,7 +420,8 @@ export default function QuizScreen() {
 
   // ── Question ─────────────────────────────────────────────────────────────────
   const q = questions[idx];
-  const answered = selected !== null;
+  const answered = selected !== null; // locks out further taps
+
   const timerWarning = timerEnabled
     ? timeLeft <= 30
     : elapsedSeconds >= scoringMaxSecs * 0.75;
@@ -471,7 +482,7 @@ export default function QuizScreen() {
           {(q.options || []).map((opt, i) => {
             let optStyle = styles.option;
             let textStyle = styles.optionText;
-            if (answered) {
+            if (revealed) {
               if (i === q.answer_index) {
                 optStyle = [styles.option, styles.optionCorrect];
                 textStyle = styles.optionTextCorrect;
@@ -481,6 +492,8 @@ export default function QuizScreen() {
               } else {
                 optStyle = [styles.option, styles.optionDimmed];
               }
+            } else if (answered && i === selected) {
+              optStyle = [styles.option, styles.optionSelected];
             }
             return (
               <TouchableOpacity
@@ -496,14 +509,14 @@ export default function QuizScreen() {
           })}
         </View>
 
-        {answered && !!q.fact && (
+        {revealed && !!q.fact && (
           <View style={styles.factBox}>
             <Text style={styles.factIcon}>{selected === q.answer_index ? '✓' : '✗'}</Text>
             <Text style={styles.factText}>{q.fact}</Text>
           </View>
         )}
 
-        {answered && (
+        {revealed && (
           <TouchableOpacity style={styles.nextBtn} onPress={handleNext}>
             <Text style={styles.nextBtnText}>
               {idx + 1 >= questions.length ? 'See Results' : 'Next Question →'}
@@ -598,6 +611,7 @@ const styles = StyleSheet.create({
     borderRadius: radius.lg, borderWidth: 1.5, borderColor: colors.border,
     backgroundColor: colors.surface,
   },
+  optionSelected: { borderColor: colors.primary, backgroundColor: '#E0F7FA' },
   optionCorrect: { backgroundColor: '#E8F5E9', borderColor: '#4CAF50' },
   optionWrong: { backgroundColor: '#F44336', borderColor: '#F44336' },
   optionDimmed: { opacity: 0.45, borderColor: colors.border, backgroundColor: colors.surface },

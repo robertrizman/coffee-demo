@@ -223,18 +223,24 @@ function Root() {
             onPosition,
             (err2) => {
               console.log('[Location] ❌ Network location also failed:', err2.message);
-              dispatch({ type: 'SET_CUSTOMER_LOCATION', payload: { granted: false, denied: true } });
+              // code 1 = permission denied; codes 2/3 = transient signal failure
+              if (err2.code === 1) {
+                dispatch({ type: 'SET_CUSTOMER_LOCATION', payload: { granted: false, denied: true } });
+              }
             },
-            { enableHighAccuracy: false, timeout: 10000, maximumAge: 60000 }
+            { enableHighAccuracy: false, timeout: 10000, maximumAge: 0 }
           );
-        } else {
+        } else if (error.code === 1) {
+          // Only mark denied when the OS explicitly rejected the permission
           dispatch({ type: 'SET_CUSTOMER_LOCATION', payload: { granted: false, denied: true } });
         }
+        // code 2 (position unavailable) — signal issue, not a permission problem; leave state alone so watchPosition can still succeed
       },
       { enableHighAccuracy: true, timeout: 20000, maximumAge: 0 }
     );
 
-    // Watch — use network accuracy on Android to avoid GPS timeouts
+    // Watch — use network accuracy to avoid GPS drain; maximumAge: 0 prevents iOS from
+    // delivering a stale cached location that could fool the geo check into passing
     if (locationWatchRef.current !== null) {
       Geolocation.clearWatch(locationWatchRef.current);
     }
@@ -252,7 +258,7 @@ function Root() {
       (error) => {
         console.log('[Location] Watch error code:', error.code, 'message:', error.message);
       },
-      { enableHighAccuracy: false, timeout: 20000, maximumAge: 30000, distanceFilter: 50 }
+      { enableHighAccuracy: false, timeout: 20000, maximumAge: 0, distanceFilter: 50 }
     );
   };
 
