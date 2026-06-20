@@ -167,7 +167,8 @@ class TealiumPrismModule: NSObject {
       return
     }
 
-    if let vid = tealium.dataLayer.all["tealium_visitor_id"] as? String, !vid.isEmpty {
+    if let vid = tealium.visitorId, !vid.isEmpty {
+      NSLog("[TealiumPRISM] getVisitorId: \(vid)")
       resolver(vid)
     } else {
       rejecter("NO_VISITOR_ID", "tealium_visitor_id not available", nil)

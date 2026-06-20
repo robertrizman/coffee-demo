@@ -507,6 +507,21 @@ export function setVisitorId(id) {
   }
 }
 
+/** Ask PRISM directly — updates the cached value and returns it. */
+export async function fetchVisitorIdFromPrism() {
+  if (!PrismModule) return _visitorId;
+  try {
+    const vid = await PrismModule.getVisitorId();
+    if (vid) {
+      _visitorId = vid;
+      console.log('[Tealium] fetchVisitorIdFromPrism:', vid);
+    }
+  } catch (e) {
+    console.warn('[Tealium] fetchVisitorIdFromPrism error:', e.message);
+  }
+  return _visitorId;
+}
+
 // ── Email (used as Moments API attribute value) ───────────
 
 let _email = null;

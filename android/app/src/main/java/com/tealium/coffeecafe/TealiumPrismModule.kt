@@ -15,6 +15,17 @@ class TealiumPrismModule(reactContext: ReactApplicationContext) :
     companion object {
         private var tealium: Tealium? = null
         private var initialized = false
+        private var cachedVisitorId: String? = null
+    }
+
+    private fun cacheVisitorIdIfNeeded(result: com.tealium.prism.core.api.misc.TealiumResult<com.tealium.prism.core.api.tracking.TrackResult>) {
+        if (cachedVisitorId != null) return
+        result.getOrNull()?.dispatch?.payload()?.getString("tealium_visitor_id")?.let { vid ->
+            if (vid.isNotEmpty()) {
+                cachedVisitorId = vid
+                println("[TealiumPrism] Cached tealium_visitor_id: $vid")
+            }
+        }
     }
 
     @ReactMethod
@@ -49,7 +60,9 @@ class TealiumPrismModule(reactContext: ReactApplicationContext) :
     fun track(eventName: String, data: ReadableMap?, promise: Promise) {
         val t = tealium ?: run { promise.reject("NOT_INITIALIZED", "PRISM not initialized"); return }
         try {
-            t.track(eventName, buildDataObject(data))
+            t.track(eventName, buildDataObject(data)).subscribe { result ->
+                cacheVisitorIdIfNeeded(result)
+            }
             promise.resolve(true)
         } catch (e: Exception) { promise.reject("TRACK_ERROR", e.message, e) }
     }
@@ -58,7 +71,9 @@ class TealiumPrismModule(reactContext: ReactApplicationContext) :
     fun trackView(screenName: String, data: ReadableMap?, promise: Promise) {
         val t = tealium ?: run { promise.reject("NOT_INITIALIZED", "PRISM not initialized"); return }
         try {
-            t.track(screenName, buildDataObject(data))
+            t.track(screenName, buildDataObject(data)).subscribe { result ->
+                cacheVisitorIdIfNeeded(result)
+            }
             promise.resolve(true)
         } catch (e: Exception) { promise.reject("TRACK_ERROR", e.message, e) }
     }
@@ -130,19 +145,14 @@ class TealiumPrismModule(reactContext: ReactApplicationContext) :
 
     @ReactMethod
     fun getVisitorId(promise: Promise) {
-        val t = tealium ?: run { promise.reject("NOT_INITIALIZED", "PRISM not initialized"); return }
-        try {
-            t.dataLayer.getString("tealium_visitor_id").subscribe { result ->
-                val vid = result.getOrNull()
-                if (!vid.isNullOrEmpty()) {
-                    println("[TealiumPrism] tealium_visitor_id: $vid")
-                    promise.resolve(vid)
-                } else {
-                    promise.reject("NO_VISITOR_ID", "tealium_visitor_id not available")
-                }
-            }
-        } catch (e: Exception) {
-            promise.reject("VISITOR_ID_ERROR", e.message, e)
+        // Return the value intercepted from the enriched track() payload
+        val cached = cachedVisitorId
+        if (!cached.isNullOrEmpty()) {
+            println("[TealiumPrism] getVisitorId from cache: $cached")
+            promise.resolve(cached)
+            return
         }
+        // Not cached yet — events haven't fired or the dispatch payload didn't contain it
+        promise.reject("NO_VISITOR_ID", "tealium_visitor_id not yet available")
     }
 }

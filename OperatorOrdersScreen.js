@@ -1,7 +1,7 @@
 import React, { useState, useRef, useEffect, useCallback } from 'react';
 import {
-  View, Text, ScrollView, TouchableOpacity, RefreshControl,
-  StyleSheet, Modal, Alert, TouchableWithoutFeedback, Linking, AppState, Animated,
+  View, Text, FlatList, TouchableOpacity, RefreshControl,
+  StyleSheet, Modal, Alert, TouchableWithoutFeedback, Linking, AppState, Animated, ActivityIndicator,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useKeepAwake } from 'expo-keep-awake';
@@ -23,6 +23,7 @@ import { QrScanIcon, SettingsIcon, LogoutIcon, PrinterIcon, UserIcon, AgendaIcon
 
 const TABS = ['All', 'Pending', 'Complete'];
 const SOUND_VOLUME = 0.6;
+const PAGE_SIZE = 10;
 
 function timeAgo(ts) {
   if (!ts) return '';
@@ -73,6 +74,7 @@ export default function OperatorOrdersScreen() {
   const { state, dispatch } = useApp();
   const { logout, barista, isOwner } = useAuth();
   const [tab, setTab] = useState('All');
+  const [visibleCount, setVisibleCount] = useState(PAGE_SIZE);
 
   const [scannerOpen, setScannerOpen] = useState(false);
   const [inlineScannerVisible, setInlineScannerVisible] = useState(false);
@@ -170,6 +172,16 @@ export default function OperatorOrdersScreen() {
     if (tab === 'Complete') return o.status === 'complete';
     return true; // All tab shows pending, complete and cancelled
   });
+
+  // Reset visible window when switching tabs
+  useEffect(() => { setVisibleCount(PAGE_SIZE); }, [tab]);
+
+  const displayedOrders = filtered.slice(0, visibleCount);
+  const hasMore = visibleCount < filtered.length;
+
+  const handleLoadMore = () => {
+    if (hasMore) setVisibleCount(prev => prev + PAGE_SIZE);
+  };
 
   const handleRefresh = async () => {
     setRefreshing(true);
@@ -510,8 +522,10 @@ export default function OperatorOrdersScreen() {
         </View>
       )}
 
-      <ScrollView
-        contentContainerStyle={styles.list}
+      <FlatList
+        data={displayedOrders}
+        keyExtractor={(item) => item.id}
+        contentContainerStyle={[styles.list, filtered.length === 0 && styles.listEmpty]}
         showsVerticalScrollIndicator={false}
         refreshControl={
           <RefreshControl
@@ -521,19 +535,36 @@ export default function OperatorOrdersScreen() {
             colors={[colors.primary]}
           />
         }
-      >
-        {filtered.length === 0 ? (
+        onEndReached={handleLoadMore}
+        onEndReachedThreshold={0.3}
+        ListEmptyComponent={
           <View style={styles.emptyState}>
             <PrinterIcon size={48} color={colors.primaryMid} />
             <Text style={styles.emptyTitle}>No orders</Text>
             <Text style={styles.emptySubtitle}>Customer orders will appear here as they come in</Text>
           </View>
-        ) : (
-          filtered.map((order) => {
-            const anim = newOrderAnims.current[order.id];
-            const isNew = newOrderIds.has(order.id);
-            return (
-            <Animated.View key={order.id} style={[
+        }
+        ListFooterComponent={
+          hasMore ? (
+            <TouchableOpacity style={styles.loadMoreBtn} onPress={handleLoadMore}>
+              <ActivityIndicator size="small" color={colors.primary} style={{ marginRight: 8 }} />
+              <Text style={styles.loadMoreText}>
+                Showing {displayedOrders.length} of {filtered.length} orders
+              </Text>
+            </TouchableOpacity>
+          ) : (
+            filtered.length > PAGE_SIZE ? (
+              <Text style={styles.allLoadedText}>All {filtered.length} orders loaded</Text>
+            ) : (
+              <View style={{ height: 32 }} />
+            )
+          )
+        }
+        renderItem={({ item: order }) => {
+          const anim = newOrderAnims.current[order.id];
+          const isNew = newOrderIds.has(order.id);
+          return (
+            <Animated.View style={[
               styles.orderCard,
               order.status === 'complete' && styles.orderCardDone,
               order.status === 'cancelled' && styles.orderCardCancelled,
@@ -630,7 +661,6 @@ export default function OperatorOrdersScreen() {
                 </View>
               )}
 
-              {/* QR Code display */}
               {qrVisible[order.id] && qrDataUrls[order.id] && (
                 <View style={styles.qrContainer}>
                   <Text style={styles.qrLabel}>Scan to complete order</Text>
@@ -647,11 +677,9 @@ export default function OperatorOrdersScreen() {
                 </View>
               )}
             </Animated.View>
-            );
-          })
-        )}
-        <View style={{ height: 32 }} />
-      </ScrollView>
+          );
+        }}
+      />
 
       {/* QR Scanner Modal — stays open, continuous scanning */}
       <Modal visible={scannerOpen} animationType="slide" onRequestClose={closeScanner}>
@@ -763,6 +791,17 @@ const styles = StyleSheet.create({
   printerBannerText: { fontSize: 11, fontFamily: fonts.semibold, color: '#92400e', flex: 1 },
 
   list: { padding: spacing.md, gap: spacing.md },
+  listEmpty: { flex: 1 },
+
+  loadMoreBtn: {
+    flexDirection: 'row', alignItems: 'center', justifyContent: 'center',
+    paddingVertical: spacing.md, marginTop: spacing.sm, marginBottom: spacing.lg,
+  },
+  loadMoreText: { fontSize: 12, color: colors.textMid, fontFamily: fonts.semibold },
+  allLoadedText: {
+    textAlign: 'center', fontSize: 11, color: colors.textMuted,
+    paddingVertical: spacing.md, marginBottom: spacing.lg,
+  },
 
   emptyState: { alignItems: 'center', paddingTop: 60, gap: spacing.md },
   emptyTitle: { ...typography.heading3, color: colors.textMuted },

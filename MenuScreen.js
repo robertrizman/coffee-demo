@@ -458,29 +458,6 @@ export default function MenuScreen() {
 
       <View style={styles.divider} />
 
-      {/* Personalised reorder banner — shown when Moments API returns a last drink order */}
-      {lastDrink && state.menuEnabled[lastDrink.id] !== false && !isAdmin && (
-        <TouchableOpacity style={styles.reorderBanner} onPress={handleReorder} activeOpacity={0.85}>
-          <View style={styles.reorderIconCircle}>
-            <ReorderIcon size={18} color={colors.primary} />
-          </View>
-          <View style={styles.reorderLeft}>
-            <View style={styles.reorderLabelRow}>
-              <Text style={styles.reorderLabel}>Your last order</Text>
-              <View style={styles.reorderPill}><Text style={styles.reorderPillText}>Moments API</Text></View>
-            </View>
-            <Text style={styles.reorderDrink} numberOfLines={1}>
-              {lastDrink.milk !== 'No Milk' ? `${lastDrink.milk} ` : ''}{lastDrink.name}
-              {lastDrink.size ? `, ${lastDrink.size}` : ''}
-            </Text>
-          </View>
-          <View style={styles.reorderBtn}>
-            <Text style={styles.reorderBtnText}>Reorder</Text>
-            <ChevronIcon size={14} color="#fff" />
-          </View>
-        </TouchableOpacity>
-      )}
-
       <ScrollView
         ref={scrollRef}
         contentContainerStyle={styles.list}
@@ -488,6 +465,29 @@ export default function MenuScreen() {
         onScroll={handleScroll}
         scrollEventThrottle={100}
       >
+        {/* Personalised reorder card — shown when Moments API returns a last drink order */}
+        {lastDrink && state.menuEnabled[lastDrink.id] !== false && !isAdmin && (
+          <View style={styles.reorderCardShadow}>
+            <TouchableOpacity style={styles.reorderCard} onPress={handleReorder} activeOpacity={0.85}>
+              <View style={styles.reorderCardImg}>
+                {DRINK_IMAGES[lastDrink.id]
+                  ? <Image source={DRINK_IMAGES[lastDrink.id]} style={styles.reorderImg} resizeMode="contain" />
+                  : <ReorderIcon size={20} color={colors.primary} />
+                }
+              </View>
+              <View style={styles.reorderCardBody}>
+                <Text style={styles.reorderLabel}>Your last order</Text>
+                <Text style={styles.reorderDrink} numberOfLines={1}>{lastDrink.name}</Text>
+                <View style={styles.reorderPill}><Text style={styles.reorderPillText}>Using Context API</Text></View>
+              </View>
+              <View style={styles.reorderBtn}>
+                <Text style={styles.reorderBtnText}>Reorder</Text>
+                <ChevronIcon size={12} color="#fff" />
+              </View>
+            </TouchableOpacity>
+          </View>
+        )}
+
         {allTabs.map((cat) => {
           const isFoodCat = FOOD_CATEGORIES.includes(cat);
           const catStaticItems = !isFoodCat
@@ -991,29 +991,41 @@ const styles = StyleSheet.create({
     color: colors.textMid,
   },
 
-  // Reorder banner
-  reorderBanner: {
+  // Reorder card
+  reorderCardShadow: {
+    borderRadius: radius.lg,
+    backgroundColor: colors.surface,
+    ...shadow.card,
+  },
+  reorderCard: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: colors.tealLight,
-    borderBottomWidth: 1,
-    borderBottomColor: colors.tealMid,
-    paddingHorizontal: spacing.lg,
-    paddingVertical: 10,
+    backgroundColor: colors.surface,
+    borderRadius: radius.lg,
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.sm,
     gap: spacing.sm,
+    borderWidth: 1.5,
+    borderColor: colors.tealMid,
+    overflow: 'hidden',
   },
-  reorderIconCircle: {
-    width: 36,
-    height: 36,
-    borderRadius: radius.full,
+  reorderCardImg: {
+    width: 44,
+    height: 44,
+    borderRadius: radius.md,
     backgroundColor: colors.primaryLight,
     borderWidth: 1,
     borderColor: colors.primaryMid,
     alignItems: 'center',
     justifyContent: 'center',
+    overflow: 'hidden',
+    flexShrink: 0,
   },
-  reorderLeft: { flex: 1 },
-  reorderLabelRow: { flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 2 },
+  reorderImg: {
+    width: 44,
+    height: 44,
+  },
+  reorderCardBody: { flex: 1, minWidth: 0, gap: 3 },
   reorderLabel: {
     fontSize: 10,
     fontFamily: fonts.bold,
@@ -1021,13 +1033,20 @@ const styles = StyleSheet.create({
     letterSpacing: 0.5,
     textTransform: 'uppercase',
   },
+  reorderDrink: {
+    fontSize: 13,
+    fontFamily: fonts.semibold,
+    color: colors.midnight,
+    lineHeight: 18,
+  },
   reorderPill: {
-    backgroundColor: colors.primaryLight,
+    alignSelf: 'flex-start',
+    backgroundColor: colors.tealLight,
     borderRadius: radius.full,
     paddingHorizontal: 6,
     paddingVertical: 2,
     borderWidth: 1,
-    borderColor: colors.primaryMid,
+    borderColor: colors.tealMid,
   },
   reorderPillText: {
     fontSize: 8,
@@ -1035,22 +1054,19 @@ const styles = StyleSheet.create({
     color: colors.primary,
     letterSpacing: 0.8,
   },
-  reorderDrink: {
-    fontSize: 14,
-    fontFamily: fonts.semibold,
-    color: colors.midnight,
-  },
   reorderBtn: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 4,
+    alignSelf: 'center',
+    gap: 3,
     backgroundColor: colors.primary,
     borderRadius: radius.full,
-    paddingHorizontal: spacing.md,
-    paddingVertical: 7,
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    flexShrink: 0,
   },
   reorderBtnText: {
-    fontSize: 12,
+    fontSize: 11,
     fontFamily: fonts.bold,
     color: '#fff',
   },

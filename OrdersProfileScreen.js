@@ -1,11 +1,14 @@
-import React, { useEffect, useState, useCallback, useRef } from 'react';
+import React, { useEffect, useState, useCallback, useRef, useMemo } from 'react';
 import {
-  View, Text, ScrollView, StyleSheet, Switch,
+  View, Text, ScrollView, StyleSheet, Switch, Image,
   TouchableOpacity, ActivityIndicator, RefreshControl,
   TextInput, Alert, Modal, Clipboard, Platform, AppState, Linking,
   PermissionsAndroid,
 } from 'react-native';
+import DRINK_IMAGES from './drinkImages';
 import * as Notifications from 'expo-notifications';
+import * as Location from 'expo-location';
+import { WebView } from 'react-native-webview';
 import Geolocation from '@react-native-community/geolocation';
 import { registerPushToken } from './push';
 import { getDeviceId } from './deviceId';
@@ -15,7 +18,7 @@ import { useNavigation } from '@react-navigation/native';
 import { useAuth } from './AuthContext';
 import { supabase } from './supabase';
 import { getOrderPersonality } from './foodPairingAI';
-import { trackProfileTab, trackEditProfile, trackProfileUpdated, trackUuidCopy, trackDietaryRequirementsUpdated, joinTrace, leaveTrace, getCanonicalDeviceId, getVisitorId, setEmailForMoments } from './tealium';
+import { trackProfileTab, trackEditProfile, trackProfileUpdated, trackUuidCopy, trackDietaryRequirementsUpdated, joinTrace, leaveTrace, getCanonicalDeviceId, getVisitorId, fetchVisitorIdFromPrism, setEmailForMoments } from './tealium';
 import { colors, typography, spacing, radius, shadow, fonts } from './theme';
 import { UserIcon, EmailIcon, LocationPinIcon, TakeawayCupIcon, CheckIcon, CopyIcon, EditIcon, AiSparkIcon, LightbulbIcon, MagnifyIcon, LightningBoltIcon, LeafIcon, ShieldIcon } from './CoffeeIcons';
 
@@ -72,6 +75,8 @@ export default function OrdersProfileScreen() {
   const [locationPickerVisible, setLocationPickerVisible] = useState(false);
   const [selectedLocationId, setSelectedLocationId] = useState(profile?.arc_location_id || null);
   const [selectedLocationName, setSelectedLocationName] = useState(profile?.arc_location_name || null);
+  const [userLocation, setUserLocation] = useState(null);
+  const mapWebViewRef = useRef(null);
   const [toast, setToast] = useState(null);
 
   // Permission toggles
@@ -218,28 +223,30 @@ export default function OrdersProfileScreen() {
   const [debugTapCount, setDebugTapCount] = useState(0);
   const [momentsUnlocked, setMomentsUnlocked] = useState(false);
   const [tealiumUuid, setTealiumUuid] = useState(null);
+  const [visitorId, setVisitorId] = useState(() => getVisitorId());
+  const [missedYouVisible, setMissedYouVisible] = useState(false);
+  const [missedYouOrder, setMissedYouOrder] = useState(null);
+  const missedYouChecked = useRef(false);
   const [editDietary, setEditDietary] = useState(profile?.dietary_requirements || '');
   const [personalityData, setPersonalityData] = useState(null);
   const [personalityLoading, setPersonalityLoading] = useState(false);
   const personalityFetched = useRef(false);
 
-  // Listen for Tealium UUID to be ready
+  // Listen for Tealium UUID and visitor ID to be ready
   useEffect(() => {
-    const checkTealiumUuid = () => {
+    const checkIds = () => {
       const uuid = getCanonicalDeviceId();
-      if (uuid && uuid !== tealiumUuid) {
-        console.log('[Profile] Tealium UUID updated:', uuid);
-        setTealiumUuid(uuid);
-      }
+      if (uuid) setTealiumUuid(uuid);
+      const vid = getVisitorId();
+      if (vid) setVisitorId(vid);
     };
-    
-    // Check immediately
-    checkTealiumUuid();
-    
-    // Check again after 2 seconds (Tealium should be ready)
-    const timer = setTimeout(checkTealiumUuid, 2000);
-    
-    return () => clearTimeout(timer);
+    checkIds();
+    // PRISM resolves visitor ID asynchronously; poll a few times to catch it
+    const t1 = setTimeout(checkIds, 2000);
+    const t2 = setTimeout(checkIds, 5000);
+    const t3 = setTimeout(checkIds, 10000);
+    const t4 = setTimeout(checkIds, 20000);
+    return () => { clearTimeout(t1); clearTimeout(t2); clearTimeout(t3); clearTimeout(t4); };
   }, []);
 
   // Filter global orders down to only this user's orders
@@ -310,6 +317,41 @@ export default function OrdersProfileScreen() {
       .catch(() => setPersonalityLoading(false));
   }, [mergedOrders.length, isAdmin]);
 
+  // When debug tab opens, ask PRISM directly for the visitor ID
+  useEffect(() => {
+    if (activeTab !== 'debug') return;
+    fetchVisitorIdFromPrism().then(vid => { if (vid) setVisitorId(vid); });
+  }, [activeTab]);
+
+  const MOMENTS_BASE = 'https://personalization-api.ap-southeast-2.prod.tealiumapis.com/personalization/accounts/success-robert-rizman/profiles/coffee-demo/engines/aaa7abe0-9023-49c8-8858-5fe2dbb18c39';
+
+  // "We missed you" check — runs once visitor ID is known and orders have loaded
+  useEffect(() => {
+    if (!visitorId || loading || missedYouChecked.current) return;
+    missedYouChecked.current = true;
+    fetch(`${MOMENTS_BASE}/visitors/${visitorId}`, { headers: { 'Content-Type': 'application/json' } })
+      .then(r => r.json())
+      .then(data => {
+        const dates = data?.dates || {};
+        // Find last visit epoch — try known keys then fall back to first available
+        const epoch = dates['Last Visit Date'] ?? dates['last_visit_date'] ?? dates['last_visit']
+          ?? (Object.keys(dates).length > 0 ? Object.values(dates)[0] : null);
+        if (!epoch) return;
+        // Normalise: Moments API returns epoch in ms; if < 1e12 it's seconds
+        const lastVisitMs = epoch > 1e12 ? epoch : epoch * 1000;
+        const diffMs = Date.now() - lastVisitMs;
+        const diffDays = diffMs / 86400000;
+        const diffHours = diffMs / 3600000;
+        // Production: 7+ days away. Test condition: last visit within 3 hours.
+        const shouldShow = diffDays >= 7 || diffHours < 3;
+        if (shouldShow && mergedOrders.length > 0) {
+          setMissedYouOrder(mergedOrders[0]);
+          setMissedYouVisible(true);
+        }
+      })
+      .catch(() => {});
+  }, [visitorId, loading]);
+
   useEffect(() => {
     if (activeTab !== 'profile' || momentsData) return;
     const email = profile?.email;
@@ -330,6 +372,291 @@ export default function OrdersProfileScreen() {
       })
       .catch(() => {});
   }, [activeTab]);
+
+  const locationMapHtml = useMemo(() => {
+    const today = new Date();
+    const locationsJson = JSON.stringify(
+      locations.map(loc => ({
+        id: loc.id,
+        venue_name: loc.venue_name,
+        address: loc.address,
+        state: loc.state,
+        latitude: loc.latitude,
+        longitude: loc.longitude,
+        geo_radius_meters: loc.geo_radius_meters || null,
+        enabled:
+          loc.enabled &&
+          (!loc.start_date || new Date(loc.start_date) <= today) &&
+          (!loc.end_date || new Date(loc.end_date) >= today),
+      }))
+    );
+    const selId = selectedLocationId ?? null;
+    const initLat = userLocation?.latitude ?? null;
+    const initLng = userLocation?.longitude ?? null;
+
+    return `<!DOCTYPE html>
+<html>
+<head>
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no"/>
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  html, body { width: 100%; height: 100%; }
+  #map { width: 100%; height: 100%; }
+  .popup-venue { font-size: 15px; font-weight: bold; color: #1a3a5c; margin-bottom: 4px; }
+  .popup-address { font-size: 12px; color: #555; margin-bottom: 10px; line-height: 1.5; }
+  .popup-btn { background: #0c3867; color: #fff; border: none; padding: 9px 0; border-radius: 8px; font-size: 13px; font-weight: bold; cursor: pointer; width: 100%; }
+  .popup-btn.selected { background: #16a34a; }
+  .popup-inactive { font-size: 11px; color: #999; text-align: center; padding: 4px 0; }
+  #infoBtn {
+    position: absolute; bottom: 18px; left: 10px; z-index: 1000;
+    width: 22px; height: 22px; border-radius: 50%;
+    background: rgba(255,255,255,0.92); border: 1.5px solid #bbb;
+    font-size: 12px; font-style: italic; font-family: Georgia, serif;
+    line-height: 19px; text-align: center; cursor: pointer;
+    color: #444; box-shadow: 0 1px 5px rgba(0,0,0,0.28); padding: 0;
+  }
+  #attrPanel {
+    display: none; position: absolute; bottom: 46px; left: 10px; z-index: 1000;
+    background: rgba(255,255,255,0.93); border-radius: 5px;
+    padding: 5px 9px; font-size: 10px; color: #555; white-space: nowrap;
+    box-shadow: 0 1px 5px rgba(0,0,0,0.22);
+  }
+  #attrPanel a { color: #0066cc; text-decoration: none; }
+  #locateBtn {
+    position: absolute; top: 10px; right: 10px; z-index: 1000;
+    width: 36px; height: 36px; border-radius: 8px;
+    background: white; border: none; box-shadow: 0 2px 6px rgba(0,0,0,0.3);
+    cursor: pointer; padding: 0; display: flex; align-items: center; justify-content: center;
+  }
+  #locateBtn.searching { background: #e8f0fe; }
+  @keyframes user-pulse {
+    0%   { transform: scale(0.5); opacity: 0.8; }
+    100% { transform: scale(3.2); opacity: 0; }
+  }
+</style>
+</head>
+<body>
+<div id="map"></div>
+<button id="locateBtn">
+  <svg width="18" height="18" viewBox="0 0 24 24" fill="none">
+    <circle cx="12" cy="12" r="6" stroke="#4285F4" stroke-width="2"/>
+    <circle cx="12" cy="12" r="2.5" fill="#4285F4"/>
+    <line x1="12" y1="2" x2="12" y2="7" stroke="#4285F4" stroke-width="2" stroke-linecap="round"/>
+    <line x1="12" y1="17" x2="12" y2="22" stroke="#4285F4" stroke-width="2" stroke-linecap="round"/>
+    <line x1="2" y1="12" x2="7" y2="12" stroke="#4285F4" stroke-width="2" stroke-linecap="round"/>
+    <line x1="17" y1="12" x2="22" y2="12" stroke="#4285F4" stroke-width="2" stroke-linecap="round"/>
+  </svg>
+</button>
+<button id="infoBtn">i</button>
+<div id="attrPanel">
+  © <a href="https://www.openstreetmap.org/copyright" target="_blank">OpenStreetMap</a> contributors
+  © <a href="https://carto.com/attributions" target="_blank">CARTO</a>
+</div>
+<script>
+  var locs = ${locationsJson};
+  var selId = ${JSON.stringify(selId)};
+  var map = L.map('map', { zoomControl: true, attributionControl: false });
+  L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png', {
+    maxZoom: 20, subdomains: 'abcd',
+  }).addTo(map);
+
+  var bounds = [];
+  var pulseRings = [];
+  var ringIndex = 0;
+  var markerMap = {};
+  var openedForLocation = null;
+  var hasAutoZoomed = false;
+
+  locs.forEach(function(loc) {
+    if (loc.latitude == null || loc.longitude == null) return;
+    var isSel = loc.id === selId;
+    var pinColor = isSel ? '#68d8d5' : (loc.enabled ? '#0c3867' : '#aaaaaa');
+    var ringColor = isSel ? '#0c3867' : 'white';
+    var svg =
+      '<svg xmlns="http://www.w3.org/2000/svg" width="34" height="46" viewBox="0 0 34 46">' +
+        '<path d="M17 0C7.6 0 0 7.6 0 17c0 11.7 17 29 17 29S34 28.7 34 17C34 7.6 26.4 0 17 0z" fill="' + pinColor + '"/>' +
+        '<circle cx="17" cy="17" r="8" fill="' + ringColor + '" opacity="0.95"/>' +
+      '</svg>';
+    var icon = L.divIcon({ html: svg, className: '', iconSize: [34, 46], iconAnchor: [17, 46], popupAnchor: [0, -48] });
+
+    if (loc.geo_radius_meters) {
+      L.circle([loc.latitude, loc.longitude], {
+        radius: loc.geo_radius_meters, stroke: false,
+        fillColor: loc.enabled ? '#68d8d5' : '#cccccc', fillOpacity: 0.07, interactive: false,
+      }).addTo(map);
+      var ring = L.circle([loc.latitude, loc.longitude], {
+        radius: 1, color: loc.enabled ? '#68d8d5' : '#cccccc',
+        fill: false, weight: 3, opacity: 0, interactive: false,
+      }).addTo(map);
+      pulseRings.push({ ring: ring, max: loc.geo_radius_meters, t: (ringIndex * 0.45) % 1 });
+      ringIndex++;
+    }
+
+    var marker = L.marker([loc.latitude, loc.longitude], { icon: icon }).addTo(map);
+    markerMap[loc.id] = marker;
+    bounds.push([loc.latitude, loc.longitude]);
+
+    var vn = loc.venue_name.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+    var addr = (loc.address + ', ' + loc.state).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+    var popupHtml =
+      '<div style="min-width:200px; padding:4px 0;">' +
+        '<div class="popup-venue">' + vn + '</div>' +
+        '<div class="popup-address">' + addr + '</div>';
+    if (loc.enabled) {
+      var btnCls = isSel ? 'popup-btn selected' : 'popup-btn';
+      var btnLbl = isSel ? '✓ Selected' : 'Select this location';
+      popupHtml += '<button class="' + btnCls + '" data-id="' + loc.id + '">' + btnLbl + '</button>';
+    } else {
+      popupHtml += '<div class="popup-inactive">Currently unavailable</div>';
+    }
+    popupHtml += '</div>';
+    marker.bindPopup(popupHtml, { maxWidth: 270 });
+  });
+
+  if (pulseRings.length > 0) {
+    setInterval(function() {
+      pulseRings.forEach(function(p) {
+        p.t += 0.022;
+        if (p.t >= 1) p.t = 0;
+        p.ring.setRadius(Math.max(p.max * p.t, 1));
+        p.ring.setStyle({ opacity: 0.85 * (1 - p.t) });
+      });
+    }, 40);
+  }
+
+  var activeLocs = locs.filter(function(l) { return l.enabled && l.latitude != null; });
+  var activeBounds = activeLocs.map(function(l) { return [l.latitude, l.longitude]; });
+  if (activeLocs.length === 1) { map.setView(activeBounds[0], 16); }
+  else if (activeBounds.length > 1) { map.fitBounds(activeBounds, { padding: [60, 60] }); }
+  else if (bounds.length > 0) { map.fitBounds(bounds, { padding: [60, 60] }); }
+  else { map.setView([-25.2744, 133.7751], 4); }
+
+  document.addEventListener('click', function(e) {
+    if (e.target.classList.contains('popup-btn')) {
+      var id = e.target.getAttribute('data-id');
+      var loc = locs.find(function(l) { return l.id === id; });
+      if (loc && window.ReactNativeWebView) {
+        window.ReactNativeWebView.postMessage(JSON.stringify({ type: 'select', location: loc }));
+      }
+    }
+  });
+
+  document.getElementById('infoBtn').addEventListener('click', function(e) {
+    e.stopPropagation();
+    var p = document.getElementById('attrPanel');
+    p.style.display = p.style.display === 'block' ? 'none' : 'block';
+  });
+  map.on('click', function() { document.getElementById('attrPanel').style.display = 'none'; });
+
+  var userMarker = null;
+  var userDotHtml =
+    '<div style="position:relative;width:20px;height:20px;">' +
+      '<div style="position:absolute;inset:0;border-radius:50%;background:rgba(66,133,244,0.28);animation:user-pulse 1.9s ease-out infinite;"></div>' +
+      '<div style="position:absolute;top:3px;left:3px;right:3px;bottom:3px;border-radius:50%;background:#4285F4;border:2.5px solid #fff;box-shadow:0 1px 6px rgba(0,0,0,0.38);"></div>' +
+    '</div>';
+  var userIcon = L.divIcon({ html: userDotHtml, className: '', iconSize: [20, 20], iconAnchor: [10, 10] });
+
+  function zoomToClosest(lat, lng) {
+    if (hasAutoZoomed) return;
+    if (activeLocs.length === 0) return;
+    var userLL = L.latLng(lat, lng);
+    var closest = null; var closestDist = Infinity;
+    activeLocs.forEach(function(loc) {
+      var dist = map.distance(userLL, L.latLng(loc.latitude, loc.longitude));
+      if (dist < closestDist) { closest = loc; closestDist = dist; }
+    });
+    if (!closest) return;
+    hasAutoZoomed = true;
+    map.flyTo([closest.latitude, closest.longitude], 16, { animate: true, duration: 1.0 });
+    setTimeout(function() { if (markerMap[closest.id]) markerMap[closest.id].openPopup(); }, 900);
+  }
+
+  function checkProximity(lat, lng) {
+    var userLL = L.latLng(lat, lng);
+    var closest = null; var closestDist = Infinity;
+    locs.forEach(function(loc) {
+      if (!loc.enabled || !loc.geo_radius_meters || loc.latitude == null) return;
+      var dist = map.distance(userLL, L.latLng(loc.latitude, loc.longitude));
+      if (dist <= loc.geo_radius_meters && dist < closestDist) { closest = loc; closestDist = dist; }
+    });
+    if (closest) {
+      if (openedForLocation !== closest.id && markerMap[closest.id]) {
+        openedForLocation = closest.id;
+        markerMap[closest.id].openPopup();
+      }
+    } else { openedForLocation = null; }
+  }
+
+  window.updateUserLocation = function(lat, lng) {
+    var ll = [lat, lng];
+    if (userMarker) { userMarker.setLatLng(ll); }
+    else { userMarker = L.marker(ll, { icon: userIcon, zIndexOffset: 2000 }).addTo(map); }
+    zoomToClosest(lat, lng);
+    checkProximity(lat, lng);
+  };
+
+  window.flyToUser = function(lat, lng) {
+    window.updateUserLocation(lat, lng);
+    map.flyTo([lat, lng], 16, { animate: true, duration: 0.8 });
+  };
+
+  var initLat = ${JSON.stringify(initLat)};
+  var initLng = ${JSON.stringify(initLng)};
+  if (initLat !== null) { window.updateUserLocation(initLat, initLng); }
+
+  document.getElementById('locateBtn').addEventListener('click', function() {
+    if (userMarker) { map.flyTo(userMarker.getLatLng(), 16, { animate: true, duration: 0.8 }); return; }
+    this.classList.add('searching');
+    if (window.ReactNativeWebView) {
+      window.ReactNativeWebView.postMessage(JSON.stringify({ type: 'locate_request' }));
+    }
+  });
+</script>
+</body>
+</html>`;
+  }, [locations, selectedLocationId, userLocation]);
+
+  const handleLocationMapMessage = (event) => {
+    try {
+      const data = JSON.parse(event.nativeEvent.data);
+      if (data.type === 'select' && data.location?.id) {
+        const loc = locations.find(l => l.id === data.location.id);
+        if (loc) handleSelectLocation(loc);
+      } else if (data.type === 'locate_request') {
+        handleLocateRequest();
+      }
+    } catch (e) {
+      console.warn('[Profile] Map message error:', e.message);
+    }
+  };
+
+  const handleLocateRequest = async () => {
+    try {
+      const { status } = await Location.requestForegroundPermissionsAsync();
+      if (status !== 'granted') return;
+      const loc = await Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.High });
+      const { latitude, longitude } = loc.coords;
+      setUserLocation(loc.coords);
+      mapWebViewRef.current?.injectJavaScript(
+        `document.getElementById('locateBtn').classList.remove('searching');
+         window.flyToUser(${latitude}, ${longitude}); true;`
+      );
+    } catch (e) {
+      console.warn('[Profile] Location error:', e.message);
+    }
+  };
+
+  const openLocationPicker = async () => {
+    setLocationPickerVisible(true);
+    try {
+      const { status } = await Location.getForegroundPermissionsAsync();
+      if (status !== 'granted') return;
+      const loc = await Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.Balanced });
+      setUserLocation(loc.coords);
+    } catch (e) {}
+  };
 
   const loadLocations = async () => {
     const { data, error } = await supabase.from('arc_locations').select('*').order('venue_name');
@@ -452,10 +779,22 @@ export default function OrdersProfileScreen() {
     }
   };
 
+  const handleMissedYouReorder = () => {
+    if (!missedYouOrder) return;
+    (missedYouOrder.items || []).forEach(item => {
+      dispatch({ type: 'ADD_ITEM', payload: item });
+    });
+    setMissedYouVisible(false);
+    navigation.navigate('Order', { screen: 'OrderSummary' });
+  };
+
   const handleQueryMoments = async ({ isRefresh = false } = {}) => {
-    const email = profile?.email;
-    if (!email) { setTraceStatus('No email available'); return; }
-    const url = `https://personalization-api.ap-southeast-2.prod.tealiumapis.com/personalization/accounts/success-robert-rizman/profiles/coffee-demo/engines/aaa7abe0-9023-49c8-8858-5fe2dbb18c39?attributeId=5549&attributeValue=${encodeURIComponent(email.trim().toLowerCase())}`;
+    if (!visitorId) {
+      setTraceStatus('Visitor ID not yet available — try again in a moment');
+      setTimeout(() => setTraceStatus(''), 3000);
+      return;
+    }
+    const url = `https://personalization-api.ap-southeast-2.prod.tealiumapis.com/personalization/accounts/success-robert-rizman/profiles/coffee-demo/engines/aaa7abe0-9023-49c8-8858-5fe2dbb18c39/visitors/${visitorId}`;
     setMomentsUrl(url);
     if (isRefresh) setMomentsRefreshing(true); else setMomentsLoading(true);
     try {
@@ -575,7 +914,9 @@ export default function OrdersProfileScreen() {
                 <Text style={styles.emptySubtitle}>Your orders will appear here once you place one</Text>
               </View>
             ) : (
-              mergedOrders.map((order) => (
+              mergedOrders.map((order) => {
+                const fulfilledAt = order.fulfilledAt ?? (order.fulfilled_at ? new Date(order.fulfilled_at).getTime() : null);
+                return (
                 <View key={order.id} style={[
                   styles.orderCard,
                   order.status === 'complete' && styles.orderCardDone,
@@ -586,7 +927,7 @@ export default function OrdersProfileScreen() {
                       <Text style={styles.orderId}>{order.id}</Text>
                       <Text style={styles.orderTime}>{timeAgo(order.placedAt || order.placed_at)}</Text>
                     </View>
-                    <StatusBadge status={order.status} fulfilledAt={order.fulfilledAt} />
+                    <StatusBadge status={order.status} fulfilledAt={fulfilledAt} />
                   </View>
                   <View style={styles.orderItems}>
                     {(order.items || []).map((item, i) => {
@@ -596,7 +937,10 @@ export default function OrdersProfileScreen() {
                       if (item.specialRequest) mods.push(`"${item.specialRequest}"`);
                       return (
                         <View key={i} style={styles.orderItem}>
-                          <View style={styles.itemBullet} />
+                          {DRINK_IMAGES[item.id]
+                            ? <Image source={DRINK_IMAGES[item.id]} style={styles.orderItemImage} resizeMode="contain" />
+                            : <View style={styles.itemBullet} />
+                          }
                           <View style={{ flex: 1 }}>
                             <Text style={styles.itemName}>{[item.size, item.name].filter(Boolean).join(' ')}</Text>
                             {mods.length > 0 && <Text style={styles.itemMods}>{mods.join(' · ')}</Text>}
@@ -605,12 +949,10 @@ export default function OrdersProfileScreen() {
                       );
                     })}
                   </View>
-                  {order.status === 'complete' && (
+                  {order.status === 'complete' && !(fulfilledAt && (Date.now() - fulfilledAt) > 30 * 60 * 1000) && (
                     <View style={styles.readyBanner}>
-                      {order.fulfilledAt && (Date.now() - order.fulfilledAt) > 30 * 60 * 1000
-                        ? <><CheckIcon size={14} color={colors.primary} /><Text style={styles.readyText}>Collected</Text></>
-                        : <><TakeawayCupIcon size={14} color={colors.primary} /><Text style={styles.readyText}>Ready for pickup!</Text></>
-                      }
+                      <TakeawayCupIcon size={14} color={colors.primary} />
+                      <Text style={styles.readyText}>Ready for pickup!</Text>
                     </View>
                   )}
                   {order.status === 'cancelled' && (
@@ -619,7 +961,7 @@ export default function OrdersProfileScreen() {
                     </View>
                   )}
                 </View>
-              ))
+              );})
             )}
             <View style={{ height: 40 }} />
           </ScrollView>
@@ -662,7 +1004,7 @@ export default function OrdersProfileScreen() {
                 <View style={styles.profileRow}>
                   <LocationPinIcon size={22} color={colors.textMid} />
                   <View style={styles.profileInfo}>
-                    <Text style={styles.profileLabel}>ARC LOCATION</Text>
+                    <Text style={styles.profileLabel}>LOCATION</Text>
                     {selectedLocationName ? (
                       <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
                         <Text style={[styles.profileValue, !currentLocationActive && { color: colors.textMuted }]}>
@@ -686,7 +1028,7 @@ export default function OrdersProfileScreen() {
                     </Text>
                     <TouchableOpacity
                       style={styles.locationUpdateBtn}
-                      onPress={() => setLocationPickerVisible(true)}
+                      onPress={openLocationPicker}
                     >
                       <Text style={styles.locationUpdateBtnText}>Update location →</Text>
                     </TouchableOpacity>
@@ -750,7 +1092,7 @@ export default function OrdersProfileScreen() {
                 <Text style={styles.fieldLabel}>ARC LOCATION</Text>
                 <TouchableOpacity
                   style={styles.inputRow}
-                  onPress={() => setLocationPickerVisible(true)}
+                  onPress={openLocationPicker}
                   activeOpacity={0.7}
                 >
                   <LocationPinIcon size={16} color={colors.textMuted} />
@@ -844,50 +1186,30 @@ export default function OrdersProfileScreen() {
       <Modal visible={locationPickerVisible} animationType="slide" presentationStyle="pageSheet">
         <SafeAreaView style={{ flex: 1, backgroundColor: colors.background }}>
           <View style={styles.modalHeader}>
-            <View style={styles.modalTitleRow}><LocationPinIcon size={20} color={colors.midnight} /><Text style={styles.modalTitle}>Select Arc Location</Text></View>
+            <View style={styles.modalTitleRow}>
+              <LocationPinIcon size={20} color={colors.midnight} />
+              <Text style={styles.modalTitle}>Select Location</Text>
+            </View>
             <TouchableOpacity onPress={() => setLocationPickerVisible(false)} style={styles.modalCloseBtn}>
               <Text style={styles.modalCloseBtnText}>✕</Text>
             </TouchableOpacity>
           </View>
-          <ScrollView contentContainerStyle={{ padding: spacing.lg, gap: spacing.sm }}>
-            {locations.map(loc => {
-              const active = isLocationActive(loc);
-              const isSelected = selectedLocationId === loc.id;
-              return (
-                <TouchableOpacity
-                  key={loc.id}
-                  style={[
-                    styles.locationItem,
-                    isSelected && styles.locationItemSelected,
-                    !active && styles.locationItemDisabled,
-                  ]}
-                  onPress={() => { if (!active) return; handleSelectLocation(loc); }}
-                  activeOpacity={active ? 0.7 : 1}
-                >
-                  <View style={{ flex: 1 }}>
-                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
-                      <Text style={[styles.locationItemName, !active && { color: colors.textMuted }]}>
-                        {loc.venue_name}
-                      </Text>
-                      <View style={active ? styles.locationBadgeActive : styles.locationBadgeInactive}>
-                        <Text style={active ? styles.locationBadgeActiveText : styles.locationBadgeInactiveText}>
-                          {active ? 'Active' : 'Unavailable'}
-                        </Text>
-                      </View>
-                    </View>
-                    <Text style={styles.locationItemAddress}>{loc.address}, {loc.state}</Text>
-                    {loc.start_date && (
-                      <Text style={styles.locationItemDates}>
-                        {new Date(loc.start_date).toLocaleDateString('en-AU', { day: 'numeric', month: 'short', year: 'numeric' })}
-                        {loc.end_date ? ` – ${new Date(loc.end_date).toLocaleDateString('en-AU', { day: 'numeric', month: 'short', year: 'numeric' })}` : ''}
-                      </Text>
-                    )}
-                  </View>
-                  {isSelected && <Text style={{ fontSize: 17, color: colors.primary, fontFamily: fonts.bold }}>✓</Text>}
-                </TouchableOpacity>
-              );
-            })}
-          </ScrollView>
+          <WebView
+            ref={mapWebViewRef}
+            source={{ html: locationMapHtml }}
+            style={{ flex: 1 }}
+            onMessage={handleLocationMapMessage}
+            javaScriptEnabled
+            domStorageEnabled
+            originWhitelist={['*']}
+            mixedContentMode="always"
+            allowFileAccess
+          />
+          <View style={{ paddingVertical: spacing.sm, paddingHorizontal: spacing.lg, borderTopWidth: 1, borderTopColor: colors.borderLight, backgroundColor: colors.surface, alignItems: 'center' }}>
+            <Text style={{ fontSize: 11, color: colors.textMuted, fontFamily: fonts.regular, textAlign: 'center' }}>
+              Tap a pin to see venue details · Active locations shown in navy
+            </Text>
+          </View>
         </SafeAreaView>
       </Modal>
 
@@ -955,6 +1277,29 @@ export default function OrdersProfileScreen() {
             ) : null}
           </View>
 
+          {/* We Missed You test trigger */}
+          <View style={styles.debugCard}>
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+              <TakeawayCupIcon size={18} color={colors.midnight} />
+              <Text style={styles.debugCardTitle}>We Missed You</Text>
+            </View>
+            <Text style={styles.debugCardDesc}>
+              Preview the re-engagement modal using the most recent order.
+            </Text>
+            <TouchableOpacity
+              style={[styles.debugBtn, styles.debugBtnPrimary, !mergedOrders.length && styles.debugBtnDisabled]}
+              disabled={!mergedOrders.length}
+              onPress={() => {
+                missedYouChecked.current = false;
+                setMissedYouOrder(mergedOrders[0]);
+                setMissedYouVisible(true);
+              }}
+              activeOpacity={0.8}
+            >
+              <Text style={styles.debugBtnText}>Show modal</Text>
+            </TouchableOpacity>
+          </View>
+
           {/* Moments API Section */}
           {momentsUnlocked && (
             <View style={styles.debugCard}>
@@ -964,21 +1309,25 @@ export default function OrdersProfileScreen() {
               </View>
               <Text style={styles.debugCardDesc}>Query the Moments API engine for this visitor's current profile data.</Text>
 
-              <Text style={styles.debugLabel}>CUSTOMER UUID (TEALIUM)</Text>
-              <Text style={styles.debugMono}>{(tealiumUuid || state.deviceId || '—').toLowerCase()}</Text>
-
-              <Text style={styles.debugLabel}>EMAIL (ATTRIBUTE VALUE)</Text>
+              <Text style={styles.debugLabel}>CUSTOMER EMAIL</Text>
               <Text style={styles.debugMono}>{profile?.email || '—'}</Text>
+
+              <Text style={styles.debugLabel}>TEALIUM VISITOR ID</Text>
+              <Text style={[styles.debugMono, !visitorId && { color: colors.textMuted, fontStyle: 'italic' }]}>
+                {visitorId || 'Resolving from PRISM…'}
+              </Text>
 
               <Text style={styles.debugLabel}>ENDPOINT</Text>
               <Text style={styles.debugMono} numberOfLines={3}>
-                {`https://personalization-api.ap-southeast-2.prod.tealiumapis.com/personalization/accounts/success-robert-rizman/profiles/coffee-demo/engines/aaa7abe0-9023-49c8-8858-5fe2dbb18c39?attributeId=5549&attributeValue=${encodeURIComponent((profile?.email || '').trim().toLowerCase())}`}
+                {visitorId
+                  ? `https://personalization-api.ap-southeast-2.prod.tealiumapis.com/personalization/accounts/success-robert-rizman/profiles/coffee-demo/engines/aaa7abe0-9023-49c8-8858-5fe2dbb18c39/visitors/${visitorId}`
+                  : 'Visitor ID required'}
               </Text>
 
               <TouchableOpacity
-                style={[styles.debugBtn, styles.debugBtnPrimary, momentsLoading && styles.debugBtnDisabled]}
+                style={[styles.debugBtn, styles.debugBtnPrimary, (momentsLoading || !visitorId) && styles.debugBtnDisabled]}
                 onPress={handleQueryMoments}
-                disabled={momentsLoading}
+                disabled={momentsLoading || !visitorId}
                 activeOpacity={0.8}
               >
                 {momentsLoading
@@ -999,6 +1348,65 @@ export default function OrdersProfileScreen() {
           <View style={{ height: 40 }} />
         </ScrollView>
       )}
+
+      {/* ── We Missed You Modal ── */}
+      <Modal visible={missedYouVisible} transparent animationType="fade">
+        <View style={styles.missedYouOverlay}>
+          <View style={styles.missedYouSheet}>
+            {/* Header */}
+            <View style={styles.missedYouHeader}>
+              <TakeawayCupIcon size={32} color={colors.primary} />
+              <Text style={styles.missedYouTitle}>We missed you!</Text>
+              <Text style={styles.missedYouSubtitle}>
+                Ready to re-order your last visit?
+              </Text>
+            </View>
+
+            {/* Last order items */}
+            {(missedYouOrder?.items || []).map((item, i) => {
+              const mods = [];
+              if (item.milk && item.milk !== 'No Milk') mods.push(item.milk);
+              if (item.extras?.length) mods.push(item.extras.join(', '));
+              return (
+                <View key={i} style={styles.missedYouItem}>
+                  {DRINK_IMAGES[item.id] ? (
+                    <Image
+                      source={DRINK_IMAGES[item.id]}
+                      style={styles.missedYouItemImage}
+                      resizeMode="contain"
+                    />
+                  ) : (
+                    <View style={styles.missedYouItemImagePlaceholder} />
+                  )}
+                  <View style={{ flex: 1 }}>
+                    <Text style={styles.missedYouItemName}>
+                      {[item.size, item.name].filter(Boolean).join(' ')}
+                    </Text>
+                    {mods.length > 0 && (
+                      <Text style={styles.missedYouItemMods}>{mods.join(' · ')}</Text>
+                    )}
+                  </View>
+                </View>
+              );
+            })}
+
+            {/* Actions */}
+            <TouchableOpacity
+              style={styles.missedYouReorderBtn}
+              onPress={handleMissedYouReorder}
+              activeOpacity={0.85}
+            >
+              <Text style={styles.missedYouReorderBtnText}>Re-order now</Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={styles.missedYouDismissBtn}
+              onPress={() => setMissedYouVisible(false)}
+            >
+              <Text style={styles.missedYouDismissText}>Maybe later</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
 
     </SafeAreaView>
   );
@@ -1073,7 +1481,8 @@ const styles = StyleSheet.create({
     borderTopWidth: 1, borderTopColor: colors.borderLight,
     paddingTop: spacing.sm, gap: 8,
   },
-  orderItem: { flexDirection: 'row', alignItems: 'flex-start', gap: spacing.sm },
+  orderItem: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
+  orderItemImage: { width: 38, height: 38, borderRadius: 19 },
   itemBullet: { width: 7, height: 7, borderRadius: 4, backgroundColor: colors.primary, marginTop: 6, flexShrink: 0 },
   itemName: { fontSize: 14, fontFamily: fonts.semibold, color: colors.textDark },
   itemMods: { ...typography.caption, marginTop: 2 },
@@ -1279,4 +1688,52 @@ const styles = StyleSheet.create({
     padding: spacing.sm, lineHeight: 16,
   },
   debugResponseWrap: { marginTop: spacing.sm, gap: spacing.xs },
+
+  // ── We Missed You Modal ──
+  missedYouOverlay: {
+    flex: 1, backgroundColor: 'rgba(0,0,0,0.55)',
+    justifyContent: 'flex-end',
+  },
+  missedYouSheet: {
+    backgroundColor: colors.background,
+    borderTopLeftRadius: 24, borderTopRightRadius: 24,
+    paddingTop: spacing.lg, paddingHorizontal: spacing.lg,
+    paddingBottom: 40, gap: spacing.md,
+  },
+  missedYouHeader: { alignItems: 'center', gap: spacing.sm, paddingBottom: spacing.sm },
+  missedYouTitle: {
+    fontSize: 26, fontFamily: fonts.extrabold, color: colors.midnight, textAlign: 'center',
+  },
+  missedYouSubtitle: {
+    fontSize: 14, color: colors.textMid, textAlign: 'center', lineHeight: 20,
+  },
+  missedYouItem: {
+    flexDirection: 'row', alignItems: 'center', gap: spacing.md,
+    backgroundColor: colors.surface, borderRadius: radius.lg,
+    padding: spacing.md, borderWidth: 1, borderColor: colors.borderLight,
+  },
+  missedYouItemImage: {
+    width: 72, height: 72, borderRadius: 14,
+  },
+  missedYouItemImagePlaceholder: {
+    width: 72, height: 72, borderRadius: 14,
+    backgroundColor: colors.primaryLight,
+  },
+  missedYouItemName: {
+    fontSize: 16, fontFamily: fonts.bold, color: colors.textDark,
+  },
+  missedYouItemMods: {
+    fontSize: 12, color: colors.textMuted, marginTop: 3,
+  },
+  missedYouReorderBtn: {
+    backgroundColor: colors.primary, borderRadius: radius.lg,
+    paddingVertical: 14, alignItems: 'center', marginTop: spacing.sm,
+  },
+  missedYouReorderBtnText: {
+    color: '#fff', fontSize: 16, fontFamily: fonts.bold, letterSpacing: 0.3,
+  },
+  missedYouDismissBtn: { alignItems: 'center', paddingVertical: spacing.sm },
+  missedYouDismissText: {
+    fontSize: 13, color: colors.textMuted, fontFamily: fonts.medium,
+  },
 });

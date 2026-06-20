@@ -425,7 +425,7 @@ export function AppProvider({ children }) {
       });
 
     // Load orders
-    supabase.from('orders').select('*').order('placed_at', { ascending: false })
+    supabase.from('orders').select('*').order('placed_at', { ascending: false }).limit(1000)
       .then(({ data, error }) => {
         if (error) { console.warn('[Supabase] Fetch orders error:', error.message); return; }
         dispatch({ type: 'LOAD_ORDERS', payload: (data || []).map(rowToOrder) });
