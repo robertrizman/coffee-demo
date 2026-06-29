@@ -228,10 +228,6 @@ export default function OrdersProfileScreen() {
   const [missedYouVisible, setMissedYouVisible] = useState(false);
   const [missedYouOrder, setMissedYouOrder] = useState(null);
   const missedYouChecked = useRef(false);
-  const [callAttrVisible, setCallAttrVisible] = useState(false);
-  const [callAttrItems, setCallAttrItems] = useState([]);
-  const callAttrRaw = useRef('');
-  const callAttrChecked = useRef(false);
   const [editDietary, setEditDietary] = useState(profile?.dietary_requirements || '');
   const [personalityData, setPersonalityData] = useState(null);
   const [personalityLoading, setPersonalityLoading] = useState(false);
@@ -372,28 +368,6 @@ export default function OrdersProfileScreen() {
       }
     }).catch(() => {});
   }, [mergedOrders]));
-
-  // Call Attribute Received — runs once on app open when email is known
-  useEffect(() => {
-    if (!profile?.email || callAttrChecked.current) return;
-    callAttrChecked.current = true;
-    const email = profile.email.trim().toLowerCase();
-    const url = `${MOMENTS_BASE}?attributeId=5549&attributeValue=${encodeURIComponent(email)}`;
-    fetch(url, { headers: { 'Content-Type': 'application/json' } })
-      .then(r => r.json())
-      .then(data => {
-        const callAttr = data?.properties?.['Web Pillar - Input Data - Aggregate'];
-        if (!callAttr || !callAttr.includes(',')) return;
-        SecureStore.getItemAsync('call_attr_dismissed').then(dismissed => {
-          if (dismissed !== callAttr) {
-            callAttrRaw.current = callAttr;
-            setCallAttrItems(callAttr.split(',').map(s => s.trim()).filter(Boolean));
-            setCallAttrVisible(true);
-          }
-        }).catch(() => {});
-      })
-      .catch(() => {});
-  }, [profile?.email]);
 
   useEffect(() => {
     if (activeTab !== 'profile' || momentsData) return;
@@ -1369,42 +1343,6 @@ export default function OrdersProfileScreen() {
         </ScrollView>
       )}
 
-      {/* ── Call Attribute Received Modal ── */}
-      <Modal visible={callAttrVisible} transparent animationType="fade">
-        <View style={styles.callAttrOverlay}>
-          <View style={styles.callAttrSheet}>
-            <View style={styles.callAttrHeader}>
-              <Text style={styles.callAttrTitle}>Call Attribute Received</Text>
-              <Text style={styles.callAttrSubtitle}>
-                The following data was received from your Tealium profile:
-              </Text>
-            </View>
-            {callAttrItems.map((item, i) => (
-              <View key={i} style={styles.callAttrItem}>
-                <View style={styles.callAttrBullet} />
-                <Text style={styles.callAttrItemText}>{item}</Text>
-              </View>
-            ))}
-            <TouchableOpacity
-              style={styles.callAttrDismissBtn}
-              onPress={() => {
-                SecureStore.setItemAsync('call_attr_dismissed', callAttrRaw.current).catch(() => {});
-                setCallAttrVisible(false);
-              }}
-              activeOpacity={0.85}
-            >
-              <Text style={styles.callAttrDismissBtnText}>Dismiss Forever</Text>
-            </TouchableOpacity>
-            <TouchableOpacity
-              style={styles.callAttrCloseBtn}
-              onPress={() => setCallAttrVisible(false)}
-            >
-              <Text style={styles.callAttrCloseText}>Close</Text>
-            </TouchableOpacity>
-          </View>
-        </View>
-      </Modal>
-
       {/* ── We Missed You Modal ── */}
       <Modal visible={missedYouVisible} transparent animationType="fade">
         <View style={styles.missedYouOverlay}>
@@ -1793,39 +1731,4 @@ const styles = StyleSheet.create({
     fontSize: 13, color: colors.textMuted, fontFamily: fonts.medium,
   },
 
-  // ── Call Attribute Received Modal ──
-  callAttrOverlay: {
-    flex: 1, backgroundColor: 'rgba(0,0,0,0.55)', justifyContent: 'flex-end',
-  },
-  callAttrSheet: {
-    backgroundColor: colors.background,
-    borderTopLeftRadius: 24, borderTopRightRadius: 24,
-    paddingTop: spacing.lg, paddingHorizontal: spacing.lg,
-    paddingBottom: 40, gap: spacing.md,
-  },
-  callAttrHeader: { alignItems: 'center', gap: spacing.sm, paddingBottom: spacing.sm },
-  callAttrTitle: {
-    fontSize: 22, fontFamily: fonts.extrabold, color: colors.midnight, textAlign: 'center',
-  },
-  callAttrSubtitle: {
-    fontSize: 13, color: colors.textMid, textAlign: 'center', lineHeight: 20,
-  },
-  callAttrItem: {
-    flexDirection: 'row', alignItems: 'center', gap: spacing.sm,
-    backgroundColor: colors.surface, borderRadius: radius.lg,
-    padding: spacing.md, borderWidth: 1, borderColor: colors.borderLight,
-  },
-  callAttrBullet: {
-    width: 8, height: 8, borderRadius: 4, backgroundColor: colors.primary, flexShrink: 0,
-  },
-  callAttrItemText: { fontSize: 14, fontFamily: fonts.medium, color: colors.textDark, flex: 1 },
-  callAttrDismissBtn: {
-    backgroundColor: colors.primary, borderRadius: radius.lg,
-    paddingVertical: 14, alignItems: 'center', marginTop: spacing.sm,
-  },
-  callAttrDismissBtnText: {
-    color: '#fff', fontSize: 15, fontFamily: fonts.bold, letterSpacing: 0.3,
-  },
-  callAttrCloseBtn: { alignItems: 'center', paddingVertical: spacing.sm },
-  callAttrCloseText: { fontSize: 13, color: colors.textMuted, fontFamily: fonts.medium },
 });
