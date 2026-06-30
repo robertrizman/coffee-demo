@@ -192,25 +192,27 @@ export default function MenuScreen() {
   const [callAttrVisible, setCallAttrVisible] = useState(false);
   const [callAttrItems, setCallAttrItems] = useState([]);
   const callAttrRaw = useRef('');
-  const callAttrChecked = useRef(false);
 
   const MOMENTS_BASE = 'https://personalization-api.ap-southeast-2.prod.tealiumapis.com/personalization/accounts/success-robert-rizman/profiles/coffee-demo/engines/aaa7abe0-9023-49c8-8858-5fe2dbb18c39';
 
-  // Call Attribute Received — runs once on menu open when email is known
+  // Check for call attribute data each time the email becomes known.
+  // SecureStore dismissed key is the idempotency guard — no ref needed.
   useEffect(() => {
     const email = state.profile?.email;
-    if (!email || isAdmin || callAttrChecked.current) return;
-    callAttrChecked.current = true;
+    if (!email || isAdmin) return;
     const url = `${MOMENTS_BASE}?attributeId=5549&attributeValue=${encodeURIComponent(email.trim().toLowerCase())}`;
     fetch(url, { headers: { 'Content-Type': 'application/json' } })
       .then(r => r.json())
       .then(data => {
         const callAttr = data?.properties?.['Web Pillar - Input Data - Aggregate'];
-        if (!callAttr || !callAttr.includes(',')) return;
+        if (!callAttr) return;
         SecureStore.getItemAsync('call_attr_dismissed').then(dismissed => {
           if (dismissed !== callAttr) {
             callAttrRaw.current = callAttr;
-            setCallAttrItems(callAttr.split(',').map(s => s.trim()).filter(Boolean));
+            const items = callAttr.includes(',')
+              ? callAttr.split(',').map(s => s.trim()).filter(Boolean)
+              : [callAttr.trim()];
+            setCallAttrItems(items);
             setCallAttrVisible(true);
           }
         }).catch(() => {});
