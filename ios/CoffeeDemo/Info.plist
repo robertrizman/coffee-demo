@@ -19,7 +19,7 @@
 	<key>CFBundlePackageType</key>
 	<string>$(PRODUCT_BUNDLE_PACKAGE_TYPE)</string>
 	<key>CFBundleShortVersionString</key>
-	<string>1.1.1</string>
+	<string>1.1.2</string>
 	<key>CFBundleSignature</key>
 	<string>????</string>
 	<key>CFBundleURLTypes</key>
@@ -33,7 +33,7 @@
 		</dict>
 	</array>
 	<key>CFBundleVersion</key>
-	<string>7</string>
+	<string>8</string>
 	<key>ITSAppUsesNonExemptEncryption</key>
 	<false/>
 	<key>LSMinimumSystemVersion</key>
@@ -49,6 +49,8 @@
 	</dict>
 	<key>NSCameraUsageDescription</key>
 	<string>Allow Architect Arc Cafe to access your camera to scan order QR codes.</string>
+	<key>NSPhotoLibraryUsageDescription</key>
+	<string>Allow Architect Arc Cafe to access your photo library.</string>
 	<key>NSLocationWhenInUseUsageDescription</key>
 	<string>We need your location to confirm you are at the venue to place an order.</string>
 	<key>NSLocationAlwaysAndWhenInUseUsageDescription</key>
