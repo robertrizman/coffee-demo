@@ -197,27 +197,31 @@ export default function MenuScreen() {
 
   // Check for call attribute data each time the email becomes known.
   // SecureStore dismissed key is the idempotency guard — no ref needed.
+  // 5s delay gives Tealium time to enrich the profile after email is submitted.
   useEffect(() => {
     const email = state.profile?.email;
     if (!email || isAdmin) return;
-    const url = `${MOMENTS_BASE}?attributeId=5549&attributeValue=${encodeURIComponent(email.trim().toLowerCase())}`;
-    fetch(url, { headers: { 'Content-Type': 'application/json' } })
-      .then(r => r.json())
-      .then(data => {
-        const callAttr = data?.properties?.['Web Pillar - Input Data - Aggregate'];
-        if (!callAttr) return;
-        SecureStore.getItemAsync('call_attr_dismissed').then(dismissed => {
-          if (dismissed !== callAttr) {
-            callAttrRaw.current = callAttr;
-            const items = callAttr.includes(',')
-              ? callAttr.split(',').map(s => s.trim()).filter(Boolean)
-              : [callAttr.trim()];
-            setCallAttrItems(items);
-            setCallAttrVisible(true);
-          }
-        }).catch(() => {});
-      })
-      .catch(() => {});
+    const timer = setTimeout(() => {
+      const url = `${MOMENTS_BASE}?attributeId=5549&attributeValue=${encodeURIComponent(email.trim().toLowerCase())}`;
+      fetch(url, { headers: { 'Content-Type': 'application/json' } })
+        .then(r => r.json())
+        .then(data => {
+          const callAttr = data?.properties?.['Web Pillar - Input Data - Aggregate'];
+          if (!callAttr) return;
+          SecureStore.getItemAsync('call_attr_dismissed').then(dismissed => {
+            if (dismissed !== callAttr) {
+              callAttrRaw.current = callAttr;
+              const items = callAttr.includes(',')
+                ? callAttr.split(',').map(s => s.trim()).filter(Boolean)
+                : [callAttr.trim()];
+              setCallAttrItems(items);
+              setCallAttrVisible(true);
+            }
+          }).catch(() => {});
+        })
+        .catch(() => {});
+    }, 5000);
+    return () => clearTimeout(timer);
   }, [state.profile?.email, isAdmin]);
 
   // Fetch last drink order from Moments API when profile email is available
