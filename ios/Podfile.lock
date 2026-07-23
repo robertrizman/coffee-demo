@@ -2194,11 +2194,14 @@ PODS:
     - libwebp (~> 1.0)
     - SDWebImage/Core (~> 5.17)
   - Sentry/HybridSDK (8.56.1)
-  - tealium-swift/Collect (2.18.3):
-    - tealium-swift/Core
-  - tealium-swift/Core (2.18.3)
-  - tealium-swift/Lifecycle (2.18.3):
-    - tealium-swift/Core
+  - SQLite.swift (0.15.5):
+    - SQLite.swift/standard (= 0.15.5)
+  - SQLite.swift/standard (0.15.5)
+  - tealium-prism/Core (0.5.0):
+    - SQLite.swift (~> 0.15.0)
+  - tealium-prism/Lifecycle (0.5.0):
+    - SQLite.swift (~> 0.15.0)
+    - tealium-prism/Core
   - Yoga (0.0.0)
   - ZXingObjC/Core (3.6.9)
   - ZXingObjC/OneD (3.6.9):
@@ -2313,9 +2316,8 @@ DEPENDENCIES:
   - "RNSentry (from `../node_modules/@sentry/react-native`)"
   - RNSVG (from `../node_modules/react-native-svg`)
   - RNWorklets (from `../node_modules/react-native-worklets`)
-  - tealium-swift/Collect (~> 2.18)
-  - tealium-swift/Core (~> 2.18)
-  - tealium-swift/Lifecycle (~> 2.18)
+  - tealium-prism/Core (~> 0.5)
+  - tealium-prism/Lifecycle (~> 0.5)
   - Yoga (from `../node_modules/react-native/ReactCommon/yoga`)
 
 SPEC REPOS:
@@ -2329,7 +2331,8 @@ SPEC REPOS:
     - SDWebImageSVGCoder
     - SDWebImageWebPCoder
     - Sentry
-    - tealium-swift
+    - SQLite.swift
+    - tealium-prism
     - ZXingObjC
 
 EXTERNAL SOURCES:
@@ -2659,10 +2662,11 @@ SPEC CHECKSUMS:
   SDWebImageSVGCoder: 15a300a97ec1c8ac958f009c02220ac0402e936c
   SDWebImageWebPCoder: e38c0a70396191361d60c092933e22c20d5b1380
   Sentry: b3ec44d01708fce73f99b544beb57e890eca4406
-  tealium-swift: c9137d28fe7f92f89622e66403ec75a9c0892def
+  SQLite.swift: c38c92f61436f1a4053029550edb1ef7caa2a2cd
+  tealium-prism: 26b047d4350524eb9776ce54d577e9e2a3872fd7
   Yoga: 5934998fbeaef7845dbf698f698518695ab4cd1a
   ZXingObjC: 8898711ab495761b2dbbdec76d90164a6d7e14c5
 
-PODFILE CHECKSUM: d8712ccbd80768647df08e351513d447ae76ce8a
+PODFILE CHECKSUM: 8a8c379b717ad8cbaaf0eb84d208fcb1e3858d36
 
 COCOAPODS: 1.16.2

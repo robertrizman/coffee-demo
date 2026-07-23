@@ -27,9 +27,8 @@ target 'CoffeeDemo' do
   pod 'BRLMPrinterKit'
 
   # Tealium PRISM SDK
-  pod 'tealium-swift/Core', '~> 2.18'
-  pod 'tealium-swift/Lifecycle', '~> 2.18'
-  pod 'tealium-swift/Collect', '~> 2.18'
+  pod 'tealium-prism/Core', '~> 0.5'
+  pod 'tealium-prism/Lifecycle', '~> 0.5'
 
   if ENV['EXPO_USE_COMMUNITY_AUTOLINKING'] == '1'
     config_command = ['node', '-e', "process.argv=['', '', 'config'];require('@react-native-community/cli').run()"];

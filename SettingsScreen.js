@@ -10,6 +10,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { useNavigation } from '@react-navigation/native';
 import * as Print from 'expo-print';
 import { trackSettingsOpen, trackPrinterTest, getTealiumConfig, reinitTealium } from './tealium';
+import * as SecureStore from 'expo-secure-store';
 import { setOpenAIKey } from './foodPairingAI';
 import { buildLabelsHtml, buildQrDebugHtml } from './printing';
 import { useAuth } from './AuthContext';
@@ -1442,6 +1443,27 @@ export default function SettingsScreen() {
                   </Text>
                 </View>
               )}
+
+              {!tealiumEditMode && isOwner && (
+                <View style={styles.tealiumDemoRow}>
+                  <View style={{ flex: 1 }}>
+                    <Text style={styles.tealiumDemoLabel}>We Missed You</Text>
+                    <Text style={styles.tealiumDemoDesc}>
+                      Preview the Moments API re-engagement modal on the My Account tab.
+                    </Text>
+                  </View>
+                  <TouchableOpacity
+                    style={styles.tealiumDemoBtn}
+                    onPress={async () => {
+                      await SecureStore.setItemAsync('demo_trigger_missed_you', '1');
+                      Alert.alert('Demo set', 'Switch to the My Account tab to see the "We Missed You" modal.');
+                    }}
+                    activeOpacity={0.8}
+                  >
+                    <Text style={styles.tealiumDemoBtnText}>Show modal</Text>
+                  </TouchableOpacity>
+                </View>
+              )}
             </View>
           </View>
         )}
@@ -1961,6 +1983,18 @@ const styles = StyleSheet.create({
     backgroundColor: colors.primary, alignItems: 'center',
   },
   tealiumSaveBtnText: { fontSize: 14, fontFamily: fonts.bold, color: '#fff' },
+  tealiumDemoRow: {
+    flexDirection: 'row', alignItems: 'center', gap: spacing.md,
+    marginTop: spacing.md, paddingTop: spacing.md,
+    borderTopWidth: 1, borderTopColor: colors.borderLight,
+  },
+  tealiumDemoLabel: { fontSize: 13, fontFamily: fonts.semibold, color: colors.textDark, marginBottom: 2 },
+  tealiumDemoDesc: { fontSize: 11, color: colors.textMuted, lineHeight: 15 },
+  tealiumDemoBtn: {
+    paddingHorizontal: spacing.md, paddingVertical: 8,
+    borderRadius: radius.lg, backgroundColor: colors.primary,
+  },
+  tealiumDemoBtnText: { fontSize: 13, fontFamily: fonts.bold, color: '#fff' },
   broadcastBtn: {
     backgroundColor: colors.midnight, borderRadius: radius.xl,
     padding: spacing.lg, alignItems: 'center', gap: 4,

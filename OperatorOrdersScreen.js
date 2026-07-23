@@ -190,7 +190,7 @@ export default function OperatorOrdersScreen() {
         .from('orders')
         .select('*')
         .order('placed_at', { ascending: false })
-        .limit(50);
+        .limit(1000);
       if (data) dispatch({ type: 'LOAD_ORDERS', payload: data.map((row) => ({
         id: row.id,
         name: row.name,

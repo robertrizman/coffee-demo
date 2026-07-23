@@ -45,6 +45,7 @@ export function getTealiumConfig() {
 // ── PRISM native module (only available in dev build) ─────
 const PrismModule = NativeModules.TealiumPrismModule || null;
 let prismReady = false;
+let _pendingProfile = null;
 
 async function _initPrism(account, profile, env, datasource) {
   if (!PrismModule) return;
@@ -52,6 +53,10 @@ async function _initPrism(account, profile, env, datasource) {
     await PrismModule.initialize(account, profile, env, datasource);
     prismReady = true;
     console.log(`[Tealium] PRISM initialized — ${account}/${profile}/${env}`);
+    // setUserDataLayer may have been called before init finished (e.g. profile
+    // restored from SecureStore racing PrismModule.initialize on app launch) —
+    // flush whatever was queued so it isn't silently dropped.
+    if (_pendingProfile) setUserDataLayer(_pendingProfile);
   } catch (err) {
     console.warn('[Tealium] PRISM init error:', err.message);
   }
@@ -173,7 +178,10 @@ export async function setUserDataLayer(profile) {
     customer_email: profile.email || '',
   };
   if (prismReady && PrismModule) {
+    _pendingProfile = null;
     try { await PrismModule.setDataLayer(data); } catch {}
+  } else {
+    _pendingProfile = profile;
   }
 }
 

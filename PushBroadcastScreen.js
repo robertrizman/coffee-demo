@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import {
   View, Text, TextInput, TouchableOpacity, StyleSheet,
   ScrollView, Alert, Switch, ActivityIndicator, Platform,
@@ -20,6 +20,7 @@ export default function PushBroadcastScreen({ onBack }) {
   const [locations, setLocations] = useState([]);
   const [selectedLocationId, setSelectedLocationId] = useState(null);
   const [locationPickerVisible, setLocationPickerVisible] = useState(false);
+  const scrollRef = useRef(null);
 
   useEffect(() => {
     loadBroadcasts();
@@ -136,6 +137,15 @@ export default function PushBroadcastScreen({ onBack }) {
     ]);
   };
 
+  const handleResend = (b) => {
+    setTitle(b.title);
+    setMessage(b.message);
+    setIsScheduled(false);
+    setScheduleDate('');
+    setScheduleTime('');
+    scrollRef.current?.scrollTo({ y: 0, animated: true });
+  };
+
   const statusColor = (status) => {
     if (status === 'sent') return '#22c55e';
     if (status === 'scheduled') return colors.primary;
@@ -145,11 +155,22 @@ export default function PushBroadcastScreen({ onBack }) {
 
   return (
     <>
-    <ScrollView style={styles.container} contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
+    <ScrollView ref={scrollRef} style={styles.container} contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
 
       {/* Compose */}
       <View style={styles.card}>
-        <Text style={styles.cardTitle}>📣 New Broadcast</Text>
+        <View style={styles.cardTitleRow}>
+          <Text style={styles.cardTitle}>📣 New Broadcast</Text>
+          {(title || message) && (
+            <TouchableOpacity
+              onPress={() => { setTitle(''); setMessage(''); setIsScheduled(false); setScheduleDate(''); setScheduleTime(''); }}
+              style={styles.clearBtn}
+              activeOpacity={0.7}
+            >
+              <Text style={styles.clearBtnText}>Clear</Text>
+            </TouchableOpacity>
+          )}
+        </View>
 
         <Text style={styles.fieldLabel}>TITLE</Text>
         <TextInput
@@ -294,11 +315,16 @@ export default function PushBroadcastScreen({ onBack }) {
                       : `Created: ${new Date(b.created_at).toLocaleString()}`}
                   </Text>
                 </View>
-                {b.status === 'scheduled' && (
-                  <TouchableOpacity onPress={() => handleCancel(b.id)} style={styles.cancelBtn}>
-                    <Text style={styles.cancelBtnText}>✕</Text>
+                <View style={styles.historyActions}>
+                  <TouchableOpacity onPress={() => handleResend(b)} style={styles.resendBtn}>
+                    <Text style={styles.resendBtnText}>↑ Use</Text>
                   </TouchableOpacity>
-                )}
+                  {b.status === 'scheduled' && (
+                    <TouchableOpacity onPress={() => handleCancel(b.id)} style={styles.cancelBtn}>
+                      <Text style={styles.cancelBtnText}>✕</Text>
+                    </TouchableOpacity>
+                  )}
+                </View>
               </View>
             ))}
           </ScrollView>
@@ -367,7 +393,13 @@ const styles = StyleSheet.create({
     padding: spacing.lg, gap: spacing.sm,
     borderWidth: 1, borderColor: colors.borderLight,
   },
-  cardTitle: { ...typography.heading3, marginBottom: 4 },
+  cardTitleRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 4 },
+  cardTitle: { ...typography.heading3 },
+  clearBtn: {
+    paddingHorizontal: 12, paddingVertical: 5,
+    borderRadius: radius.full, borderWidth: 1, borderColor: colors.border,
+  },
+  clearBtnText: { fontSize: 12, fontFamily: fonts.semibold, color: colors.textMuted },
   fieldLabel: { ...typography.label, marginTop: spacing.sm },
   input: {
     borderWidth: 1.5, borderColor: colors.border, borderRadius: radius.md,
@@ -405,6 +437,13 @@ const styles = StyleSheet.create({
   historyTime: { fontSize: 10, color: colors.textMuted },
   statusBadge: { borderRadius: radius.full, paddingHorizontal: 8, paddingVertical: 2 },
   statusText: { fontSize: 10, fontFamily: fonts.bold },
+  historyActions: { flexDirection: 'column', alignItems: 'center', gap: 6 },
+  resendBtn: {
+    paddingHorizontal: 10, paddingVertical: 5,
+    borderRadius: radius.full, backgroundColor: colors.primaryLight,
+    borderWidth: 1, borderColor: colors.primary,
+  },
+  resendBtnText: { fontSize: 11, fontFamily: fonts.bold, color: colors.primary },
   cancelBtn: {
     width: 28, height: 28, borderRadius: 14,
     backgroundColor: '#fee2e2', alignItems: 'center', justifyContent: 'center',

@@ -11,7 +11,7 @@ import { EditIcon } from './CoffeeIcons';
 
 export default function StoreHoursManager() {
   const { state, dispatch } = useApp();
-  const { storeOpen, closedTitle, closedMessage, storeBreaks, offersEnabled } = state;
+  const { storeOpen, closedTitle, closedMessage, storeBreaks, offersEnabled, aiOfferEnabled, eduOfferEnabled } = state;
 
   const [adding, setAdding] = useState(false);
   const [newBreak, setNewBreak] = useState({ label: '', start_time: '10:00', end_time: '11:00' });
@@ -63,6 +63,16 @@ export default function StoreHoursManager() {
   const toggleOffers = async (value) => {
     dispatch({ type: 'SET_STORE_CONFIG', payload: { offers_enabled: value } });
     await supabase.from('store_config').update({ offers_enabled: value }).eq('id', 'default');
+  };
+
+  const toggleAiOffer = async (value) => {
+    dispatch({ type: 'SET_STORE_CONFIG', payload: { ai_offer_enabled: value } });
+    await supabase.from('store_config').update({ ai_offer_enabled: value }).eq('id', 'default');
+  };
+
+  const toggleEduOffer = async (value) => {
+    dispatch({ type: 'SET_STORE_CONFIG', payload: { edu_offer_enabled: value } });
+    await supabase.from('store_config').update({ edu_offer_enabled: value }).eq('id', 'default');
   };
 
   const toggleStore = async (value) => {
@@ -182,6 +192,37 @@ export default function StoreHoursManager() {
             thumbColor="#fff"
           />
         </View>
+        {offersEnabled !== false && (
+          <>
+            <View style={styles.divider} />
+            <View style={styles.toggleRow}>
+              <View>
+                <Text style={styles.toggleLabelSub}>AI Accelerator</Text>
+                <Text style={styles.toggleSub}>{aiOfferEnabled !== false ? 'Visible to customers' : 'Hidden from customers'}</Text>
+              </View>
+              <Switch
+                value={aiOfferEnabled !== false}
+                onValueChange={toggleAiOffer}
+                trackColor={{ false: '#e0e0e0', true: colors.primary }}
+                thumbColor="#fff"
+                style={{ transform: [{ scaleX: 0.85 }, { scaleY: 0.85 }] }}
+              />
+            </View>
+            <View style={styles.toggleRow}>
+              <View>
+                <Text style={styles.toggleLabelSub}>Education</Text>
+                <Text style={styles.toggleSub}>{eduOfferEnabled !== false ? 'Visible to customers' : 'Hidden from customers'}</Text>
+              </View>
+              <Switch
+                value={eduOfferEnabled !== false}
+                onValueChange={toggleEduOffer}
+                trackColor={{ false: '#e0e0e0', true: colors.primary }}
+                thumbColor="#fff"
+                style={{ transform: [{ scaleX: 0.85 }, { scaleY: 0.85 }] }}
+              />
+            </View>
+          </>
+        )}
       </View>
 
       {/* Break slots */}
@@ -276,6 +317,7 @@ const styles = StyleSheet.create({
   sectionTitle: { fontSize: 12, fontFamily: fonts.bold, color: colors.textMuted, letterSpacing: 1, textTransform: 'uppercase' },
   toggleRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingVertical: 4 },
   toggleLabel: { fontSize: 15, fontFamily: fonts.bold, color: colors.midnight },
+  toggleLabelSub: { fontSize: 14, fontFamily: fonts.semibold, color: colors.midnight },
   toggleSub: { fontSize: 12, color: colors.textMuted, marginTop: 2 },
 
   editBtn: {

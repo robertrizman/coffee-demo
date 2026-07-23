@@ -15,9 +15,11 @@ const EDU_URL = 'https://university.tealium.com/learn';
 export default function OffersScreen() {
   const { state } = useApp();
   const profile = state.profile;
+  const aiEnabled = state.aiOfferEnabled !== false;
+  const eduEnabled = state.eduOfferEnabled !== false;
 
   const scrollRef = useRef(null);
-  const [activeTab, setActiveTab] = useState('ai');
+  const [activeTab, setActiveTab] = useState(() => aiEnabled ? 'ai' : 'edu');
   const sectionY = useRef({ ai: 0, edu: 0 });
 
   const handleScroll = useCallback(({ nativeEvent }) => {
@@ -57,7 +59,8 @@ export default function OffersScreen() {
   return (
     <SafeAreaView edges={['top', 'left', 'right']} style={styles.safe}>
 
-      {/* ── Sticky tab bar ── */}
+      {/* ── Sticky tab bar — only shown when both offers are active ── */}
+      {aiEnabled && eduEnabled && (
       <View style={styles.tabBar}>
         {[
           { key: 'ai',  label: 'AI Accelerator' },
@@ -75,6 +78,7 @@ export default function OffersScreen() {
           </TouchableOpacity>
         ))}
       </View>
+      )}
 
       <ScrollView
         ref={scrollRef}
@@ -87,7 +91,7 @@ export default function OffersScreen() {
         {/* ══════════════════════════════════════════
             SECTION 1 — AI Accelerator
         ══════════════════════════════════════════ */}
-        <View onLayout={e => { sectionY.current.ai = e.nativeEvent.layout.y; }}>
+        {aiEnabled && <View onLayout={e => { sectionY.current.ai = e.nativeEvent.layout.y; }}>
 
           <View style={styles.header}>
             <View style={styles.badge}>
@@ -159,15 +163,15 @@ export default function OffersScreen() {
             <Text style={styles.ctaBtnText}>I'm Interested</Text>
           </TouchableOpacity>
 
-        </View>
+        </View>}
 
-        {/* Section divider */}
-        <View style={styles.sectionDivider} />
+        {/* Section divider — only between two visible sections */}
+        {aiEnabled && eduEnabled && <View style={styles.sectionDivider} />}
 
         {/* ══════════════════════════════════════════
             SECTION 2 — Education
         ══════════════════════════════════════════ */}
-        <View onLayout={e => { sectionY.current.edu = e.nativeEvent.layout.y; }}>
+        {eduEnabled && <View onLayout={e => { sectionY.current.edu = e.nativeEvent.layout.y; }}>
 
           <View style={styles.header}>
             <View style={[styles.badge, styles.badgeEdu]}>
@@ -252,7 +256,7 @@ export default function OffersScreen() {
           </TouchableOpacity>
 
           <View style={{ height: 32 }} />
-        </View>
+        </View>}
 
       </ScrollView>
     </SafeAreaView>

@@ -207,8 +207,32 @@ class BrotherPrinter: NSObject {
     }
 
     DispatchQueue.global(qos: .userInitiated).async {
+      // Log accessory state so we can diagnose stream failures
+      let accessories = EAAccessoryManager.shared().connectedAccessories
+      let matchedAccessory = accessories.first { $0.serialNumber == serial }
+      if let acc = matchedAccessory {
+        NSLog("[BT] Accessory at print time: name=%@ serial=%@ protocols=%@",
+              acc.name, acc.serialNumber, acc.protocolStrings.joined(separator: ","))
+      } else {
+        NSLog("[BT] WARNING: serial %@ not found in connectedAccessories at print time (count=%d)",
+              serial, accessories.count)
+        for acc in accessories {
+          NSLog("[BT]   available: name=%@ serial=%@ protocols=%@",
+                acc.name, acc.serialNumber, acc.protocolStrings.joined(separator: ","))
+        }
+      }
+
       let channel = BRLMChannel(bluetoothSerialNumber: serial)
-      let generateResult = BRLMPrinterDriverGenerator.open(channel)
+      var generateResult = BRLMPrinterDriverGenerator.open(channel)
+
+      // OpenStreamFailure (30001): RFCOMM stream stale. Retry with a fresh channel object.
+      if generateResult.error.code == BRLMOpenChannelErrorCode.openStreamFailure {
+        NSLog("[BT] OpenStreamFailure on first attempt, retrying in 2s with fresh channel")
+        Thread.sleep(forTimeInterval: 2.0)
+        let retryChannel = BRLMChannel(bluetoothSerialNumber: serial)
+        generateResult = BRLMPrinterDriverGenerator.open(retryChannel)
+        NSLog("[BT] Retry result: %@", String(describing: generateResult.error.code))
+      }
 
       if generateResult.error.code != BRLMOpenChannelErrorCode.noError {
         DispatchQueue.main.async {

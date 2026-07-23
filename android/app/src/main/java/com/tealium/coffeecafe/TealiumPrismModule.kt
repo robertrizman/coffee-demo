@@ -1,11 +1,13 @@
 package com.tealium.coffeecafe
 
 import android.app.Application
+import android.util.Log
 import com.facebook.react.bridge.*
-import com.tealium.prism.core.api.Modules
 import com.tealium.prism.core.api.Tealium
 import com.tealium.prism.core.api.TealiumConfig
 import com.tealium.prism.core.api.data.DataObject
+import com.tealium.prism.core.api.logger.LogHandler
+import com.tealium.prism.core.api.logger.LogLevel
 
 class TealiumPrismModule(reactContext: ReactApplicationContext) :
     ReactContextBaseJavaModule(reactContext) {
@@ -14,7 +16,6 @@ class TealiumPrismModule(reactContext: ReactApplicationContext) :
 
     companion object {
         private var tealium: Tealium? = null
-        private var initialized = false
         private var cachedVisitorId: String? = null
     }
 
@@ -30,26 +31,34 @@ class TealiumPrismModule(reactContext: ReactApplicationContext) :
 
     @ReactMethod
     fun initialize(account: String, profile: String, environment: String, datasource: String, promise: Promise) {
-        if (initialized) { promise.resolve(true); return }
         try {
+            // Unlike iOS's weak-referenced instance registry (where releasing our reference lets
+            // the old instance deallocate automatically), Android's TealiumInstanceManager holds
+            // instances in a plain MutableMap with strong references — Tealium.create(config) will
+            // keep handing back the original instance forever, ignoring any new settingsUrl, unless
+            // we explicitly shut it down first.
+            tealium = null
+            Tealium.shutdown("$account-$profile")
+
             val app = reactApplicationContext.applicationContext as Application
+            val settingsUrl = "https://tags.tiqcdn.com/dle/success-robert-rizman/coffee-demo/mobile_settings_dev.json?cb=${(100000..999999).random()}"
             val config = TealiumConfig.Builder(
                 application = app,
                 accountName = account,
                 profileName = profile,
                 environment = environment,
-                modules = listOf(
-                    Modules.appData(),
-                    Modules.collect(),
-                    Modules.connectivityData(),
-                    Modules.deviceData(),
-                    Modules.timeData(),
-                    Modules.trace(),
-                )
-            ).setDataSource(datasource).build()
+                modules = listOf()
+            ).setDataSource(datasource)
+                .setSettingsUrl(settingsUrl)
+                .configureCoreSettings { it.setLogLevel(LogLevel.TRACE) }
+                .setLogHandler(object : LogHandler {
+                    override fun log(tag: String, message: String, level: LogLevel) {
+                        Log.d("TealiumPrismSDK", "[${level.name}] $tag: $message")
+                    }
+                })
+                .build()
 
             tealium = Tealium.create(config)
-            initialized = true
             promise.resolve(true)
         } catch (e: Exception) {
             promise.reject("INIT_ERROR", e.message, e)
@@ -61,6 +70,9 @@ class TealiumPrismModule(reactContext: ReactApplicationContext) :
         val t = tealium ?: run { promise.reject("NOT_INITIALIZED", "PRISM not initialized"); return }
         try {
             t.track(eventName, buildDataObject(data)).subscribe { result ->
+                if (result.isFailure) {
+                    Log.e("TealiumPrismSDK", "track('$eventName') failed", result.exceptionOrNull())
+                }
                 cacheVisitorIdIfNeeded(result)
             }
             promise.resolve(true)
@@ -72,6 +84,9 @@ class TealiumPrismModule(reactContext: ReactApplicationContext) :
         val t = tealium ?: run { promise.reject("NOT_INITIALIZED", "PRISM not initialized"); return }
         try {
             t.track(screenName, buildDataObject(data)).subscribe { result ->
+                if (result.isFailure) {
+                    Log.e("TealiumPrismSDK", "trackView('$screenName') failed", result.exceptionOrNull())
+                }
                 cacheVisitorIdIfNeeded(result)
             }
             promise.resolve(true)

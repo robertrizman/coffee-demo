@@ -11,6 +11,8 @@ import com.brother.sdk.lmprinter.setting.QLPrintSettings
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
 import java.io.File
 
@@ -18,6 +20,9 @@ class BrotherPrinterBridge(reactContext: ReactApplicationContext) :
     ReactContextBaseJavaModule(reactContext) {
 
     override fun getName(): String = "BrotherPrinter"
+
+    // Serializes all native SDK calls — BasePrinter::BasePrinter (getPaperList) is not thread-safe
+    private val sdkMutex = Mutex()
 
     // ── WiFi Print ────────────────────────────────────────
 
@@ -28,44 +33,59 @@ class BrotherPrinterBridge(reactContext: ReactApplicationContext) :
         autoCut: Boolean,
         promise: Promise
     ) {
-        try {
-            val uri = java.net.URI(pdfUri)
-            val pdfFile = File(uri.path)
+        CoroutineScope(Dispatchers.IO).launch {
+            var driver: com.brother.sdk.lmprinter.PrinterDriver? = null
+            try {
+                val uri = java.net.URI(pdfUri)
+                val pdfFile = File(uri.path)
 
-            if (!pdfFile.exists()) {
-                promise.reject("PDF_ERROR", "PDF file not found: ${pdfFile.absolutePath}")
-                return
-            }
-
-            val channel = Channel.newWifiChannel(printerIP)
-            val driverResult = PrinterDriverGenerator.openChannel(channel)
-
-            if (driverResult.error.code != com.brother.sdk.lmprinter.OpenChannelError.ErrorCode.NoError) {
-                promise.reject("CHANNEL_ERROR", "Failed to open printer channel: ${driverResult.error.code}")
-                return
-            }
-
-            val driver = driverResult.driver
-            val settings = QLPrintSettings(PrinterModel.QL_820NWB)
-            settings.isAutoCut = autoCut
-            settings.labelSize = QLPrintSettings.LabelSize.DieCutW39H48
-            settings.workPath = reactApplicationContext.cacheDir.absolutePath
-
-            val printError = driver.printPDF(pdfFile.absolutePath, settings)
-            driver.closeChannel()
-
-            if (printError.code != com.brother.sdk.lmprinter.PrintError.ErrorCode.NoError) {
-                promise.reject("PRINT_ERROR", "Print failed: ${printError.code}")
-            } else {
-                val result = Arguments.createMap().apply {
-                    putBoolean("success", true)
-                    putString("ip", printerIP)
-                    putBoolean("autoCut", autoCut)
+                if (!pdfFile.exists()) {
+                    withContext(Dispatchers.Main) {
+                        promise.reject("PDF_ERROR", "PDF file not found: ${pdfFile.absolutePath}")
+                    }
+                    return@launch
                 }
-                promise.resolve(result)
+
+                sdkMutex.withLock {
+                    val channel = Channel.newWifiChannel(printerIP)
+                    val driverResult = PrinterDriverGenerator.openChannel(channel)
+
+                    if (driverResult.error.code != com.brother.sdk.lmprinter.OpenChannelError.ErrorCode.NoError) {
+                        withContext(Dispatchers.Main) {
+                            promise.reject("CHANNEL_ERROR", "Failed to open printer channel: ${driverResult.error.code}")
+                        }
+                        return@withLock
+                    }
+
+                    driver = driverResult.driver
+                    val settings = QLPrintSettings(PrinterModel.QL_820NWB)
+                    settings.isAutoCut = autoCut
+                    settings.labelSize = QLPrintSettings.LabelSize.DieCutW39H48
+                    settings.workPath = reactApplicationContext.cacheDir.absolutePath
+
+                    val printError = driver!!.printPDF(pdfFile.absolutePath, settings)
+                    driver!!.closeChannel()
+                    driver = null
+
+                    withContext(Dispatchers.Main) {
+                        if (printError.code != com.brother.sdk.lmprinter.PrintError.ErrorCode.NoError) {
+                            promise.reject("PRINT_ERROR", "Print failed: ${printError.code}")
+                        } else {
+                            val result = Arguments.createMap().apply {
+                                putBoolean("success", true)
+                                putString("ip", printerIP)
+                                putBoolean("autoCut", autoCut)
+                            }
+                            promise.resolve(result)
+                        }
+                    }
+                }
+            } catch (e: Exception) {
+                try { driver?.closeChannel() } catch (_: Exception) {}
+                withContext(Dispatchers.Main) {
+                    promise.reject("PRINT_ERROR", "Failed to print: ${e.message}", e)
+                }
             }
-        } catch (e: Exception) {
-            promise.reject("PRINT_ERROR", "Failed to print: ${e.message}", e)
         }
     }
 
@@ -84,13 +104,15 @@ class BrotherPrinterBridge(reactContext: ReactApplicationContext) :
                     withContext(Dispatchers.Main) { promise.resolve(false) }
                     return@launch
                 }
-                val channel = Channel.newBluetoothChannel(bluetoothAddress, bluetoothAdapter)
-                val driverResult = PrinterDriverGenerator.openChannel(channel)
-                if (driverResult.error.code == com.brother.sdk.lmprinter.OpenChannelError.ErrorCode.NoError) {
-                    driverResult.driver.closeChannel()
-                    withContext(Dispatchers.Main) { promise.resolve(true) }
-                } else {
-                    withContext(Dispatchers.Main) { promise.resolve(false) }
+                sdkMutex.withLock {
+                    val channel = Channel.newBluetoothChannel(bluetoothAddress, bluetoothAdapter)
+                    val driverResult = PrinterDriverGenerator.openChannel(channel)
+                    if (driverResult.error.code == com.brother.sdk.lmprinter.OpenChannelError.ErrorCode.NoError) {
+                        driverResult.driver.closeChannel()
+                        withContext(Dispatchers.Main) { promise.resolve(true) }
+                    } else {
+                        withContext(Dispatchers.Main) { promise.resolve(false) }
+                    }
                 }
             } catch (e: Exception) {
                 withContext(Dispatchers.Main) { promise.resolve(false) }
@@ -129,63 +151,65 @@ class BrotherPrinterBridge(reactContext: ReactApplicationContext) :
                     return@launch
                 }
 
-                val channel = Channel.newBluetoothChannel(bluetoothAddress, bluetoothAdapter)
-                val driverResult = PrinterDriverGenerator.openChannel(channel)
+                sdkMutex.withLock {
+                    val channel = Channel.newBluetoothChannel(bluetoothAddress, bluetoothAdapter)
+                    val driverResult = PrinterDriverGenerator.openChannel(channel)
 
-                if (driverResult.error.code != com.brother.sdk.lmprinter.OpenChannelError.ErrorCode.NoError) {
-                    withContext(Dispatchers.Main) {
-                        promise.reject("CHANNEL_ERROR", "Failed to open Bluetooth channel: ${driverResult.error.code}")
-                    }
-                    return@launch
-                }
-
-                driver = driverResult.driver
-                val settings = QLPrintSettings(PrinterModel.QL_820NWB)
-                settings.isAutoCut = autoCut
-                settings.labelSize = QLPrintSettings.LabelSize.DieCutW39H48
-                settings.workPath = reactApplicationContext.cacheDir.absolutePath
-
-                // Run printPDF in a dedicated thread with a 30-second timeout.
-                // Without this, a stuck/unresponsive printer causes the Brother SDK's
-                // internal JNI callback (JNIObserver::sendMessage) to fire against a
-                // stale jobject, producing a SIGABRT from art::Thread::DecodeJObject.
-                // Calling closeChannel() on timeout releases the SDK's JNI references.
-                val localDriver = driver
-                val executor = java.util.concurrent.Executors.newSingleThreadExecutor()
-                val future = executor.submit(java.util.concurrent.Callable {
-                    localDriver.printPDF(pdfFile.absolutePath, settings)
-                })
-                executor.shutdown()
-
-                val printError = try {
-                    future.get(30, java.util.concurrent.TimeUnit.SECONDS)
-                } catch (e: java.util.concurrent.TimeoutException) {
-                    future.cancel(true)
-                    try { localDriver.closeChannel() } catch (_: Exception) {}
-                    driver = null
-                    withContext(Dispatchers.Main) {
-                        promise.reject("PRINT_TIMEOUT", "Print timed out — check the printer is on and has paper.")
-                    }
-                    return@launch
-                } catch (e: java.util.concurrent.ExecutionException) {
-                    try { localDriver.closeChannel() } catch (_: Exception) {}
-                    driver = null
-                    throw e.cause ?: e
-                }
-
-                driver.closeChannel()
-                driver = null
-
-                withContext(Dispatchers.Main) {
-                    if (printError.code != com.brother.sdk.lmprinter.PrintError.ErrorCode.NoError) {
-                        promise.reject("PRINT_ERROR", "Bluetooth print failed: ${printError.code}")
-                    } else {
-                        val result = Arguments.createMap().apply {
-                            putBoolean("success", true)
-                            putString("bluetoothAddress", bluetoothAddress)
-                            putBoolean("autoCut", autoCut)
+                    if (driverResult.error.code != com.brother.sdk.lmprinter.OpenChannelError.ErrorCode.NoError) {
+                        withContext(Dispatchers.Main) {
+                            promise.reject("CHANNEL_ERROR", "Failed to open Bluetooth channel: ${driverResult.error.code}")
                         }
-                        promise.resolve(result)
+                        return@withLock
+                    }
+
+                    driver = driverResult.driver
+                    val settings = QLPrintSettings(PrinterModel.QL_820NWB)
+                    settings.isAutoCut = autoCut
+                    settings.labelSize = QLPrintSettings.LabelSize.DieCutW39H48
+                    settings.workPath = reactApplicationContext.cacheDir.absolutePath
+
+                    // Run printPDF in a dedicated thread with a 30-second timeout.
+                    // Without this, a stuck/unresponsive printer causes the Brother SDK's
+                    // internal JNI callback (JNIObserver::sendMessage) to fire against a
+                    // stale jobject, producing a SIGABRT from art::Thread::DecodeJObject.
+                    // Calling closeChannel() on timeout releases the SDK's JNI references.
+                    val localDriver = driver!!
+                    val executor = java.util.concurrent.Executors.newSingleThreadExecutor()
+                    val future = executor.submit(java.util.concurrent.Callable {
+                        localDriver.printPDF(pdfFile.absolutePath, settings)
+                    })
+                    executor.shutdown()
+
+                    val printError = try {
+                        future.get(30, java.util.concurrent.TimeUnit.SECONDS)
+                    } catch (e: java.util.concurrent.TimeoutException) {
+                        future.cancel(true)
+                        try { localDriver.closeChannel() } catch (_: Exception) {}
+                        driver = null
+                        withContext(Dispatchers.Main) {
+                            promise.reject("PRINT_TIMEOUT", "Print timed out — check the printer is on and has paper.")
+                        }
+                        return@withLock
+                    } catch (e: java.util.concurrent.ExecutionException) {
+                        try { localDriver.closeChannel() } catch (_: Exception) {}
+                        driver = null
+                        throw e.cause ?: e
+                    }
+
+                    driver!!.closeChannel()
+                    driver = null
+
+                    withContext(Dispatchers.Main) {
+                        if (printError.code != com.brother.sdk.lmprinter.PrintError.ErrorCode.NoError) {
+                            promise.reject("PRINT_ERROR", "Bluetooth print failed: ${printError.code}")
+                        } else {
+                            val result = Arguments.createMap().apply {
+                                putBoolean("success", true)
+                                putString("bluetoothAddress", bluetoothAddress)
+                                putBoolean("autoCut", autoCut)
+                            }
+                            promise.resolve(result)
+                        }
                     }
                 }
             } catch (e: Exception) {

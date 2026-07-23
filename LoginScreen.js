@@ -156,7 +156,7 @@ export default function LoginScreen() {
             <Text style={styles.aboutText}>
               This is a demonstration app built for Tealium event tracking and analytics purposes. It is not intended for commercial use, resale. All data collected is used solely for Tealium platform demonstration purposes.
             </Text>
-            <Text style={styles.aboutVersion}>Architect Arc · Powered by Tealium PRISM SDK</Text>
+            <Text style={styles.aboutVersion}>Architect Arc · Powered by Tealium Prism SDK</Text>
             <Text style={styles.buildVersion}>
               v{Constants.expoConfig?.version ?? '—'}
             </Text>

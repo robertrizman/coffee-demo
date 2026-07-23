@@ -2,9 +2,10 @@ import React, { useState, useEffect, useRef } from 'react';
 import {
   View, Text, ScrollView, TouchableOpacity,
   StyleSheet, TextInput, Alert,
-  KeyboardAvoidingView, Platform, Modal, Animated, Easing, Linking,
+  KeyboardAvoidingView, Platform, Modal, Animated, Linking,
 } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { Video, ResizeMode } from 'expo-av';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useNavigation } from '@react-navigation/native';
 import { useApp, generateOrderId } from './AppContext';
 import { getCanonicalDeviceId } from './tealium';
@@ -30,6 +31,7 @@ export default function OrderSummaryScreen() {
   const navigation = useNavigation();
   const { state, dispatch } = useApp();
   const { currentOrder } = state;
+  const insets = useSafeAreaInsets();
 
   const [name, setName] = useState(state.profile?.name || currentOrder.name || '');
   const [email, setEmail] = useState(state.profile?.email || currentOrder.email || '');
@@ -125,16 +127,11 @@ export default function OrderSummaryScreen() {
   }, [currentOrder.items.length, state.deviceId]);
 
   // Animation values
-  const fillAnim = useRef(new Animated.Value(0)).current;   // coffee fill 0→1
-  const steam1 = useRef(new Animated.Value(0)).current;
-  const steam2 = useRef(new Animated.Value(0)).current;
-  const steam3 = useRef(new Animated.Value(0)).current;
-  const scaleAnim = useRef(new Animated.Value(0.8)).current;
-  const fadeAnim = useRef(new Animated.Value(0)).current;
-  const dot1 = useRef(new Animated.Value(0)).current;
-  const dot2 = useRef(new Animated.Value(0)).current;
-  const dot3 = useRef(new Animated.Value(0)).current;
   const etaPulse = useRef(new Animated.Value(1)).current;
+  const overlayAnim = useRef(new Animated.Value(0)).current;
+  const overlayShown = useRef(false);
+  const videoRef = useRef(null);
+  const navDone = useRef(false);
 
   const fetchETA = async () => {
     try {
@@ -202,55 +199,19 @@ export default function OrderSummaryScreen() {
     }
   }, [confirmVisible]);
 
-  const startBrewingAnimation = () => {
-    // Reset
-    fillAnim.setValue(0);
-    scaleAnim.setValue(0.8);
-    fadeAnim.setValue(0);
-    [steam1, steam2, steam3, dot1, dot2, dot3].forEach((a) => a.setValue(0));
-
-    // Card entrance
-    Animated.parallel([
-      Animated.spring(scaleAnim, { toValue: 1, tension: 60, friction: 8, useNativeDriver: true }),
-      Animated.timing(fadeAnim, { toValue: 1, duration: 400, useNativeDriver: true }),
-    ]).start();
-
-    // Coffee fill
-    Animated.timing(fillAnim, {
-      toValue: 1, duration: 2800, delay: 300,
-      easing: Easing.out(Easing.cubic), useNativeDriver: false,
-    }).start();
-
-    // Steam loops
-    const steamLoop = (anim, delay) => {
-      anim.setValue(0);
-      Animated.sequence([
-        Animated.delay(delay),
-        Animated.loop(
-          Animated.timing(anim, { toValue: 1, duration: 1800, easing: Easing.inOut(Easing.ease), useNativeDriver: true })
-        ),
-      ]).start();
-    };
-    steamLoop(steam1, 800);
-    steamLoop(steam2, 1100);
-    steamLoop(steam3, 1400);
-
-    // Bouncing dots
-    const dotLoop = (anim, delay) => {
-      Animated.sequence([
-        Animated.delay(delay),
-        Animated.loop(
-          Animated.sequence([
-            Animated.timing(anim, { toValue: 1, duration: 350, useNativeDriver: true }),
-            Animated.timing(anim, { toValue: 0, duration: 350, useNativeDriver: true }),
-            Animated.delay(400),
-          ])
-        ),
-      ]).start();
-    };
-    dotLoop(dot1, 600);
-    dotLoop(dot2, 800);
-    dotLoop(dot3, 1000);
+  const handleVideoStatus = (status) => {
+    if (!status.isLoaded) return;
+    // Fade in text overlay as soon as video starts playing
+    if (!overlayShown.current && status.isPlaying) {
+      overlayShown.current = true;
+      Animated.timing(overlayAnim, { toValue: 1, duration: 700, useNativeDriver: true }).start();
+    }
+    // Navigate when video finishes
+    if (status.didJustFinish && !navDone.current) {
+      navDone.current = true;
+      setBrewingVisible(false);
+      navigation.navigate('My Account');
+    }
   };
 
   const handleEmailBlur = () => {
@@ -346,13 +307,18 @@ export default function OrderSummaryScreen() {
       arc_location_name: state.profile?.arc_location_name || '',
     });
 
-    // Show brewing animation, then navigate
+    // Show video, navigate on finish (fallback after 10s)
+    overlayAnim.setValue(0);
+    overlayShown.current = false;
+    navDone.current = false;
     setBrewingVisible(true);
-    startBrewingAnimation();
     setTimeout(() => {
-      setBrewingVisible(false);
-      navigation.navigate('My Account');
-    }, 4200);
+      if (!navDone.current) {
+        navDone.current = true;
+        setBrewingVisible(false);
+        navigation.navigate('My Account');
+      }
+    }, 10000);
   };
 
   const formatItemSummary = (item) => {
@@ -596,68 +562,28 @@ export default function OrderSummaryScreen() {
         </View>
       </Modal>
 
-      {/* ── Brewing Animation Modal ── */}
-      <Modal visible={brewingVisible} transparent animationType="fade">
-        <View style={styles.brewOverlay}>
-          <Animated.View style={[styles.brewCard, { transform: [{ scale: scaleAnim }], opacity: fadeAnim }]}>
-
-            {/* Cup scene */}
-            <View style={styles.cupScene}>
-              {/* Steam strands */}
-              {[steam1, steam2, steam3].map((anim, i) => (
-                <Animated.View
-                  key={i}
-                  style={[
-                    styles.steam,
-                    { left: 52 + i * 20 },
-                    {
-                      opacity: anim.interpolate({ inputRange: [0, 0.2, 0.8, 1], outputRange: [0, 0.7, 0.3, 0] }),
-                      transform: [{
-                        translateY: anim.interpolate({ inputRange: [0, 1], outputRange: [0, -40] }),
-                      }, {
-                        scaleX: anim.interpolate({ inputRange: [0, 1], outputRange: [1, 1.5] }),
-                      }],
-                    },
-                  ]}
-                />
-              ))}
-
-              {/* Cup body */}
-              <View style={styles.cupBody}>
-                {/* Coffee fill animates upward */}
-                <Animated.View style={[
-                  styles.coffeeFill,
-                  { height: fillAnim.interpolate({ inputRange: [0, 1], outputRange: [0, 64] }) },
-                ]} />
-              </View>
-              <View style={styles.cupHandle} />
-              <View style={styles.cupSaucer} />
-            </View>
-
-            {/* Message */}
-            <Text style={styles.brewTitle}>Order placed!</Text>
-            <Text style={styles.brewSubtitle}>
+      {/* ── Brewing Video Modal ── */}
+      <Modal visible={brewingVisible} transparent animationType="fade" statusBarTranslucent>
+        <View style={styles.brewVideoContainer}>
+          <Video
+            ref={videoRef}
+            source={require('./assets/videos/order-placed.mp4')}
+            style={StyleSheet.absoluteFill}
+            resizeMode={ResizeMode.COVER}
+            shouldPlay
+            isMuted
+            useNativeControls={false}
+            onPlaybackStatusUpdate={handleVideoStatus}
+          />
+          {/* Text overlay fades in during second half of video */}
+          <Animated.View style={[styles.brewVideoOverlay, { opacity: overlayAnim, paddingBottom: Math.max(insets.bottom, 24) }]}>
+            <Text style={styles.brewVideoTitle}>Order placed!</Text>
+            <Text style={styles.brewVideoSubtitle}>
               Sit back and relax — your barista is on it. We'll notify you when your order is ready for pickup.
             </Text>
-
-            {/* Bouncing dots */}
-            <View style={styles.dotsRow}>
-              {[dot1, dot2, dot3].map((anim, i) => (
-                <Animated.View
-                  key={i}
-                  style={[styles.dot, {
-                    transform: [{ translateY: anim.interpolate({ inputRange: [0, 1], outputRange: [0, -8] }) }],
-                    opacity: anim.interpolate({ inputRange: [0, 1], outputRange: [0.3, 1] }),
-                  }]}
-                />
-              ))}
+            <View style={styles.brewVideoNotifyPill}>
+              <Text style={styles.brewVideoNotifyText}>🔔  You'll be notified when your order is ready</Text>
             </View>
-
-            {/* Notification pill */}
-            <View style={styles.notifyPill}>
-              <Text style={styles.notifyPillText}>🔔  You'll be notified when your order is ready for pickup</Text>
-            </View>
-
           </Animated.View>
         </View>
       </Modal>
@@ -863,80 +789,33 @@ const styles = StyleSheet.create({
   geoWarningLink: { fontFamily: fonts.bold, textDecorationLine: 'underline' },
 
   // ── Brewing modal ──────────────────────────────────────
-  brewOverlay: {
+  brewVideoContainer: {
     flex: 1,
-    backgroundColor: 'rgba(13,43,43,0.82)',
-    alignItems: 'center',
-    justifyContent: 'center',
-    padding: spacing.lg,
+    backgroundColor: '#000',
   },
-  brewCard: {
-    backgroundColor: colors.background,
-    borderRadius: 28,
-    padding: spacing.xl,
-    paddingTop: spacing.lg,
+  brewVideoOverlay: {
+    position: 'absolute',
+    bottom: 0,
+    left: 0,
+    right: 0,
+    paddingTop: 36,
+    paddingHorizontal: 28,
+    backgroundColor: 'rgba(0,0,0,0.58)',
     alignItems: 'center',
-    width: '100%',
-    maxWidth: 340,
     gap: spacing.md,
   },
-
-  // Cup
-  cupScene: { width: 140, height: 160, position: 'relative', marginBottom: spacing.sm },
-  steam: {
-    position: 'absolute',
-    width: 7,
-    height: 30,
-    borderRadius: 4,
-    backgroundColor: colors.primary,
-    bottom: 124,
-  },
-  cupBody: {
-    position: 'absolute', bottom: 14, left: 10,
-    width: 120, height: 110,
-    backgroundColor: colors.surface,
-    borderRadius: 8,
-    borderBottomLeftRadius: 20, borderBottomRightRadius: 20,
-    borderWidth: 2.5, borderColor: colors.primary,
-    overflow: 'hidden',
-    alignItems: 'center', justifyContent: 'center',
-  },
-  coffeeFill: {
-    position: 'absolute', bottom: 0, left: 0, right: 0,
-    backgroundColor: '#6b3a2a',
-    borderBottomLeftRadius: 18, borderBottomRightRadius: 18,
-  },
-  cupEmoji: { fontSize: 28, zIndex: 2 },
-  cupHandle: {
-    position: 'absolute', bottom: 44, right: 2,
-    width: 26, height: 34,
-    borderWidth: 2.5, borderColor: colors.primary,
-    borderLeftWidth: 0,
-    borderTopRightRadius: 14, borderBottomRightRadius: 14,
-  },
-  cupSaucer: {
-    position: 'absolute', bottom: 0, left: 0,
-    width: 140, height: 14,
-    backgroundColor: colors.primary,
-    borderRadius: 8,
-  },
-
-  brewTitle: { fontSize: 23, fontFamily: fonts.extrabold, color: colors.textDark, textAlign: 'center' },
-  brewSubtitle: { fontSize: 14, color: colors.textLight, textAlign: 'center', lineHeight: 24 },
-
-  dotsRow: { flexDirection: 'row', gap: 8, marginVertical: spacing.sm },
-  dot: { width: 9, height: 9, borderRadius: 5, backgroundColor: colors.primary },
-
-  notifyPill: {
-    backgroundColor: colors.primaryLight,
+  brewVideoTitle: { fontSize: 26, fontFamily: fonts.extrabold, color: '#fff', textAlign: 'center' },
+  brewVideoSubtitle: { fontSize: 14, color: 'rgba(255,255,255,0.85)', textAlign: 'center', lineHeight: 22 },
+  brewVideoNotifyPill: {
+    backgroundColor: 'rgba(255,255,255,0.15)',
     borderRadius: radius.lg,
     paddingHorizontal: spacing.lg,
     paddingVertical: spacing.sm + 2,
     borderWidth: 1,
-    borderColor: colors.primaryMid,
+    borderColor: 'rgba(255,255,255,0.3)',
     marginTop: spacing.sm,
     alignSelf: 'center',
     maxWidth: 300,
   },
-  notifyPillText: { fontSize: 12, fontFamily: fonts.bold, color: colors.primary, textAlign: 'center' },
+  brewVideoNotifyText: { fontSize: 12, fontFamily: fonts.bold, color: '#fff', textAlign: 'center' },
 });

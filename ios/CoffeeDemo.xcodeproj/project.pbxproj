@@ -18,7 +18,6 @@
 		F11748422D0307B40044C1D9 /* AppDelegate.swift in Sources */ = {isa = PBXBuildFile; fileRef = F11748412D0307B40044C1D9 /* AppDelegate.swift */; };
 		F629416B2F8A06D80072C41D /* TealiumPrismModule.m in Sources */ = {isa = PBXBuildFile; fileRef = F62941672F8A06D80072C41D /* TealiumPrismModule.m */; };
 		F629416F2F8A13CE0072C41D /* TealiumPrismModule.swift in Sources */ = {isa = PBXBuildFile; fileRef = F629416E2F8A13CE0072C41D /* TealiumPrismModule.swift */; };
-		F62941702F8A13CE0072C41D /* TealiumPrismModule 2.m in Sources */ = {isa = PBXBuildFile; fileRef = F629416D2F8A13CE0072C41D /* TealiumPrismModule 2.m */; };
 		F633638F2F8CD52E0099DB61 /* FoodPairingModule.swift in Sources */ = {isa = PBXBuildFile; fileRef = F633638E2F8CD52E0099DB61 /* FoodPairingModule.swift */; };
 		F63363902F8CD52E0099DB61 /* FoodPairingModule.m in Sources */ = {isa = PBXBuildFile; fileRef = F633638D2F8CD52E0099DB61 /* FoodPairingModule.m */; };
 		F64C92DA2F8C832D00B3F2B2 /* BrotherPrinterBridge.m in Sources */ = {isa = PBXBuildFile; fileRef = F64C92D82F8C832D00B3F2B2 /* BrotherPrinterBridge.m */; };
@@ -55,7 +54,6 @@
 		F11748442D0722820044C1D9 /* CoffeeDemo-Bridging-Header.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; name = "CoffeeDemo-Bridging-Header.h"; path = "CoffeeDemo/CoffeeDemo-Bridging-Header.h"; sourceTree = "<group>"; };
 		F2FFF7EBAA4949C604D01143 /* libPods-CoffeeDemo.a */ = {isa = PBXFileReference; explicitFileType = archive.ar; includeInIndex = 0; path = "libPods-CoffeeDemo.a"; sourceTree = BUILT_PRODUCTS_DIR; };
 		F62941672F8A06D80072C41D /* TealiumPrismModule.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = TealiumPrismModule.m; sourceTree = "<group>"; };
-		F629416D2F8A13CE0072C41D /* TealiumPrismModule 2.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = "TealiumPrismModule 2.m"; sourceTree = "<group>"; };
 		F629416E2F8A13CE0072C41D /* TealiumPrismModule.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TealiumPrismModule.swift; sourceTree = "<group>"; };
 		F633638D2F8CD52E0099DB61 /* FoodPairingModule.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = FoodPairingModule.m; sourceTree = "<group>"; };
 		F633638E2F8CD52E0099DB61 /* FoodPairingModule.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FoodPairingModule.swift; sourceTree = "<group>"; };
@@ -84,7 +82,6 @@
 				D971E5450BAE45E8BB20CADF /* ObjectClassifierModule.swift */,
 				F64C92D82F8C832D00B3F2B2 /* BrotherPrinterBridge.m */,
 				F64C92D92F8C832D00B3F2B2 /* BrotherPrinterBridge.swift */,
-				F629416D2F8A13CE0072C41D /* TealiumPrismModule 2.m */,
 				F629416E2F8A13CE0072C41D /* TealiumPrismModule.swift */,
 				F62941672F8A06D80072C41D /* TealiumPrismModule.m */,
 				F11748412D0307B40044C1D9 /* AppDelegate.swift */,
@@ -348,9 +345,8 @@
 				"${PODS_CONFIGURATION_BUILD_DIR}/React-Core/React-Core_privacy.bundle",
 				"${PODS_CONFIGURATION_BUILD_DIR}/React-cxxreact/React-cxxreact_privacy.bundle",
 				"${PODS_CONFIGURATION_BUILD_DIR}/SDWebImage/SDWebImage.bundle",
+				"${PODS_CONFIGURATION_BUILD_DIR}/SQLite.swift/SQLite.swift.bundle",
 				"${PODS_CONFIGURATION_BUILD_DIR}/Sentry/Sentry.bundle",
-				"${PODS_ROOT}/tealium-swift/tealium/core/devicedata/device-names.json",
-				"${PODS_CONFIGURATION_BUILD_DIR}/tealium-swift/TealiumSwift.bundle",
 			);
 			name = "[CP] Copy Pods Resources";
 			outputPaths = (
@@ -365,9 +361,8 @@
 				"${TARGET_BUILD_DIR}/${UNLOCALIZED_RESOURCES_FOLDER_PATH}/React-Core_privacy.bundle",
 				"${TARGET_BUILD_DIR}/${UNLOCALIZED_RESOURCES_FOLDER_PATH}/React-cxxreact_privacy.bundle",
 				"${TARGET_BUILD_DIR}/${UNLOCALIZED_RESOURCES_FOLDER_PATH}/SDWebImage.bundle",
+				"${TARGET_BUILD_DIR}/${UNLOCALIZED_RESOURCES_FOLDER_PATH}/SQLite.swift.bundle",
 				"${TARGET_BUILD_DIR}/${UNLOCALIZED_RESOURCES_FOLDER_PATH}/Sentry.bundle",
-				"${TARGET_BUILD_DIR}/${UNLOCALIZED_RESOURCES_FOLDER_PATH}/device-names.json",
-				"${TARGET_BUILD_DIR}/${UNLOCALIZED_RESOURCES_FOLDER_PATH}/TealiumSwift.bundle",
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 			shellPath = /bin/sh;
@@ -386,7 +381,6 @@
 				9AD019280BC84B048A32658E /* ObjectClassifierModule.swift in Sources */,
 				304189C232A0473C83C30F39 /* ObjectClassifierModule.m in Sources */,
 				F629416F2F8A13CE0072C41D /* TealiumPrismModule.swift in Sources */,
-				F62941702F8A13CE0072C41D /* TealiumPrismModule 2.m in Sources */,
 				F629416B2F8A06D80072C41D /* TealiumPrismModule.m in Sources */,
 				F11748422D0307B40044C1D9 /* AppDelegate.swift in Sources */,
 				F64C92DA2F8C832D00B3F2B2 /* BrotherPrinterBridge.m in Sources */,

@@ -29,7 +29,7 @@ export const MENU = [
   { id: 'frappe', name: 'Frappe', description: 'Blended iced coffee drink', category: 'Iced & Cold', defaultEnabled: true },
 
   // SPECIALTY
-  { id: 'hot-chocolate', name: 'Hot Chocolate', description: 'Rich dark chocolate steamed milk', category: 'Specialty', defaultEnabled: true },
+  { id: 'hot-chocolate', name: 'Hot Chocolate', description: 'Rich chocolate steamed milk', category: 'Specialty', defaultEnabled: true },
   { id: 'chai-latte', name: 'Chai Latte', description: 'Spiced tea with steamed milk', category: 'Specialty', defaultEnabled: true },
   { id: 'matcha-latte', name: 'Matcha Latte', description: 'Japanese green tea with milk', category: 'Specialty', defaultEnabled: true },
   { id: 'turmeric-latte', name: 'Turmeric Latte', description: 'Golden milk, anti-inflammatory', category: 'Specialty', defaultEnabled: true },

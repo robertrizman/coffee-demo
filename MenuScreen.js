@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
+import { Video, ResizeMode } from 'expo-av';
 import {
   View, Text, ScrollView, TouchableOpacity,
   StyleSheet, Modal, Animated, Easing, Image, useWindowDimensions, Platform, Alert,
@@ -98,55 +99,6 @@ function TypingText({ text, onDone, speed = 18 }) {
       {displayed}
       {!done && <Text style={{ color: colors.primary }}>▌</Text>}
     </Text>
-  );
-}
-
-function BrewingCup() {
-  const fillAnim = useRef(new Animated.Value(0)).current;
-  const steam1 = useRef(new Animated.Value(0)).current;
-  const steam2 = useRef(new Animated.Value(0)).current;
-  const steam3 = useRef(new Animated.Value(0)).current;
-
-  useEffect(() => {
-    Animated.loop(
-      Animated.timing(fillAnim, { toValue: 1, duration: 4000, useNativeDriver: false })
-    ).start();
-    [steam1, steam2, steam3].forEach((s, i) => {
-      Animated.loop(
-        Animated.sequence([
-          Animated.delay(i * 300),
-          Animated.timing(s, { toValue: 1, duration: 1200, useNativeDriver: true }),
-          Animated.timing(s, { toValue: 0, duration: 400, useNativeDriver: true }),
-        ])
-      ).start();
-    });
-  }, []);
-
-  return (
-    <View style={{ width: 120, height: 130, alignItems: 'center', marginBottom: 8 }}>
-      {/* Steam */}
-      {[steam1, steam2, steam3].map((anim, i) => (
-        <Animated.View key={i} style={{
-          position: 'absolute', top: 0,
-          left: 30 + i * 20, width: 4, height: 24,
-          borderRadius: 2, backgroundColor: 'rgba(255,255,255,0.4)',
-          opacity: anim,
-          transform: [{ translateY: anim.interpolate({ inputRange: [0, 1], outputRange: [0, -20] }) }],
-        }} />
-      ))}
-      {/* Cup */}
-      <View style={{ marginTop: 28, width: 90, height: 70, borderRadius: 8, borderWidth: 2.5, borderColor: '#fff', overflow: 'hidden', backgroundColor: 'rgba(255,255,255,0.08)' }}>
-        <Animated.View style={{
-          position: 'absolute', bottom: 0, left: 0, right: 0,
-          height: fillAnim.interpolate({ inputRange: [0, 1], outputRange: [0, 70] }),
-          backgroundColor: '#5c3317',
-        }} />
-      </View>
-      {/* Handle */}
-      <View style={{ position: 'absolute', right: 8, top: 42, width: 18, height: 30, borderRadius: 12, borderWidth: 2.5, borderColor: '#fff', borderLeftColor: 'transparent' }} />
-      {/* Saucer */}
-      <View style={{ width: 100, height: 8, borderRadius: 4, backgroundColor: '#fff', marginTop: 2 }} />
-    </View>
   );
 }
 
@@ -311,8 +263,17 @@ export default function MenuScreen() {
   if (isClosed) {
     return (
       <SafeAreaView edges={['top', 'left', 'right']} style={[styles.safe, { backgroundColor: colors.midnight }]}>
+        <Video
+          source={require('./assets/videos/onboarding-bg.mp4')}
+          style={StyleSheet.absoluteFill}
+          resizeMode={ResizeMode.COVER}
+          shouldPlay={isClosed}
+          isLooping
+          isMuted
+          useNativeControls={false}
+        />
+        <View style={styles.closedVideoTint} />
         <View style={styles.closedScreen}>
-          <BrewingCup />
           <Text style={styles.closedTitle}>{state.closedTitle || 'Back Soon!'}</Text>
           <Text style={styles.closedMsg}>{state.closedMessage || "We're taking a short break — check back soon!"}</Text>
           {state.storeBreaks.filter(b => b.active).length > 0 && (
@@ -873,6 +834,10 @@ export default function MenuScreen() {
 
 const styles = StyleSheet.create({
   safe: { flex: 1, backgroundColor: colors.background },
+  closedVideoTint: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: 'rgba(5, 24, 56, 0.6)',
+  },
   closedScreen: {
     flex: 1, alignItems: 'center', justifyContent: 'center',
     padding: spacing.xl, gap: 16,

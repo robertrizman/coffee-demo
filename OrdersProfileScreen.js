@@ -21,7 +21,7 @@ import { supabase } from './supabase';
 import { getOrderPersonality } from './foodPairingAI';
 import { trackProfileTab, trackEditProfile, trackProfileUpdated, trackUuidCopy, trackDietaryRequirementsUpdated, joinTrace, leaveTrace, getCanonicalDeviceId, getVisitorId, fetchVisitorIdFromPrism, setEmailForMoments } from './tealium';
 import { colors, typography, spacing, radius, shadow, fonts } from './theme';
-import { UserIcon, EmailIcon, LocationPinIcon, TakeawayCupIcon, CheckIcon, CopyIcon, EditIcon, AiSparkIcon, LightbulbIcon, MagnifyIcon, LightningBoltIcon, LeafIcon, ShieldIcon } from './CoffeeIcons';
+import { UserIcon, EmailIcon, LocationPinIcon, TakeawayCupIcon, CheckIcon, CopyIcon, EditIcon, AiSparkIcon, LightbulbIcon, MagnifyIcon, LightningBoltIcon, LeafIcon, ShieldIcon, AnalyticsIcon, SettingsIcon } from './CoffeeIcons';
 
 function timeAgo(ts) {
   const secs = Math.floor((Date.now() - ts) / 1000);
@@ -221,6 +221,8 @@ export default function OrdersProfileScreen() {
   const [momentsLoading, setMomentsLoading] = useState(false);
   const [momentsRefreshing, setMomentsRefreshing] = useState(false);
   const [momentsUrl, setMomentsUrl] = useState('');
+  const [mobileSettingsData, setMobileSettingsData] = useState(null);
+  const [mobileSettingsLoading, setMobileSettingsLoading] = useState(false);
   const [debugTapCount, setDebugTapCount] = useState(0);
   const [momentsUnlocked, setMomentsUnlocked] = useState(false);
   const [tealiumUuid, setTealiumUuid] = useState(null);
@@ -825,6 +827,20 @@ export default function OrdersProfileScreen() {
     if (isRefresh) setMomentsRefreshing(false); else setMomentsLoading(false);
   };
 
+  const handleQueryMobileSettings = async () => {
+    const url = `https://tags.tiqcdn.com/dle/success-robert-rizman/coffee-demo/mobile_settings_dev.json?cb=${Math.floor(Math.random() * 900000) + 100000}`;
+    setMobileSettingsLoading(true);
+    try {
+      const res = await fetch(url);
+      const data = await res.json();
+      setMobileSettingsData(data);
+      console.log('[Debug] Mobile settings response:', JSON.stringify(data));
+    } catch (e) {
+      setMobileSettingsData({ error: e.message });
+    }
+    setMobileSettingsLoading(false);
+  };
+
   return (
     <SafeAreaView edges={['top', 'left', 'right']} style={styles.safe}>
       {/* Toast notification */}
@@ -1339,6 +1355,87 @@ export default function OrdersProfileScreen() {
             </View>
           )}
 
+          {/* Attribution Section */}
+          {momentsUnlocked && (momentsData?.properties || momentsData?.metrics) && (() => {
+            const aggregate = momentsData.properties?.['Web Pillar - Input Data - Aggregate'];
+            const aggregateItems = aggregate
+              ? (String(aggregate).includes(',') ? String(aggregate).split(',').map(s => s.trim()).filter(Boolean) : [String(aggregate).trim()])
+              : [];
+            const metricsObj = momentsData.metrics || {};
+            const metrics = [
+              ['Identity Resolution', metricsObj['Web Pillar - Identity Resolution - Count']],
+              ['First-Party Data', metricsObj['Web Pillar - First-Party Data - Count']],
+              ['Real-Time Activation', metricsObj['Web Pillar - Real-Time Activation - Count']],
+            ].filter(([, value]) => value !== undefined && value !== null && value !== '');
+
+            if (aggregateItems.length === 0 && metrics.length === 0) return null;
+
+            return (
+              <View style={styles.debugCard}>
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                  <AnalyticsIcon size={18} color={colors.midnight} />
+                  <Text style={styles.debugCardTitle}>Attribution</Text>
+                </View>
+                <Text style={styles.debugCardDesc}>Web Pillar attribution signals returned by the Moments API for this visitor.</Text>
+
+                {aggregateItems.length > 0 && (
+                  <>
+                    <Text style={styles.debugLabel}>WEB PILLAR - INPUT DATA - AGGREGATE</Text>
+                    <View style={styles.attrPillRow}>
+                      {aggregateItems.map((item, i) => (
+                        <View key={i} style={styles.attrPill}>
+                          <Text style={styles.attrPillText}>{item}</Text>
+                        </View>
+                      ))}
+                    </View>
+                  </>
+                )}
+
+                {metrics.length > 0 && (
+                  <>
+                    <Text style={styles.debugLabel}>WEB PILLAR METRICS</Text>
+                    <View style={styles.attrPillRow}>
+                      {metrics.map(([label, value]) => (
+                        <View key={label} style={styles.attrMetricPill}>
+                          <Text style={styles.attrMetricPillLabel}>{label}</Text>
+                          <Text style={styles.attrMetricPillValue}>{value}</Text>
+                        </View>
+                      ))}
+                    </View>
+                  </>
+                )}
+              </View>
+            );
+          })()}
+
+          {/* Mobile Settings Section */}
+          <View style={styles.debugCard}>
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+              <SettingsIcon size={18} color={colors.midnight} />
+              <Text style={styles.debugCardTitle}>Mobile Settings</Text>
+            </View>
+            <Text style={styles.debugCardDesc}>Fetch and inspect the remote Tealium prism settings JSON hosted for this profile.</Text>
+
+            <TouchableOpacity
+              style={[styles.debugBtn, styles.debugBtnPrimary, mobileSettingsLoading && styles.debugBtnDisabled]}
+              onPress={handleQueryMobileSettings}
+              disabled={mobileSettingsLoading}
+              activeOpacity={0.8}
+            >
+              {mobileSettingsLoading
+                ? <ActivityIndicator size="small" color="#fff" />
+                : <Text style={styles.debugBtnText}>Query Mobile JSON Settings</Text>
+              }
+            </TouchableOpacity>
+
+            {mobileSettingsData && (
+              <View style={styles.debugResponseWrap}>
+                <Text style={styles.debugLabel}>RESPONSE</Text>
+                <Text style={styles.debugMono}>{JSON.stringify(mobileSettingsData, null, 2)}</Text>
+              </View>
+            )}
+          </View>
+
           <View style={{ height: 40 }} />
         </ScrollView>
       )}
@@ -1682,6 +1779,21 @@ const styles = StyleSheet.create({
     padding: spacing.sm, lineHeight: 16,
   },
   debugResponseWrap: { marginTop: spacing.sm, gap: spacing.xs },
+  attrPillRow: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm },
+  attrPill: {
+    backgroundColor: colors.tealLight, borderRadius: radius.full,
+    paddingHorizontal: spacing.md, paddingVertical: 6,
+    borderWidth: 1, borderColor: colors.tealMid,
+  },
+  attrPillText: { fontSize: 11, fontFamily: fonts.semibold, color: colors.midnight },
+  attrMetricPill: {
+    backgroundColor: colors.surfaceAlt, borderRadius: radius.md,
+    paddingHorizontal: spacing.md, paddingVertical: spacing.sm,
+    borderWidth: 1, borderColor: colors.borderLight, alignItems: 'center',
+    minWidth: 90,
+  },
+  attrMetricPillLabel: { fontSize: 8, fontFamily: fonts.bold, color: colors.textMuted, textTransform: 'uppercase', letterSpacing: 0.5, textAlign: 'center' },
+  attrMetricPillValue: { fontSize: 15, fontFamily: fonts.bold, color: colors.midnight, marginTop: 2 },
 
   // ── We Missed You Modal ──
   missedYouOverlay: {

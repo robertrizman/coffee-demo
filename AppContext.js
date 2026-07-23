@@ -8,7 +8,7 @@ import { printOrderReceipt } from './printing';
 import { AppState } from 'react-native';
 import { loadDefaultPrinter, loadAutoPrint, loadBluetoothPrinter } from './printerConfig';
 import { warmupBluetoothConnection } from './brotherPrinter';
-import { setDeviceIdForMoments, setEmailForMoments, onPrismDeviceIdReady, getCanonicalDeviceId } from './tealium';
+import { setDeviceIdForMoments, setEmailForMoments, setUserDataLayer, onPrismDeviceIdReady, getCanonicalDeviceId } from './tealium';
 import { loadPairingRules } from './recommendations';
 import { setOpenAIKey } from './foodPairingAI';
 
@@ -56,6 +56,8 @@ const initialState = {
   profileLoaded: false,
   storeOpen: true,
   offersEnabled: true,
+  aiOfferEnabled: true,
+  eduOfferEnabled: true,
   agendaEnabled: false,
   funZoneEnabled: true,
   closedTitle: 'Back Soon!',
@@ -129,6 +131,8 @@ function reducer(state, action) {
         closedTitle: action.payload.closed_title ?? state.closedTitle,
         closedMessage: action.payload.closed_message ?? state.closedMessage,
         offersEnabled: action.payload.offers_enabled ?? state.offersEnabled,
+        aiOfferEnabled: action.payload.ai_offer_enabled ?? state.aiOfferEnabled,
+        eduOfferEnabled: action.payload.edu_offer_enabled ?? state.eduOfferEnabled,
         agendaEnabled: action.payload.agenda_enabled ?? state.agendaEnabled,
         funZoneEnabled: action.payload.fun_zone_enabled ?? state.funZoneEnabled,
       };
@@ -409,6 +413,7 @@ export function AppProvider({ children }) {
     loadProfile().then((profile) => {
       dispatch({ type: 'SET_PROFILE', payload: profile });
       if (profile?.email) setEmailForMoments(profile.email);
+      if (profile?.email || profile?.name) setUserDataLayer(profile);
     });
 
     supabase.from('menu_config').select('*')
@@ -529,7 +534,7 @@ export function AppProvider({ children }) {
     const appStateSub = AppState.addEventListener('change', async (nextState) => {
       if (nextState === 'active') {
         // Refetch orders and store config
-        supabase.from('orders').select('*').order('placed_at', { ascending: false }).limit(50)
+        supabase.from('orders').select('*').order('placed_at', { ascending: false }).limit(1000)
           .then(({ data }) => {
             if (data) dispatch({ type: 'LOAD_ORDERS', payload: data.map(rowToOrder) });
           });

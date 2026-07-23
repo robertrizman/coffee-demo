@@ -23,7 +23,7 @@ export default function ItemDetailScreen() {
   const isTea = item.category === 'Tea';
   const isIcedCold = item.category === 'Iced & Cold';
   const isJuice = (item.name || '').toLowerCase().includes('juice');
-  const isNoMilkOnly = ['long-black', 'iced-long-black', 'americano', 'iced-americano'].includes(item.id) || isJuice;
+  const isNoMilkOnly = ['espresso', 'double-espresso', 'long-black', 'iced-long-black', 'americano', 'iced-americano'].includes(item.id) || isJuice;
   const isNoMilkDefault = isTea || isNoMilkOnly;
   const isIcedMilkDrink = isIcedCold && !isNoMilkDefault;
 
