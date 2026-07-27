@@ -516,7 +516,10 @@ export default function MenuScreen() {
                     {catFoodItems.map((item, i) => (
                       <View key={item.id || i} style={styles.foodCard}>
                         <View style={styles.foodIconWrap}>
-                          {IconComp && <IconComp size={22} color={colors.primary} />}
+                          {item.image_url
+                            ? <Image source={{ uri: item.image_url }} style={styles.foodItemImage} resizeMode="cover" />
+                            : (IconComp && <IconComp size={22} color={colors.primary} />)
+                          }
                         </View>
                         <View style={{ flex: 1 }}>
                           <Text style={styles.cardName}>{item.name}</Text>
@@ -540,9 +543,11 @@ export default function MenuScreen() {
                 catItems.map((item) => (
                   <TouchableOpacity key={item.id} style={styles.card} onPress={() => handleItemPress(item)} activeOpacity={0.75}>
                     <View style={styles.iconCircle}>
-                      {DRINK_IMAGES[item.id]
-                        ? <Image source={DRINK_IMAGES[item.id]} style={styles.cardCatImage} resizeMode="contain" />
-                        : <IconComp size={28} color={colors.primary} />
+                      {item.image_url
+                        ? <Image source={{ uri: item.image_url }} style={styles.cardCatImage} resizeMode="cover" />
+                        : DRINK_IMAGES[item.id]
+                          ? <Image source={DRINK_IMAGES[item.id]} style={styles.cardCatImage} resizeMode="contain" />
+                          : <IconComp size={28} color={colors.primary} />
                       }
                     </View>
                     <View style={styles.cardText}>
@@ -905,7 +910,8 @@ const styles = StyleSheet.create({
   foodBanner: { backgroundColor: colors.tealLight, borderRadius: radius.md, padding: spacing.md, borderWidth: 1, borderColor: colors.tealMid },
   foodBannerText: { fontSize: 12, fontFamily: fonts.semibold, color: colors.primary },
   foodCard: { flexDirection: 'row', alignItems: 'center', backgroundColor: colors.surface, borderRadius: radius.lg, padding: spacing.md, borderWidth: 1, borderColor: colors.borderLight },
-  foodIconWrap: { width: 40, height: 40, borderRadius: radius.md, backgroundColor: colors.tealLight, alignItems: 'center', justifyContent: 'center', marginRight: spacing.md },
+  foodIconWrap: { width: 40, height: 40, borderRadius: radius.md, backgroundColor: colors.tealLight, alignItems: 'center', justifyContent: 'center', marginRight: spacing.md, overflow: 'hidden' },
+  foodItemImage: { width: 40, height: 40, borderRadius: radius.md },
   foodDisclaimer: {
     backgroundColor: colors.surfaceAlt,
     borderRadius: radius.md,

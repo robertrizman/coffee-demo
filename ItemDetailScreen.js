@@ -141,9 +141,11 @@ export default function ItemDetailScreen() {
                 ))}
               </View>
             </View>
-            {DRINK_IMAGES[item.id] && (
+            {item.image_url ? (
+              <Image source={{ uri: item.image_url }} style={styles.categoryImg} resizeMode="cover" />
+            ) : DRINK_IMAGES[item.id] ? (
               <Image source={DRINK_IMAGES[item.id]} style={styles.categoryImg} resizeMode="contain" />
-            )}
+            ) : null}
           </View>
         )}
 

@@ -291,7 +291,7 @@ function reducer(state, action) {
         if (row.is_custom) {
           const cat = row.category || 'Specialty';
           if (!customItems[cat]) customItems[cat] = [];
-          customItems[cat].push({ id: row.id, name: row.name, description: row.description || '', category: cat });
+          customItems[cat].push({ id: row.id, name: row.name, description: row.description || '', category: cat, image_url: row.image_url || null });
         }
       });
 
