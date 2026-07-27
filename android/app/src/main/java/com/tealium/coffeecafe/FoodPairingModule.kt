@@ -4,6 +4,8 @@ import android.os.Build
 import com.facebook.react.bridge.*
 import com.google.mediapipe.tasks.genai.llminference.LlmInference
 import com.google.mediapipe.tasks.genai.llminference.LlmInference.LlmInferenceOptions
+import com.google.mediapipe.tasks.genai.llminference.LlmInferenceSession
+import com.google.mediapipe.tasks.genai.llminference.LlmInferenceSession.LlmInferenceSessionOptions
 import org.json.JSONArray
 import org.json.JSONObject
 
@@ -73,9 +75,6 @@ class FoodPairingModule(reactContext: ReactApplicationContext) :
             val options = LlmInferenceOptions.builder()
                 .setModelPath("/data/local/tmp/llm/gemma2b-it-gpu-int8.bin")
                 .setMaxTokens(256)
-                .setTopK(40)
-                .setTemperature(0.7f)
-                .setRandomSeed(42)
                 .build()
 
             llmInference = LlmInference.createFromOptions(reactApplicationContext, options)
@@ -84,6 +83,25 @@ class FoodPairingModule(reactContext: ReactApplicationContext) :
         } catch (e: Exception) {
             println("[FoodPairing] ℹ️ Gemini Nano not available (${e.message}) — using Random Forest")
             geminiAvailable = false
+        }
+    }
+
+    /**
+     * topK/temperature/randomSeed moved from the engine-level LlmInferenceOptions (pre-0.10.25)
+     * to a per-session LlmInferenceSessionOptions in newer MediaPipe releases. A fresh,
+     * single-query session per call reproduces the old stateless generateResponse(prompt)
+     * behaviour exactly, with the same sampling config applied every time.
+     */
+    private fun runGeneration(prompt: String): String {
+        val llm = llmInference ?: throw Exception("Gemini Nano not available")
+        val sessionOptions = LlmInferenceSessionOptions.builder()
+            .setTopK(40)
+            .setTemperature(0.7f)
+            .setRandomSeed(42)
+            .build()
+        LlmInferenceSession.createFromOptions(llm, sessionOptions).use { session ->
+            session.addQueryChunk(prompt)
+            return session.generateResponse()
         }
     }
 
@@ -162,7 +180,7 @@ class FoodPairingModule(reactContext: ReactApplicationContext) :
         dayOfWeek: String,
         menuItems: String
     ): WritableMap {
-        val llm = llmInference ?: throw Exception("Gemini Nano not available")
+        if (llmInference == null) throw Exception("Gemini Nano not available")
 
         val prompt = """<start_of_turn>user
 You are a barista at a specialty coffee cart. Recommend 2 food items that pair well with the customer's coffee order.
@@ -181,7 +199,7 @@ Reply ONLY with a valid JSON object, no explanation, no markdown:
 <start_of_turn>model
 """.trimIndent()
 
-        val response = llm.generateResponse(prompt)
+        val response = runGeneration(prompt)
 
         // Extract JSON from response
         val jsonStart = response.indexOf('{')
@@ -246,7 +264,6 @@ Reply ONLY with a valid JSON object, no explanation, no markdown:
         }
         Thread {
             try {
-                val llm = llmInference!!
                 val prompt = """<start_of_turn>user
 You are a friendly café health assistant. Based on this customer's recent café order history, estimate their total kilojoule (kJ) intake from these orders and provide a short, warm, non-judgmental insight about their café habits.
 
@@ -263,7 +280,7 @@ Reply ONLY with a valid JSON object, no markdown:
 <start_of_turn>model
 """.trimIndent()
 
-                val response = llm.generateResponse(prompt)
+                val response = runGeneration(prompt)
                 val jsonStart = response.indexOf('{')
                 val jsonEnd = response.lastIndexOf('}')
                 if (jsonStart == -1 || jsonEnd == -1) {

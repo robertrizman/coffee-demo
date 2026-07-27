@@ -113,7 +113,8 @@ dependencies {
     implementation("com.tealium.prism:prism-moments-api")
 
     // MediaPipe LLM Inference (Gemini Nano — Pixel 8+, Samsung S24+/S25+/Z Fold6+/Z Flip6, Motorola Razr 50 Ultra/Edge 50 Ultra, Xiaomi 14T/MIX Flip, Realme GT 6; fails silently on unsupported devices)
-    implementation("com.google.mediapipe:tasks-genai:0.10.14")
+    // 0.10.25 is the first release with 16KB-page-aligned native libs (below that, libllm_inference_engine_jni.so is 4KB-aligned and flagged by Play Console).
+    implementation("com.google.mediapipe:tasks-genai:0.10.25")
 
     // ML Kit Image Labeling — on-device object classification via NNAPI (NPU/DSP on Snapdragon, Tensor, Dimensity)
     implementation("com.google.mlkit:image-labeling:17.0.9")
