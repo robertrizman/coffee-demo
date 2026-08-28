@@ -20,12 +20,40 @@ export default function PushBroadcastScreen({ onBack }) {
   const [locations, setLocations] = useState([]);
   const [selectedLocationId, setSelectedLocationId] = useState(null);
   const [locationPickerVisible, setLocationPickerVisible] = useState(false);
+  const [orderPushEnabled, setOrderPushEnabled] = useState(true);
+  const [togglingOrderPush, setTogglingOrderPush] = useState(false);
   const scrollRef = useRef(null);
 
   useEffect(() => {
     loadBroadcasts();
     loadLocations();
+    loadOrderPushEnabled();
   }, []);
+
+  const loadOrderPushEnabled = async () => {
+    const { data } = await supabase
+      .from('menu_config')
+      .select('description')
+      .eq('category', '_config')
+      .eq('name', 'order_push_enabled')
+      .maybeSingle();
+    // Absent row => enabled. Only the literal string 'false' disables.
+    setOrderPushEnabled(data?.description !== 'false');
+  };
+
+  const handleToggleOrderPush = async (value) => {
+    setOrderPushEnabled(value); // optimistic
+    setTogglingOrderPush(true);
+    const { error } = await supabase.from('menu_config').upsert(
+      { category: '_config', name: 'order_push_enabled', description: String(value) },
+      { onConflict: 'category,name' }
+    );
+    setTogglingOrderPush(false);
+    if (error) {
+      setOrderPushEnabled(!value); // revert
+      Alert.alert('Error', `Could not update the toggle.\n\n${error.message}`);
+    }
+  };
 
   const loadLocations = async () => {
     const { data } = await supabase
@@ -156,6 +184,36 @@ export default function PushBroadcastScreen({ onBack }) {
   return (
     <>
     <ScrollView ref={scrollRef} style={styles.container} contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
+
+      {/* Order-ready push toggle */}
+      <View style={styles.card}>
+        <Text style={styles.cardTitle}>🔔 Order-Ready Notifications</Text>
+        <View style={[styles.toggleRow, { borderTopWidth: 0, marginTop: 0, paddingTop: 0 }]}>
+          <View style={{ flex: 1, paddingRight: spacing.md }}>
+            <Text style={styles.toggleLabel}>{orderPushEnabled ? 'Enabled' : 'Disabled'}</Text>
+            <Text style={styles.toggleSub}>
+              Automatic order-ready push sent to a customer when their order is completed. Broadcasts below are not affected.
+            </Text>
+          </View>
+          {togglingOrderPush
+            ? <ActivityIndicator color={colors.primary} />
+            : (
+              <Switch
+                value={orderPushEnabled}
+                onValueChange={handleToggleOrderPush}
+                trackColor={{ false: '#e0e0e0', true: colors.primary }}
+                thumbColor="#fff"
+              />
+            )}
+        </View>
+        {!orderPushEnabled && (
+          <View style={styles.pushOffBanner}>
+            <Text style={styles.pushOffBannerText}>
+              ⚠️ Order-ready push is off — customers will not be notified when their order is complete. Broadcasts still send.
+            </Text>
+          </View>
+        )}
+      </View>
 
       {/* Compose */}
       <View style={styles.card}>
@@ -415,6 +473,12 @@ const styles = StyleSheet.create({
   },
   toggleLabel: { fontSize: 14, fontFamily: fonts.semibold, color: colors.textDark },
   toggleSub: { fontSize: 11, color: colors.textMuted },
+  pushOffBanner: {
+    backgroundColor: '#fef3c7', borderRadius: radius.md,
+    padding: spacing.sm, marginTop: spacing.sm,
+    borderWidth: 1, borderColor: '#fde68a',
+  },
+  pushOffBannerText: { fontSize: 11, fontFamily: fonts.semibold, color: '#92400e', lineHeight: 16 },
   scheduleRow: { flexDirection: 'row', gap: spacing.sm },
   scheduleField: { flex: 1 },
   sendBtn: {

@@ -7,6 +7,20 @@ const TEALIUM_ACCOUNT = 'success-robert-rizman';
 const TEALIUM_PROFILE = 'coffee-demo';
 const TEALIUM_DATASOURCE = '945h52';
 
+// Barista-controlled toggle for ORDER-READY push only (menu_config row
+// category='_config', name='order_push_enabled'). Does NOT affect broadcasts.
+// Absent row => enabled. Only the literal string 'false' disables. Any error => fail open (enabled).
+async function isOrderPushEnabled(supabase: any): Promise<boolean> {
+  try {
+    const { data } = await supabase
+      .from('menu_config').select('description')
+      .eq('category', '_config').eq('name', 'order_push_enabled').maybeSingle();
+    return data?.description !== 'false';
+  } catch (_e) {
+    return true;
+  }
+}
+
 serve(async (req) => {
   const url = new URL(req.url);
   const orderId = url.searchParams.get('order_id');
@@ -83,8 +97,12 @@ serve(async (req) => {
       console.error('[EdgeFn] Tealium collect error:', e.message);
     }
 
-    // Send push notification (ONLY on first completion)
-    if (deviceId) {
+    // Send push notification (ONLY on first completion, and only if order-ready push is enabled)
+    const orderPushEnabled = await isOrderPushEnabled(supabase);
+    if (!orderPushEnabled) {
+      console.log('[EdgeFn] Order-ready push is OFF — skipping notification for', orderId);
+    }
+    if (deviceId && orderPushEnabled) {
       const { data: tokenRow } = await supabase
         .from('push_tokens').select('push_token').eq('device_id', deviceId).single();
 
@@ -118,7 +136,10 @@ serve(async (req) => {
     console.log('[EdgeFn] Order completed more than 5s ago, skipping push notification');
   }
 
-  const message = shouldSkip ? 'Already completed.' : 'Order processed.';
+  // Simple text response
+  const message = shouldSkip
+    ? `Order ${orderId} was already scanned by the Barista, thanks for trying!`
+    : `Order ${orderId} is now ready! Push notification sent to ${customerName}.`;
 
   return new Response(message, {
     status: 200,

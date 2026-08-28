@@ -5,9 +5,19 @@ const SUPABASE_URL = Deno.env.get('SUPABASE_URL')!;
 const SERVICE_ROLE_KEY = Deno.env.get('SERVICE_ROLE_KEY')!;
 
 async function sendBroadcast(supabase: any, broadcast: any): Promise<number> {
-  const { data: tokens } = await supabase
-    .from('push_tokens')
-    .select('push_token, platform');
+  // Location targeting: when the broadcast has an arc_location_id, send only to
+  // devices whose customer picked that location. A null arc_location_id means
+  // "All locations" → send to every registered device. Devices with no location
+  // (arc_location_id null) are excluded from location-targeted broadcasts.
+  let query = supabase.from('push_tokens').select('push_token, platform');
+  if (broadcast.arc_location_id) {
+    query = query.eq('arc_location_id', broadcast.arc_location_id);
+  }
+  const { data: tokens } = await query;
+
+  console.log(
+    `[Broadcast] ${broadcast.id} target=${broadcast.arc_location_id ?? 'ALL'} recipients=${tokens?.length ?? 0}`,
+  );
 
   if (!tokens?.length) {
     await supabase.from('push_broadcasts')

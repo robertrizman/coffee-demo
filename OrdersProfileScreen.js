@@ -477,8 +477,8 @@ export default function OrdersProfileScreen() {
   var locs = ${locationsJson};
   var selId = ${JSON.stringify(selId)};
   var map = L.map('map', { zoomControl: true, attributionControl: false });
-  L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png', {
-    maxZoom: 20, subdomains: 'abcd',
+  L.tileLayer('https://basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png?key=cb1_29bd_1_afff587b694c635a20cf6220', {
+    maxZoom: 20,
   }).addTo(map);
 
   var bounds = [];

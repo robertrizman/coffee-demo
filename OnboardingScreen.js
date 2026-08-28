@@ -10,6 +10,7 @@ import { Video, ResizeMode } from 'expo-av';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { saveProfile } from './userProfile';
+import { registerPushToken } from './push';
 import { supabase } from './supabase';
 import { colors, typography, spacing, radius, fonts } from './theme';
 import { UserIcon, EmailIcon } from './CoffeeIcons';
@@ -211,9 +212,8 @@ export default function OnboardingScreen({ onComplete }) {
 
   var map = L.map('map', { zoomControl: true, attributionControl: false });
 
-  L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png', {
+  L.tileLayer('https://basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png?key=cb1_29bd_1_afff587b694c635a20cf6220', {
     maxZoom: 20,
-    subdomains: 'abcd',
   }).addTo(map);
 
   var bounds = [];
@@ -490,6 +490,10 @@ export default function OnboardingScreen({ onComplete }) {
     setSaving(false);
     trackCustomerRegistration(profile);
     onComplete(profile);
+    // Associate the chosen location with this device's push token (no-op if
+    // push permission hasn't been granted yet — it will be picked up on the
+    // first order opt-in or the My Account toggle).
+    registerPushToken(profile.arc_location_id || null).catch(() => {});
   };
 
   const openPrivacyPolicy = () => {
